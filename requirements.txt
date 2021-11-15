@@ -1,3 +1,4 @@
 torch==1.9.0
 torchtyping==0.1.4
+einops==0.3.2
 numpy==1.16.2

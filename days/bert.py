@@ -8,7 +8,7 @@ from torchtyping import TensorType, patch_typeguard
 
 def softmax(tensor: t.Tensor, dim: int = 0):
     exps = math.e ** tensor
-    exp_sums = exps.sum(dim=dim)
+    exp_sums = exps.sum(dim=dim, keepdim=True)
     result = exps / exp_sums
     return result
 
@@ -23,25 +23,27 @@ def gelu(x):
 
 
 # TODO: figure out what this should actually be
-def normalize(tensor: t.Tensor, ndims: int = 2):
-    mean = tensor
-    variance = tensor
-    for dim in ndims:
-        mean = mean.mean(-1)
-        variance = tensor.variance(-1)
-    tensor = tensor / variance + mean
+def normalize(tensor: t.Tensor, dim: int = -1, eps=1e-12):
+    norm = t.norm(tensor, dim=dim, keepdim=True)
+    norm[norm < eps] = eps
+    tensor = tensor / norm
     return tensor
 
 
 class LayerNorm(Module):
-    def __init__(self, shape, normalize_dims, eps=1e-05):
-        self.bias = Parameter(t.empty(shape))
+    def __init__(self, shape, eps=1e-05):
+        super(LayerNorm, self).__init__()
+        self.bias = Parameter(t.zeros(shape))
         self.weight = Parameter(t.ones(shape))
         self.eps = eps
-        self.normalize_dims = normalize_dims
+        # indexes to normalize over
+        self.idx_list = [-i - 1 for i, _ in enumerate(shape)]
 
     def forward(self, tensor):
-        tensor = normalize(tensor, self.normalize_dims)
+        tensor = (tensor - tensor.mean(*self.idx_list, keepdim=True)) / t.sqrt(
+            tensor.var(*self.idx_list, keepdim=True) + self.eps
+        )
+        print("shapes", tensor.shape, self.weight.shape, self.bias.shape)
         tensor = tensor * self.weight + self.bias
         return tensor
 
@@ -61,28 +63,30 @@ class Dropout(Module):
 class Linear(Module):
     def __init__(self, x, y):
         super(Linear, self).__init__()
-        weight_bound = 1 / t.sqrt(x)
-        self.weight = Parameter(t.random.uniform(-weight_bound, weight_bound, (x, y)))
-        bias_bound = 1 / math.sqrt(y)
-        self.bias = Parameter(t.random.uniform(-bias_bound, bias_bound, (y,)))
+        weight_bound = 1 / np.sqrt(x)
+        self.weight = Parameter(t.FloatTensor(x, y).uniform_(-weight_bound, weight_bound))
+        bias_bound = 1 / np.sqrt(y)
+        self.bias = Parameter(t.FloatTensor(y).uniform_(-bias_bound, bias_bound))
 
     def forward(self, x: TensorType[..., "channels"]) -> TensorType[..., "channels"]:
-        return t.einsum("ij,jk->ik", x, self.weight) + self.bias
+        return t.matmul(x, self.weight) + self.bias
 
 
 class Embedding(Module):
     def __init__(self, vocab_size: int, embedding_size: int):
+        super(Embedding, self).__init__()
         # this needs to be initialized as a bunch of normalized vector,
         # as opposed to a linear layer, which is initialized to _produce_ normalized vectors
-        self.embedding = Parameter(t.random.normal(0, 1, (vocab_size, embedding_size)))
+        self.embedding = Parameter(t.FloatTensor(vocab_size, embedding_size).normal_(0, 1))
 
         # then zero out padding tokens and/or whatever
+        self.unembed_layer_norm = LayerNorm((embedding_size,))
 
     def embed(self, x: TensorType[..., t.long]):
         return self.embedding[x]
 
     def unembed(self, x: TensorType["...", "embed_dim"]):
-        return t.einsum("ij,kj->ik", x, self.embedding)
+        return t.einsum("...j,kj->...k", self.unembed_layer_norm(x), self.embedding)
 
 
 class NormedResidualLayer(Module):
@@ -92,7 +96,34 @@ class NormedResidualLayer(Module):
         self.layer_norm = LayerNorm((size,))
 
     def forward(self, input):
-        return self.layer_norm(input + self.mlp(input))
+        return self.layer_norm(input + relu(self.mlp(input)))
+
+
+def multi_head_self_attention(
+    token_activations,
+    attention_masks,
+    num_heads,
+    project_query,
+    project_key,
+    project_value,
+):
+    query = t.einsum("...j,jk->...k", token_activations, project_query)
+    query = t.stack(t.split(query, num_heads, dim=-1), dim=0)
+
+    key = t.einsum("...j,jk->...k", token_activations, project_key)
+    key = t.stack(t.split(key, num_heads, dim=-1), dim=0)
+
+    value = t.einsum("...j,jk->...k", token_activations, project_value)
+    value = t.stack(t.split(value, num_heads, dim=-1), dim=0)
+
+    attention_raw = t.einsum("hbsc,hbsc->hbs", query, key) / math.sqrt(token_activations.shape[-1] / num_heads)
+    if attention_masks:
+        attention_raw = attention_raw * attention_masks
+    attention_patterns = softmax(attention_raw)
+
+    attention_values = t.einsum("hbs,hbsc->hbsc", attention_patterns, value)
+    output = token_activations + t.cat(t.split(attention_values, num_heads, dim=0), dim=-1)
+    return output
 
 
 class SelfAttentionLayer(Module):
@@ -109,24 +140,17 @@ class SelfAttentionLayer(Module):
         self.project_value = Linear(hidden_size, hidden_size)
         self.layer_norm = LayerNorm((hidden_size,))
 
-    def forward(self, token_activations, attention_masks):
-        query = t.einsum("ij,jk->ik", token_activations, self.project_query)
-        query = t.stack(t.split(query, self.num_heads, dim=-1), dim=0)
-
-        key = t.einsum("ij,jk->ik", token_activations, self.project_key)
-        key = t.stack(t.split(key, self.num_heads, dim=-1), dim=0)
-
-        value = t.einsum("ij,jk->ik", token_activations, self.project_value)
-        value = t.stack(t.split(value, self.num_heads, dim=-1), dim=0)
-
-        attention_raw = t.einsum("hbsc,hbsc->hbs", query, key) / math.sqrt(self.head_size)
-
-        attention_masked = attention_raw * attention_masks
-        attention_patterns = softmax(attention_masked)
-
-        attention_values = t.einsum("hbs,hbsc->hbsc", attention_patterns, value)
-        output = token_activations + t.cat(t.split(attention_values, dim=0), dim=-1)
-        return output
+    def forward(self, token_activations, attention_masks=None):
+        # should this function include layer norm?
+        return self.layer_norm(
+            multi_head_self_attention(
+                token_activations,
+                attention_masks,
+                self.project_query,
+                self.project_key,
+                self.project_value,
+            )
+        )
 
 
 class BidirectionalTransformerLayer(Module):
@@ -171,4 +195,6 @@ class Bert(Module):
 
 
 def bert_from_pytorch_save(file_path):
+    import transformers
+
     pass
