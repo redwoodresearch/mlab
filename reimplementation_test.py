@@ -2,6 +2,7 @@ import days.bert as bert
 import torch
 import torch as t
 import inspect
+import typing
 from pythonfuzz.main import PythonFuzz
 
 
@@ -9,28 +10,29 @@ def getmembers(module):
     return inspect.getmembers(module, lambda x: inspect.isfunction(x) or inspect.isclass(x))
 
 
-def get_fn_of_shape(shape):
+def tensor_of_spec_shape(shape):
     return t.random.uniform(-1, 1, shape)
 
 
-def test_reimplementation_module(target, references):
-    target_exported = {k: v for k, v in getmembers(target)}
-    references_exported = {pair[0]: pair[1] for module in references for pair in getmembers(module)}
+def test_reimplementation_module(target_module, reference_modules, pairs=[]):
+    target_exported = {k: v for k, v in getmembers(target_module)}
+    references_exported = {pair[0]: pair[1] for module in reference_modules for pair in getmembers(module)}
     for k, target in target_exported.items():
-        if k in references_exported:
-            print("matching key", k)
+        # exclude transitive members from other files :)))
+        if k in references_exported and inspect.getsourcefile(target) == inspect.getsourcefile(target_module):
             reference = references_exported[k]
-            if inspect.isfunction(target):
+            pairs.append(target, reference)
+    print("pairs are", pairs)
+    for target, reference in pairs:
+        if inspect.isfunction(target):
+            type_hints = typing.get_type_hints(target)
+            print("type hints", type_hints)
+            target_argspec = inspect.signature(target)
+            print("argspec", target_argspec)
 
-                @PythonFuzz
-                def fuzzTheseTwo():
-                    pass
-
-                fuzzTheseTwo()
-            elif inspect.isclass(target):
-                print("cant test classes yet")
-    print(target_exported)
+        elif inspect.isclass(target):
+            print("cant test classes yet")
 
 
 if __name__ == "__main__":
-    test_reimplementation_module(bert, [torch, torch.nn])
+    test_reimplementation_module(bert, [torch, torch.nn, torch.nn.functional])

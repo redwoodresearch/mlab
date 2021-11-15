@@ -1,11 +1,12 @@
 from typing import *
 import torch as t
+import numpy as np
 from torch.nn import Module, Parameter, Sequential
 import math
 from torchtyping import TensorType, patch_typeguard
 
 
-def softmax(tensor, dim=0):
+def softmax(tensor: t.Tensor, dim: int = 0):
     exps = math.e ** tensor
     exp_sums = exps.sum(dim=dim)
     result = exps / exp_sums
@@ -17,8 +18,12 @@ def relu(tensor: t.Tensor) -> t.Tensor:
     return tensor
 
 
+def gelu(x):
+    return 0.5 * x * (1 + t.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * t.pow(x, 3))))
+
+
 # TODO: figure out what this should actually be
-def normalize(tensor, ndims=2):
+def normalize(tensor: t.Tensor, ndims: int = 2):
     mean = tensor
     variance = tensor
     for dim in ndims:
