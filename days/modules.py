@@ -17,6 +17,7 @@ def relu(tensor: t.Tensor) -> t.Tensor:
     return tensor
 
 
+# gelu from openai github, not the same as torch's
 def gelu(x):
     return 0.5 * x * (1 + t.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * t.pow(x, 3))))
 

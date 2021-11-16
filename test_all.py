@@ -7,6 +7,7 @@ from transformers.utils.dummy_sentencepiece_objects import PegasusTokenizer
 import days.bert as bert
 import pytest
 import transformers
+from utils import tpeek, tstat
 
 
 def setmyexcepthook():
@@ -30,16 +31,6 @@ setmyexcepthook()
 
 MAX_TOLERANCE = 5e-3
 AVG_TOLERANCE = 1e-4
-
-
-def tpeek(name, tensor):
-    print(
-        f"{name} mean {'{0:.4g}'.format(t.mean(tensor).item())} var {'{0:.4g}'.format(t.var(tensor).item())} vals {' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}"
-    )
-
-
-def tstat(name, tensor):
-    print(name, "mean", "{0:.4g}".format(t.mean(tensor).item()), "var", "{0:.4g}".format(t.var(tensor).item()))
 
 
 def init_both(my_class, their_class, *args, **kwargs):
@@ -155,20 +146,37 @@ def test_bert():
 
     embedding_inputs = my_embedded
 
-    my_encoded = my_bert.transformer[0].attention(embedding_inputs)
-    their_encoded = their_bert.encoder.layer[0].attention(embedding_inputs)[0]
-    tpeek("my attention", my_encoded)
-    tpeek("their attention", their_encoded)
+    my_encoded = my_bert.transformer[0].attention.layer_norm(embedding_inputs)
+    their_encoded = their_bert.encoder.layer[0].attention.output.LayerNorm(embedding_inputs)
+    tpeek("my layer norm", my_encoded)
+    tpeek("their layer norm", their_encoded)
+    print()
 
-    my_encoded = my_bert.transformer[0](embedding_inputs)
-    their_encoded = their_bert.encoder.layer[0](embedding_inputs)[0]
-    tpeek("my encoded", my_encoded)
-    tpeek("their encoded", their_encoded)
+    my_encoded = my_bert.transformer[0].attention.attention(embedding_inputs)
+    their_encoded = their_bert.encoder.layer[0].attention.self(embedding_inputs)[0]
+    tpeek("my pure attention", my_encoded)
+    tpeek("their pure attention", their_encoded)
+    print()
 
-    my_encoded = my_bert.transformer(embedding_inputs)
-    their_encoded = their_bert.encoder(embedding_inputs).last_hidden_state
-    tpeek("my encoded", my_encoded)
-    tpeek("their encoded", their_encoded)
+    # my_encoded = my_bert.transformer[0].attention(embedding_inputs)
+    # their_encoded = their_bert.encoder.layer[0].attention(embedding_inputs)[0]
+    # tpeek("my attention", my_encoded)
+    # tpeek("their attention", their_encoded)
+    # print()
+
+    # my_encoded = my_bert.transformer[0](embedding_inputs)
+    # their_encoded = their_bert.encoder.layer[0](
+    #     embedding_inputs[:, :, :100],
+    # )[0]
+    # tpeek("my encoded", my_encoded)
+    # tpeek("their encoded", their_encoded)
+    # print()
+
+    # my_encoded = my_bert.transformer(embedding_inputs)
+    # their_encoded = their_bert.encoder(embedding_inputs).last_hidden_state
+    # tpeek("my encoded", my_encoded)
+    # tpeek("their encoded", their_encoded)
+    # print()
 
 
 if __name__ == "__main__":

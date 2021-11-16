@@ -1,15 +1,15 @@
 import torch as t
 import numpy as np
 from torch.nn import Module, Parameter, Sequential
-import math
 
 from torch.nn import Linear, LayerNorm, Embedding, Dropout
 from torch.nn.functional import softmax, gelu
 
 # from days.modules import softmax, gelu, Linear, LayerNorm, Embedding, Dropout
 
-from torchtyping import TensorType, patch_typeguard
+from torchtyping import TensorType
 from einops import rearrange
+from utils import tpeek, tstat
 
 
 class BertEmbedding(Module):
@@ -39,7 +39,7 @@ class BertEmbedding(Module):
         return embeddings
 
     def unembed(self, embeddings: TensorType["...", "embed_dim"]):
-        return self.unembed_layer_norm(t.einsum("ijk,kl->ijl", embeddings, self.token_embedding.weight))
+        return self.unembed_layer_norm(t.einsum("ijk,lk->ijl", embeddings, self.token_embedding.weight))
 
 
 class NormedResidualLayer(Module):
@@ -59,31 +59,35 @@ class NormedResidualLayer(Module):
 
 
 def multi_head_self_attention(
-    token_activations, attention_masks, num_heads, project_query, project_key, project_value, mlp
+    token_activations, attention_masks, num_heads, project_query, project_key, project_value, dropout
 ):
-    head_size = token_activations.shape[-1] / num_heads
+    head_size = token_activations.shape[-1] // num_heads
+
     query = project_query(token_activations)
-    query = t.stack(t.split(query, num_heads, dim=-1), dim=0)
+    query = rearrange(query, "b s (h c) -> h b s c", h=num_heads)
 
     key = project_key(token_activations)
-    key = t.stack(t.split(key, num_heads, dim=-1), dim=0)
+    key = rearrange(key, "b s (h c) -> h b s c", h=num_heads)
 
     value = project_value(token_activations)
-    value = t.stack(t.split(value, num_heads, dim=-1), dim=0)
+    value = rearrange(value, "b s (h c) -> h b s c", h=num_heads)
 
-    attention_raw = t.einsum("hbsc,hbsc->hbs", query, key) / math.sqrt(head_size)
+    # my attention raw has twice the mean and half the variance of theirs
+    attention_raw = t.einsum("hbfc,hbtc->hbft", query, key) / np.sqrt(head_size)
+
     if attention_masks:
         attention_raw = attention_raw * attention_masks
-    attention_patterns = softmax(attention_raw)
-
-    attention_values = t.einsum("hbs,hbsc->hbsc", attention_patterns, value)
+    attention_patterns = softmax(attention_raw, dim=-1)
+    attention_patterns = dropout(attention_patterns)
+    # tpeek("my attention probs", attention_patterns)
+    attention_values = t.einsum("hbft,hbfc->hbtc", attention_patterns, value)
     output = rearrange(attention_values, "h b s c -> b s (c h)")
-    return mlp(output)
+    return output
 
 
-class SelfAttentionLayer(Module):
+class PureSelfAttentionLayer(Module):
     def __init__(self, config):
-        super(SelfAttentionLayer, self).__init__()
+        super(PureSelfAttentionLayer, self).__init__()
         self.config = config
         if config["hidden_size"] % config["num_heads"] != 0:
             raise AssertionError("head num must divide hidden size")
@@ -91,26 +95,34 @@ class SelfAttentionLayer(Module):
         self.project_query = Linear(hidden_size, hidden_size, bias=True)
         self.project_key = Linear(hidden_size, hidden_size, bias=True)
         self.project_value = Linear(hidden_size, hidden_size, bias=True)
+        self.dropout = Dropout(config["dropout"])
+
+    def forward(self, token_activations, attention_masks=None):
+        return multi_head_self_attention(
+            token_activations,
+            attention_masks,
+            self.config["num_heads"],
+            self.project_query,
+            self.project_key,
+            self.project_value,
+            self.dropout,
+        )
+
+
+class SelfAttentionLayer(Module):
+    def __init__(self, config):
+        super(SelfAttentionLayer, self).__init__()
+        self.config = config
+        hidden_size = config["hidden_size"]
+        self.attention = PureSelfAttentionLayer(config)
         self.mlp = Linear(hidden_size, hidden_size, bias=True)
         self.layer_norm = LayerNorm((hidden_size,))
         self.dropout = Dropout()
 
     def forward(self, token_activations, attention_masks=None):
         # should this function include layer norm?
-        return self.layer_norm(
-            token_activations
-            + self.dropout(
-                multi_head_self_attention(
-                    token_activations,
-                    attention_masks,
-                    self.config["num_heads"],
-                    self.project_query,
-                    self.project_key,
-                    self.project_value,
-                    self.mlp,
-                )
-            )
-        )
+        post_attention = self.mlp(self.attention(token_activations, attention_masks))
+        return self.dropout(self.layer_norm(token_activations + post_attention))
 
 
 class BertLayer(Module):
@@ -213,9 +225,9 @@ def bert_from_pytorch_save():
         my_layer: BertLayer
         # their_layer:transformers.
 
-        copy_weight_bias(my_layer.attention.project_key, their_layer.attention.self.key)
-        copy_weight_bias(my_layer.attention.project_query, their_layer.attention.self.query)
-        copy_weight_bias(my_layer.attention.project_value, their_layer.attention.self.value)
+        copy_weight_bias(my_layer.attention.attention.project_key, their_layer.attention.self.key)
+        copy_weight_bias(my_layer.attention.attention.project_query, their_layer.attention.self.query)
+        copy_weight_bias(my_layer.attention.attention.project_value, their_layer.attention.self.value)
 
         copy_weight_bias(my_layer.attention.mlp, their_layer.attention.output.dense)
 
