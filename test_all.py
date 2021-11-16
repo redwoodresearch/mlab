@@ -33,7 +33,9 @@ AVG_TOLERANCE = 1e-4
 
 
 def tpeek(name, tensor):
-    print(f"{name} {t.mean(tensor).item()} {t.var(tensor).item()} {t.flatten(tensor)[:10].cpu().tolist()}")
+    print(
+        f"{name} mean {'{0:.4g}'.format(t.mean(tensor).item())} var {'{0:.4g}'.format(t.var(tensor).item())} vals {' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}"
+    )
 
 
 def tstat(name, tensor):
@@ -170,12 +172,12 @@ def test_bert():
 
 
 if __name__ == "__main__":
-    test_relu()
-    test_gelu()
-    test_softmax()
-    test_normalize()
-    test_layer_norm()
-    test_embedding()
+    # test_relu()
+    # test_gelu()
+    # test_softmax()
+    # test_normalize()
+    # test_layer_norm()
+    # test_embedding()
     test_bert()
 
     # test_self_attention_fundamentals() # this looks okay?
