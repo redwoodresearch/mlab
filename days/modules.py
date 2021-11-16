@@ -3,6 +3,7 @@ import numpy as np
 from torch.nn import Module, Parameter
 
 from torchtyping import TensorType
+from utils import tpeek
 
 
 def softmax(tensor: t.Tensor, dim: int = 0):
@@ -54,7 +55,7 @@ class Dropout(Module):
 
     def forward(self, input):
         if self.training:
-            mask = t.random.uniform() > self.fraction
+            mask = t.empty_like(input).uniform_(0, 1) > self.fraction
             return mask * input
         return input
 
@@ -82,9 +83,27 @@ class Embedding(Module):
         super(Embedding, self).__init__()
         self.weight = Parameter(t.FloatTensor(vocab_size, embedding_size).normal_(0, 1))
         self.embedding_size = embedding_size
+        self.vocab_size = vocab_size
 
     def forward(self, ids):
         return self.weight[ids]
 
     def unembed(self, embeddings):
-        return t.einsum("...j,kj->...k", embeddings, self.weight)
+        # because the weight initialization is meant for embedding, we need to scale it when we matmul
+        return t.einsum("...j,kj->...k", embeddings, self.weight) / np.sqrt(self.embedding_size)
+
+
+def cross_entropy_loss(input, target, dim=-1, ignore_id=None):
+    exps = np.e ** input
+    exp_sums = exps.sum(dim=dim)
+    exp_sum_logs = t.log(exp_sums)
+    gathered = t.gather(input, dim, target.unsqueeze(-1)).squeeze(-1)
+    token_losses = exp_sum_logs - gathered
+    if ignore_id is not None:
+        live_mask = target != ignore_id
+        token_losses *= live_mask
+        live_fraction = t.sum(live_mask) / live_mask.nelement()
+        if live_fraction == 0:
+            return t.FloatTensor(0)
+        token_losses /= live_fraction
+    return t.mean(token_losses)

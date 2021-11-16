@@ -138,7 +138,10 @@ def test_bert():
     my_bert.eval()
     their_bert.eval()
 
-    inputs = {"token_type_ids": t.LongTensor([[0, 0, 0, 1]]), "token_ids": t.LongTensor([[0, 1, 2, 3]])}
+    inputs = {
+        "token_type_ids": t.LongTensor([[0, 0, 0, 1], [0, 0, 0, 1]]),
+        "token_ids": t.LongTensor([[0, 1, 2, 3], [5, 6, 7, 8]]),
+    }
 
     my_embedded = my_bert.embedding.embed(**inputs)
     their_embedded = their_bert.embeddings(input_ids=inputs["token_ids"], token_type_ids=inputs["token_type_ids"])

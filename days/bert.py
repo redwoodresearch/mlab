@@ -19,7 +19,6 @@ class BertEmbedding(Module):
         self.position_embedding = Embedding(config["max_position_embeddings"], embedding_size)
         self.token_type_embedding = Embedding(config["type_vocab_size"], embedding_size)
 
-        self.unembed_layer_norm = LayerNorm((embedding_size,))
         self.layer_norm = LayerNorm((embedding_size,))
         self.dropout = Dropout(config["dropout"])
 
@@ -34,7 +33,7 @@ class BertEmbedding(Module):
         return embeddings
 
     def unembed(self, embeddings: TensorType["...", "embed_dim"]):
-        return self.unembed_layer_norm(t.einsum("ijk,lk->ijl", embeddings, self.token_embedding.weight))
+        return self.token_embedding.unembed(embeddings)
 
 
 class NormedResidualLayer(Module):
@@ -140,7 +139,6 @@ class Bert(Module):
 
         default_config = {
             "vocab_size": 28996,
-            "embedding_size": 5024,
             "intermediate_size": 3072,
             "hidden_size": 768,
             "num_layers": 12,
@@ -192,14 +190,8 @@ def bert_from_pytorch_save():
     def has_not_null(obj, prop):
         return hasattr(obj, prop) and (getattr(obj, prop) is not None)
 
-    def copy_maybe_transpose(mine, theirs):
-        if len(mine.weight.shape) == 1 or tuple(mine.weight.shape) == tuple(theirs.weight.shape):
-            mine.weight = theirs.weight
-        else:
-            mine.weight = Parameter(t.transpose(theirs.weight, 1, 0))
-
     def copy_weight_bias(mine, theirs):
-        copy_maybe_transpose(mine, theirs)
+        mine.weight = theirs.weight
         theirs_has_bias = has_not_null(theirs, "bias")
         mine_has_bias = has_not_null(mine, "bias")
         if theirs_has_bias != mine_has_bias:
