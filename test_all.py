@@ -6,6 +6,27 @@ from torch.nn.modules import activation
 from transformers.utils.dummy_sentencepiece_objects import PegasusTokenizer
 import days.bert as bert
 import pytest
+import transformers
+
+
+def setmyexcepthook():
+    import sys, traceback
+    from pygments import highlight
+    from pygments.lexers import get_lexer_by_name
+    from pygments.formatters import TerminalFormatter
+
+    lexer = get_lexer_by_name("pytb" if sys.version_info.major < 3 else "py3tb")
+    formatter = TerminalFormatter()
+
+    def myexcepthook(type, value, tb):
+        tbtext = "".join(traceback.format_exception(type, value, tb))
+        tbtext = tbtext.replace("/home/tao/.asdf/installs/python/3.9.6/lib/python3.9/site-packages/", "[PKG]")
+        sys.stderr.write(highlight(tbtext, lexer, formatter))
+
+    sys.excepthook = myexcepthook
+
+
+setmyexcepthook()
 
 MAX_TOLERANCE = 5e-3
 AVG_TOLERANCE = 1e-4
@@ -90,9 +111,9 @@ def test_linear():
 
 def test_embedding():
     unembed_input = t.FloatTensor(643, 23, 111).uniform_(-1, 1)
-    embed_input = t.LongTensor([1, 2, 3])
+    embed_input = t.LongTensor([[1, 2, 3], [7, 8, 9]])
     my_embedding, their_embedding = init_both(bert.Embedding, nn.Embedding, 234, 111)
-    tstat("my embedding", my_embedding.embedding)
+    tstat("my embedding", my_embedding.weight)
     tstat("their embedding", their_embedding.weight)
 
     my_out = my_embedding.embed(embed_input)
@@ -105,6 +126,7 @@ def test_embedding():
 def test_self_attention_fundamentals():
     width = 16
     activations = t.FloatTensor(10, 10, width).normal_(0, 1)
+    # activations = t.FloatTensor(10, 10, width).fill_(1)
     q = t.eye(width)
     k = t.eye(width)
     v = t.eye(width)
@@ -112,7 +134,39 @@ def test_self_attention_fundamentals():
     output = bert.multi_head_self_attention(
         activations, attention_masks=None, num_heads=4, project_query=q, project_key=k, project_value=v
     )
-    print(output)
+    print("shape", output.shape)
+    tpeek("output", output)
+    tstat("output", output)
+
+
+def test_bert():
+    my_bert, their_bert = bert.bert_from_pytorch_save()
+    their_bert: transformers.models.bert.modeling_bert.BertModel
+    my_bert.eval()
+    their_bert.eval()
+
+    inputs = {"token_type_ids": t.LongTensor([[0, 0, 0, 1]]), "token_ids": t.LongTensor([[0, 1, 2, 3]])}
+
+    my_embedded = my_bert.embedding.embed(**inputs)
+    their_embedded = their_bert.embeddings(input_ids=inputs["token_ids"], token_type_ids=inputs["token_type_ids"])
+    # testy(my_embedded, their_embedded, "embeds")
+
+    embedding_inputs = my_embedded
+
+    my_encoded = my_bert.transformer[0].attention(embedding_inputs)
+    their_encoded = their_bert.encoder.layer[0].attention(embedding_inputs)[0]
+    tpeek("my attention", my_encoded)
+    tpeek("their attention", their_encoded)
+
+    my_encoded = my_bert.transformer[0](embedding_inputs)
+    their_encoded = their_bert.encoder.layer[0](embedding_inputs)[0]
+    tpeek("my encoded", my_encoded)
+    tpeek("their encoded", their_encoded)
+
+    my_encoded = my_bert.transformer(embedding_inputs)
+    their_encoded = their_bert.encoder(embedding_inputs).last_hidden_state
+    tpeek("my encoded", my_encoded)
+    tpeek("their encoded", their_encoded)
 
 
 if __name__ == "__main__":
@@ -122,5 +176,7 @@ if __name__ == "__main__":
     test_normalize()
     test_layer_norm()
     test_embedding()
-    test_self_attention_fundamentals()
+    test_bert()
+
+    # test_self_attention_fundamentals() # this looks okay?
     # test_linear()  # idk why this isn't producing same result
