@@ -63,15 +63,15 @@ class Linear(Module):
     def __init__(self, x, y, bias):
         super(Linear, self).__init__()
         weight_bound = 1 / np.sqrt(x)
-        self.weight = Parameter(t.FloatTensor(x, y).uniform_(-weight_bound, weight_bound))
+        self.weight = Parameter(t.FloatTensor(y, x).uniform_(-weight_bound, weight_bound))
         if bias:
             bias_bound = 1 / np.sqrt(y)
             self.bias = Parameter(t.FloatTensor(y).uniform_(-bias_bound, bias_bound))
         else:
             self.bias = None
 
-    def forward(self, x: TensorType[..., "channels"]) -> TensorType[..., "channels"]:
-        x = t.matmul(x, self.weight)
+    def forward(self, x: TensorType[..., "ni_channels"]) -> TensorType[..., "out_channels"]:
+        x = t.einsum("...j,kj->...k", x, self.weight)
         if self.bias is not None:
             x += self.bias
         return x

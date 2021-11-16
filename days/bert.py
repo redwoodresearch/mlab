@@ -2,11 +2,7 @@ import torch as t
 import numpy as np
 from torch.nn import Module, Parameter, Sequential
 
-from torch.nn import Linear, LayerNorm, Embedding, Dropout
-from torch.nn.functional import softmax, gelu
-
-# from days.modules import softmax, gelu, Linear, LayerNorm, Embedding, Dropout
-
+from days.modules import gelu, Embedding, Dropout, LayerNorm, softmax, Linear
 from torchtyping import TensorType
 from einops import rearrange
 from utils import tpeek, tstat
@@ -23,7 +19,6 @@ class BertEmbedding(Module):
         self.position_embedding = Embedding(config["max_position_embeddings"], embedding_size)
         self.token_type_embedding = Embedding(config["type_vocab_size"], embedding_size)
 
-        # then zero out padding tokens and/or whatever
         self.unembed_layer_norm = LayerNorm((embedding_size,))
         self.layer_norm = LayerNorm((embedding_size,))
         self.dropout = Dropout(config["dropout"])
@@ -64,25 +59,25 @@ def multi_head_self_attention(
     head_size = token_activations.shape[-1] // num_heads
 
     query = project_query(token_activations)
-    query = rearrange(query, "b s (h c) -> h b s c", h=num_heads)
+    query = rearrange(query, "b s (h c) -> b h s c", h=num_heads)
 
     key = project_key(token_activations)
-    key = rearrange(key, "b s (h c) -> h b s c", h=num_heads)
+    key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
 
     value = project_value(token_activations)
-    value = rearrange(value, "b s (h c) -> h b s c", h=num_heads)
+    value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
 
     # my attention raw has twice the mean and half the variance of theirs
-    attention_raw = t.einsum("hbfc,hbtc->hbft", query, key) / np.sqrt(head_size)
-
-    if attention_masks:
+    attention_raw = t.einsum("bhfc,bhtc->bhft", query, key) / np.sqrt(head_size)
+    if attention_masks is not None:
         attention_raw = attention_raw * attention_masks
     attention_patterns = softmax(attention_raw, dim=-1)
     attention_patterns = dropout(attention_patterns)
-    # tpeek("my attention probs", attention_patterns)
-    attention_values = t.einsum("hbft,hbfc->hbtc", attention_patterns, value)
-    output = rearrange(attention_values, "h b s c -> b s (c h)")
-    return output
+
+    context_layer = t.einsum("bhft,bhtc->bhfc", attention_patterns, value)
+    attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
+
+    return attention_values
 
 
 class PureSelfAttentionLayer(Module):
@@ -198,7 +193,7 @@ def bert_from_pytorch_save():
         return hasattr(obj, prop) and (getattr(obj, prop) is not None)
 
     def copy_maybe_transpose(mine, theirs):
-        if tuple(mine.weight.shape) == tuple(theirs.weight.shape):
+        if len(mine.weight.shape) == 1 or tuple(mine.weight.shape) == tuple(theirs.weight.shape):
             mine.weight = theirs.weight
         else:
             mine.weight = Parameter(t.transpose(theirs.weight, 1, 0))

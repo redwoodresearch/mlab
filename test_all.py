@@ -172,11 +172,11 @@ def test_bert():
     # tpeek("their encoded", their_encoded)
     # print()
 
-    # my_encoded = my_bert.transformer(embedding_inputs)
-    # their_encoded = their_bert.encoder(embedding_inputs).last_hidden_state
-    # tpeek("my encoded", my_encoded)
-    # tpeek("their encoded", their_encoded)
-    # print()
+    my_encoded = my_bert.transformer(embedding_inputs)
+    their_encoded = their_bert.encoder(embedding_inputs).last_hidden_state
+    tpeek("my encoded", my_encoded)
+    tpeek("their encoded", their_encoded)
+    print()
 
 
 if __name__ == "__main__":
