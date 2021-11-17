@@ -34,6 +34,9 @@ def normalize(tensor: t.Tensor, dim: int = -1, eps=1e-12):
 
 class LayerNorm(Module):
     def __init__(self, shape, eps=1e-6):
+        if isinstance(shape, int):
+            shape = (shape,)
+
         super(LayerNorm, self).__init__()
         self.bias = Parameter(t.zeros(shape))
         self.weight = Parameter(t.ones(shape))
@@ -94,8 +97,9 @@ class Embedding(Module):
         return t.einsum("...j,kj->...k", embeddings, self.weight) / np.sqrt(self.embedding_size)
 
 
-def cross_entropy(input, target, ignore_index=None):
+def cross_entropy(input, target, ignore_index=None, max=1e12):
     exps = np.e ** input
+    exps[exps > max] = max
     exp_sums = exps.sum(dim=-1)
     exp_sum_logs = t.log(exp_sums)
     gathered = t.gather(input, -1, target.unsqueeze(-1)).squeeze(-1)
