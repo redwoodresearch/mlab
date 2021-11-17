@@ -211,10 +211,10 @@ def my_bert_from_hf_weights(their_lm_bert=None):
         "vocab_size": 28996,
     }
     if their_lm_bert is None:
-        lm_model: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
+        their_lm_bert: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
             "bert-base-cased"
         )
-    model = lm_model.bert
+    model = their_lm_bert.bert
     my_model = Bert(bert_default_config)
 
     # copy embeddings
@@ -241,10 +241,10 @@ def my_bert_from_hf_weights(their_lm_bert=None):
         copy_weight_bias(my_layer.residual.mlp2, their_layer.output.dense)
         copy_weight_bias(my_layer.residual.layer_norm, their_layer.output.LayerNorm)
 
-    copy_weight_bias(my_model.lm_head.mlp, lm_model.cls.predictions.transform.dense)
-    copy_weight_bias(my_model.lm_head.layer_norm, lm_model.cls.predictions.transform.LayerNorm)
+    copy_weight_bias(my_model.lm_head.mlp, their_lm_bert.cls.predictions.transform.dense)
+    copy_weight_bias(my_model.lm_head.layer_norm, their_lm_bert.cls.predictions.transform.LayerNorm)
 
     # bias is output_specific, weight is from embedding
-    my_model.lm_head.unembedding.bias = lm_model.cls.predictions.decoder.bias
+    my_model.lm_head.unembedding.bias = their_lm_bert.cls.predictions.decoder.bias
     my_model.lm_head.unembedding.weight = model.embeddings.word_embeddings.weight
-    return my_model, lm_model
+    return my_model, their_lm_bert
