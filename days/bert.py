@@ -137,8 +137,8 @@ class BertLMHead(Module):
     def __init__(self, config):
         super(BertLMHead, self).__init__()
         hidden_size = config["hidden_size"]
-        self.mlp = Linear(hidden_size, hidden_size)
-        self.unembedding = Linear(hidden_size, config["vocab_size"])
+        self.mlp = Linear(hidden_size, hidden_size, bias=True)
+        self.unembedding = Linear(hidden_size, config["vocab_size"], bias=True)
         self.layer_norm = LayerNorm((hidden_size,))
 
     def forward(self, activations):
@@ -187,7 +187,6 @@ class Bert(Module):
 
 def my_bert_from_hf_weights():
     import transformers
-    from transformers import AutoModel
 
     bert_default_config = {
         "position_embedding_type": "absolute",

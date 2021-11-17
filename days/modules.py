@@ -60,7 +60,7 @@ class Dropout(Module):
 
 
 class Linear(Module):
-    def __init__(self, x, y, bias):
+    def __init__(self, x, y, bias=True):
         super(Linear, self).__init__()
         weight_bound = 1 / np.sqrt(x)
         self.weight = Parameter(t.FloatTensor(y, x).uniform_(-weight_bound, weight_bound))
