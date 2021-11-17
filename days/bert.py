@@ -212,7 +212,6 @@ def my_bert_from_hf_weights():
     lm_model: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
         "bert-base-cased"
     )
-    print(lm_model)
     model = lm_model.bert
     my_model = Bert(bert_default_config)
 
