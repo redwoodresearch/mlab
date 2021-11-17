@@ -1,3 +1,4 @@
+from einops.einops import rearrange
 import torch as t
 import numpy as np
 
@@ -19,7 +20,12 @@ def has_not_null(obj, prop):
 
 
 def copy_weight_bias(mine, theirs):
-    mine.weight = theirs.weight
+    # support weights called 'w' because sometimes oai does that
+    if hasattr(theirs, "w") and not hasattr(theirs, "weight"):
+        mine.weight = rearrange(theirs.w, "a b -> b a")
+    else:
+        mine.weight = theirs.weight
+
     theirs_has_bias = has_not_null(theirs, "bias")
     mine_has_bias = has_not_null(mine, "bias")
     if theirs_has_bias != mine_has_bias:

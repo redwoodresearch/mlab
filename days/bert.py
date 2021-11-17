@@ -186,7 +186,7 @@ class Bert(Module):
         return BertOutput(logits=logits, encodings=encodings)
 
 
-def my_bert_from_hf_weights():
+def my_bert_from_hf_weights(their_lm_bert=None):
     import transformers
 
     bert_default_config = {
@@ -210,9 +210,10 @@ def my_bert_from_hf_weights():
         "use_cache": True,
         "vocab_size": 28996,
     }
-    lm_model: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
-        "bert-base-cased"
-    )
+    if their_lm_bert is None:
+        lm_model: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
+            "bert-base-cased"
+        )
     model = lm_model.bert
     my_model = Bert(bert_default_config)
 

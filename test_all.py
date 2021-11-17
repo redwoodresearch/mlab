@@ -5,6 +5,7 @@ import numpy as np
 from torch.nn.modules import activation
 from transformers.utils.dummy_sentencepiece_objects import PegasusTokenizer
 import days.bert as bert
+import days.gpt2 as gpt2
 import pytest
 import transformers
 from utils import tpeek, tstat
@@ -185,7 +186,18 @@ def test_bert():
     their_logits = their_bert(**inputs).logits
     tpeek("my logits", my_logits)
     tpeek("their logits", their_logits)
-    assert t.allclose(my_logits, their_logits)
+    assert t.allclose(my_logits, their_logits, rtol=0.1, atol=0.1)
+
+
+def test_gpt2():
+    my_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
+    inputs = {
+        "input_ids": t.LongTensor([[0, 1, 2, 3], [5, 6, 7, 8]]),
+    }
+    their_output = their_gpt2(**inputs).logits
+    tpeek("their logits", their_output)
+    my_output = my_gpt2(**inputs).logits
+    tpeek("my logits", my_output)
 
 
 if __name__ == "__main__":
@@ -195,7 +207,8 @@ if __name__ == "__main__":
     # test_normalize()
     # test_layer_norm()
     # test_embedding()
-    test_bert()
+    # test_bert()
+    test_gpt2()
 
     # test_self_attention_fundamentals() # this looks okay?
     # test_linear()  # idk why this isn't producing same result
