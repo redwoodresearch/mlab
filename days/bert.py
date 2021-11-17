@@ -21,7 +21,7 @@ class BertEmbedding(Module):
         self.layer_norm = LayerNorm((embedding_size,))
         self.dropout = Dropout(config["dropout"])
 
-    def embed(self, token_ids: t.LongTRensor, token_type_ids):
+    def embed(self, token_ids: t.LongTensor, token_type_ids):
         seq_length = token_ids.shape[1]
         token_embeddings = self.token_embedding(token_ids)
         token_type_embeddings = self.token_type_embedding(token_type_ids)
