@@ -6,8 +6,10 @@ from transformers import AutoTokenizer
 # from days.modules import gelu, Embedding, Dropout, LayerNorm, softmax, Linear
 from torch.nn import Embedding, Dropout, LayerNorm, Linear
 from torch.nn.functional import gelu, softmax
+
 from einops import rearrange
-from utils import tpeek, tstat
+from utils import tpeek, tstat, copy_weight_bias
+from dataclasses import dataclass
 
 
 class BertEmbedding(Module):
@@ -147,9 +149,6 @@ class BertLMHead(Module):
         return self.unembedding(self.layer_norm(gelu(self.mlp(activations))))
 
 
-from dataclasses import dataclass
-
-
 @dataclass
 class BertOutput:
     logits: t.Tensor
@@ -216,19 +215,6 @@ def my_bert_from_hf_weights():
     )
     model = lm_model.bert
     my_model = Bert(bert_default_config)
-
-    def has_not_null(obj, prop):
-        return hasattr(obj, prop) and (getattr(obj, prop) is not None)
-
-    def copy_weight_bias(mine, theirs):
-        mine.weight = theirs.weight
-        theirs_has_bias = has_not_null(theirs, "bias")
-        mine_has_bias = has_not_null(mine, "bias")
-        if theirs_has_bias != mine_has_bias:
-            print(mine.bias)
-            raise AssertionError("yikes")
-        if mine_has_bias and theirs_has_bias:
-            mine.bias = theirs.bias
 
     # copy embeddings
     my_model.embedding.position_embedding.weight = model.embeddings.position_embeddings.weight

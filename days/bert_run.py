@@ -7,7 +7,7 @@ from utils import tpeek, tstat
 import transformers
 import torchtext
 import gin
-
+from datetime import datetime
 from torch.optim import Adam
 
 device = "cuda" if t.cuda.is_available() else "cpu"
@@ -32,7 +32,8 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=10, lr=1e-5):
     batches = rearrange(trunc_token_ids, "(n b l) -> n b l", b=batch_size, l=train_context_length)
     batches = batches[t.randperm(batches.shape[0])]
     print("batches", batches.shape)
-    print_every_n = 2
+    print_every_n = 10
+    save_every_n = 200
     print("starting training")
     for epoch in range(epochs):
         for i in range(batches.shape[0]):
@@ -41,8 +42,10 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=10, lr=1e-5):
             mask_ids = t.FloatTensor(batch_size, train_context_length).to(device).uniform_(0, 1) < mask_fraction
             masked_input_ids = input_ids * ~mask_ids
             masked_input_ids += mask_ids * tokenizer.mask_token_id
-            model_output = model(input_ids=masked_input_ids, token_type_ids=t.zeros_like(input_ids).to(device))
-            model_output = model_output.logits
+            model_output = model(input_ids=masked_input_ids, token_type_ids=t.zeros_like(input_ids).to(device)).logits
+            if t.any(t.isnan(model_output)):
+                print("NAN output!!!!!")
+            # model_output = model_output.logits
             hidden_input_ids = input_ids * mask_ids
             # hidden_input_ids = t.randint(1,1000,input_ids.shape).to(device)
             model_output_flattened = rearrange(model_output, "b s c -> (b s) c")
@@ -50,8 +53,16 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=10, lr=1e-5):
             loss = cross_entropy(model_output_flattened, hidden_input_ids_flattened, ignore_index=0)
             loss.backward()
             optimizer.step()
+            optimizer.zero_grad()
             if i % print_every_n == print_every_n - 1:
                 print(f"Loss: {loss.cpu().item()}")
+            if (i + epoch * batches.shape[0]) % save_every_n == save_every_n - 1:
+
+                now = datetime.now()
+                date_time = now.strftime("%Y-%m-%d_%H-%M-%S")
+                file_name = f".my_bert_{date_time}_epoch{epoch}"
+                t.save(model, file_name)
+                print(f"finished epoch {epoch} saving to {file_name}")
 
 
 def ids_to_strings(tokenizer, ids):
