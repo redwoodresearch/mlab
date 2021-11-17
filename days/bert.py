@@ -210,7 +210,9 @@ def my_bert_from_hf_weights():
         "use_cache": True,
         "vocab_size": 28996,
     }
-    model: transformers.models.bert.modeling_bert.BertModel = AutoModel.from_pretrained("bert-base-cased")
+    model: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
+        "bert-base-cased"
+    )
     my_model = Bert(bert_default_config)
 
     def has_not_null(obj, prop):
