@@ -189,33 +189,12 @@ class Bert(Module):
 def my_bert_from_hf_weights(their_lm_bert=None):
     import transformers
 
-    bert_default_config = {
-        "position_embedding_type": "absolute",
-        "hidden_act": "gelu",
-        "attention_probs_dropout_prob": 0.1,
-        "classifier_dropout": None,
-        "gradient_checkpointing": False,
-        "hidden_dropout_prob": 0.1,
-        "hidden_size": 768,
-        "initializer_range": 0.02,
-        "intermediate_size": 3072,
-        "layer_norm_eps": 1e-12,
-        "max_position_embeddings": 512,
-        "model_type": "bert",
-        "num_attention_heads": 12,
-        "num_hidden_layers": 12,
-        "pad_token_id": 0,
-        "transformers_version": "4.11.3",
-        "type_vocab_size": 2,
-        "use_cache": True,
-        "vocab_size": 28996,
-    }
     if their_lm_bert is None:
         their_lm_bert: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
             "bert-base-cased"
         )
     model = their_lm_bert.bert
-    my_model = Bert(bert_default_config)
+    my_model = Bert(their_lm_bert.config.to_dict())
 
     # copy embeddings
     my_model.embedding.position_embedding.weight = model.embeddings.position_embeddings.weight
@@ -248,3 +227,7 @@ def my_bert_from_hf_weights(their_lm_bert=None):
     my_model.lm_head.unembedding.bias = their_lm_bert.cls.predictions.decoder.bias
     my_model.lm_head.unembedding.weight = model.embeddings.word_embeddings.weight
     return my_model, their_lm_bert
+
+
+if __name__ == "__main__":
+    my_bert_from_hf_weights()
