@@ -1,6 +1,7 @@
 import torch as t
 import numpy as np
-from torch.nn import Module, Parameter, Sequential
+from torch.nn import Module, Parameter, Sequential  # not allowed to use other stuff from nn
+from transformers import AutoTokenizer
 
 from days.modules import gelu, Embedding, Dropout, LayerNorm, softmax, Linear
 from einops import rearrange
@@ -158,7 +159,7 @@ class Bert(Module):
         return output_ids
 
 
-def bert_from_pytorch_save():
+def my_bert_from_hf_weights():
     import transformers
     from transformers import AutoModel
 

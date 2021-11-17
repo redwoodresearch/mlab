@@ -2,7 +2,7 @@ import torch as t
 import numpy as np
 from modules import cross_entropy_loss
 from einops import rearrange
-from days.bert import Bert
+from days.bert import Bert, my_bert_from_hf_weights
 from utils import tpeek, tstat
 import transformers
 import torchtext
@@ -11,10 +11,11 @@ import gin
 from torch.optim import Adam
 
 device = "cuda" if t.cuda.is_available() else "cpu"
+print("using device", device)
 
 
 @gin.configurable
-def train_from_scratch(model, tokenizer, dataset, epochs=2, lr=1e-4):
+def bert_mlm_pretrain(model, tokenizer, dataset, epochs=2, lr=1e-4):
     model.train()
     model.to(device)
     optimizer = Adam(model.parameters(), lr=lr)
@@ -24,7 +25,7 @@ def train_from_scratch(model, tokenizer, dataset, epochs=2, lr=1e-4):
     mask_fraction = 0.15
     tokenizer_output = tokenizer(dataset)
 
-    token_ids = t.LongTensor(tokenizer_output["input_ids"])
+    token_ids = t.LongTensor(tokenizer_output["input_ids"]).to(device)
     token_ids = token_ids[
         : (token_ids.shape[0] // (batch_size * train_context_length)) * (batch_size * train_context_length)
     ]
@@ -40,8 +41,7 @@ def train_from_scratch(model, tokenizer, dataset, epochs=2, lr=1e-4):
             mask_ids = t.FloatTensor(batch_size, train_context_length).uniform_(0, 1) < mask_fraction
             masked_input_ids = input_ids * ~mask_ids
             masked_input_ids += mask_ids * tokenizer.mask_token_id
-            masked_input_ids.to(device)
-            model_output = model(token_ids=masked_input_ids, token_type_ids=t.zeros_like(input_ids).to(device)).cpu()
+            model_output = model(token_ids=masked_input_ids, token_type_ids=t.zeros_like(input_ids).to(device))
 
             hidden_input_ids = input_ids * mask_ids
 
@@ -54,15 +54,10 @@ def train_from_scratch(model, tokenizer, dataset, epochs=2, lr=1e-4):
 
 if __name__ == "__main__":
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
-    model = Bert(
-        {
-            "hidden_size": 256,
-            "num_layers": 6,
-            "num_heads": 8,
-        }
-    )
+    model = Bert({"hidden_size": 256, "intermediate_size": 1024, "num_layers": 3, "num_heads": 8})
+    model = my_bert_from_hf_weights()
     print(model)
     train_data_sentence_iterator = torchtext.datasets.WikiText2(split="valid")
     train_data = "\n".join(train_data_sentence_iterator).replace("<unk>", "[UNK]")
 
-    train_from_scratch(model, tokenizer, train_data)
+    bert_mlm_pretrain(model, tokenizer, train_data)
