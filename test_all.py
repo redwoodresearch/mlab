@@ -133,7 +133,7 @@ def test_self_attention_fundamentals():
 
 
 def test_bert():
-    my_bert, their_bert = bert.bert_from_pytorch_save()
+    my_bert, their_bert = bert.my_bert_from_hf_weights()
     their_bert: transformers.models.bert.modeling_bert.BertModel
     my_bert.eval()
     their_bert.eval()
