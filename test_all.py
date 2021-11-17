@@ -140,26 +140,26 @@ def test_bert():
 
     inputs = {
         "token_type_ids": t.LongTensor([[0, 0, 0, 1], [0, 0, 0, 1]]),
-        "token_ids": t.LongTensor([[0, 1, 2, 3], [5, 6, 7, 8]]),
+        "input_ids": t.LongTensor([[0, 1, 2, 3], [5, 6, 7, 8]]),
     }
 
-    my_embedded = my_bert.embedding.embed(**inputs)
-    their_embedded = their_bert.embeddings(input_ids=inputs["token_ids"], token_type_ids=inputs["token_type_ids"])
-    # testy(my_embedded, their_embedded, "embeds")
+    # my_embedded = my_bert.embedding.embed(**inputs)
+    # their_embedded = their_bert.embeddings(**inputs)
+    # # testy(my_embedded, their_embedded, "embeds")
 
-    embedding_inputs = my_embedded
+    # embedding_inputs = my_embedded
 
-    my_encoded = my_bert.transformer[0].attention.layer_norm(embedding_inputs)
-    their_encoded = their_bert.encoder.layer[0].attention.output.LayerNorm(embedding_inputs)
-    tpeek("my layer norm", my_encoded)
-    tpeek("their layer norm", their_encoded)
-    print()
+    # my_encoded = my_bert.transformer[0].attention.layer_norm(embedding_inputs)
+    # their_encoded = their_bert.encoder.layer[0].attention.output.LayerNorm(embedding_inputs)
+    # tpeek("my layer norm", my_encoded)
+    # tpeek("their layer norm", their_encoded)
+    # print()
 
-    my_encoded = my_bert.transformer[0].attention.attention(embedding_inputs)
-    their_encoded = their_bert.encoder.layer[0].attention.self(embedding_inputs)[0]
-    tpeek("my pure attention", my_encoded)
-    tpeek("their pure attention", their_encoded)
-    print()
+    # my_encoded = my_bert.transformer[0].attention.attention(embedding_inputs)
+    # their_encoded = their_bert.encoder.layer[0].attention.self(embedding_inputs)[0]
+    # tpeek("my pure attention", my_encoded)
+    # tpeek("their pure attention", their_encoded)
+    # print()
 
     # my_encoded = my_bert.transformer[0].attention(embedding_inputs)
     # their_encoded = their_bert.encoder.layer[0].attention(embedding_inputs)[0]
@@ -175,11 +175,17 @@ def test_bert():
     # tpeek("their encoded", their_encoded)
     # print()
 
-    my_encoded = my_bert.transformer(embedding_inputs)
-    their_encoded = their_bert.encoder(embedding_inputs).last_hidden_state
-    tpeek("my encoded", my_encoded)
-    tpeek("their encoded", their_encoded)
-    print()
+    # my_encoded = my_bert.transformer(embedding_inputs)
+    # their_encoded = their_bert.encoder(embedding_inputs).last_hidden_state
+    # tpeek("my encoded", my_encoded)
+    # tpeek("their encoded", their_encoded)
+    # print()
+
+    my_logits = my_bert(**inputs).logits
+    their_logits = their_bert(**inputs).logits
+    tpeek("my logits", my_logits)
+    tpeek("their logits", their_logits)
+    assert t.allclose(my_logits, their_logits)
 
 
 if __name__ == "__main__":

@@ -142,7 +142,7 @@ class BertLMHead(Module):
         self.layer_norm = LayerNorm((hidden_size,))
 
     def forward(self, activations):
-        return self.unembedding(self.layer_norm(self.mlp(activations)))
+        return self.unembedding(self.layer_norm(gelu(self.mlp(activations))))
 
 
 from dataclasses import dataclass
@@ -209,9 +209,11 @@ def my_bert_from_hf_weights():
         "use_cache": True,
         "vocab_size": 28996,
     }
-    model: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
+    lm_model: transformers.models.bert.modeling_bert.BertModel = transformers.BertForMaskedLM.from_pretrained(
         "bert-base-cased"
     )
+    print(lm_model)
+    model = lm_model.bert
     my_model = Bert(bert_default_config)
 
     def has_not_null(obj, prop):
@@ -251,7 +253,10 @@ def my_bert_from_hf_weights():
         copy_weight_bias(my_layer.residual.mlp2, their_layer.output.dense)
         copy_weight_bias(my_layer.residual.layer_norm, their_layer.output.LayerNorm)
 
-    copy_weight_bias(my_model.lm_head.mlp, model.cls.transform.dense)
-    copy_weight_bias(my_model.lm_head.layer_norm, model.cls.transform.LayerNorm)
-    copy_weight_bias(my_model.lm_head.unembedding, model.cls.decoder)
-    return my_model, model
+    copy_weight_bias(my_model.lm_head.mlp, lm_model.cls.predictions.transform.dense)
+    copy_weight_bias(my_model.lm_head.layer_norm, lm_model.cls.predictions.transform.LayerNorm)
+
+    # bias is output_specific, weight is from embedding
+    my_model.lm_head.unembedding.bias = lm_model.cls.predictions.decoder.bias
+    my_model.lm_head.unembedding.weight = model.embeddings.word_embeddings.weight
+    return my_model, lm_model
