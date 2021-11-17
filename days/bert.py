@@ -186,7 +186,7 @@ class Bert(Module):
         return BertOutput(logits=logits, encodings=encodings)
 
 
-def my_bert_from_hf_weights(their_lm_bert=None):
+def my_bert_from_hf_weights(their_lm_bert=None, config={}):
     import transformers
 
     if their_lm_bert is None:
@@ -194,7 +194,7 @@ def my_bert_from_hf_weights(their_lm_bert=None):
             "bert-base-cased"
         )
     model = their_lm_bert.bert
-    my_model = Bert(their_lm_bert.config.to_dict())
+    my_model = Bert({**their_lm_bert.config.to_dict(), **config})
 
     # copy embeddings
     my_model.embedding.position_embedding.weight = model.embeddings.position_embeddings.weight
