@@ -1,3 +1,5 @@
+import math
+
 import torch as t
 import numpy as np
 from torch.nn import Module, Parameter
@@ -110,3 +112,57 @@ def cross_entropy(input, target, ignore_index=None, max=1e12):
             return t.FloatTensor(0)
         token_losses /= live_fraction
     return t.mean(token_losses)
+
+
+def _ntuple(n):
+    import collections
+    from itertools import repeat
+    def parse(x):
+        if isinstance(x, collections.abc.Iterable):
+            return tuple(x)
+        return tuple(repeat(x, n))
+
+    return parse
+
+_pair = _ntuple(2)
+
+class Conv2d(Module):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=True,
+    ):
+        super().__init__()
+        # uniform(-1/sqrt(k), 1/sqrt(k)), where k = weight.size(1) * prod(*kernel_size)
+        weight_size = (in_channels, out_channels // groups, *kernel_size)
+        bound = 1 / math.sqrt(weight_size[1] * math.prod(kernel_size))
+        self.weight = Parameter(t.FloatTensor(*weight_size).uniform_(-bound, bound))
+
+        if bias:
+            fan_in = math.prod(self.weight.shape[1:])
+            bound = 1 / math.sqrt(fan_in)
+            self.bias = Parameter(t.FloatTensor(out_channels).uniform_(-bound, bound))
+        else:
+            self.bias = t.zeros(out_channels)
+
+        self.stride = _pair(stride)
+        self.padding = _pair(padding)
+
+    def forward(self, x):
+        sH, sW = self.stride
+        pH, pW = self.padding
+        B, iC, iH, iW = x.shape
+        oC, _, kH, kW = self.weight.shape
+        oH = (iH + 2*pH - kH + 1) // sH
+        oW = (iW + 2*pW - kW + 1) // sW
+
+        from torch.nn.functional import pad
+        padded_x = pad(x, [pH, pH, pW, pW])
+        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=padded_x.stride() + (iW * sH, sW))
+        return t.einsum('bcxyij,ocij->boxy', strided_x, self.weight) + self.bias.reshape(1, -1, 1, 1)
