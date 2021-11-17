@@ -133,6 +133,27 @@ class BertLayer(Module):
         return self.residual(attention_output)
 
 
+class BertLMHead(Module):
+    def __init__(self, config):
+        super(BertLMHead, self).__init__()
+        hidden_size = config["hidden_size"]
+        self.mlp = Linear(hidden_size, hidden_size)
+        self.unembedding = Linear(hidden_size, config["vocab_size"])
+        self.layer_norm = LayerNorm((hidden_size,))
+
+    def forward(self, activations):
+        return self.unembedding(self.layer_norm(self.mlp(activations)))
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class BertOutput:
+    logits: t.Tensor
+    encodings: t.Tensor
+
+
 class Bert(Module):
     def __init__(self, config):
         super(Bert, self).__init__()
@@ -151,6 +172,7 @@ class Bert(Module):
 
         self.embedding = BertEmbedding(self.config)
         self.transformer = Sequential(*[BertLayer(self.config) for _ in range(self.config["num_layers"])])
+        self.lm_head = BertLMHead(config)
 
     def forward(self, input_ids, token_type_ids=None):
 
@@ -159,8 +181,8 @@ class Bert(Module):
 
         embeddings = self.embedding.embed(input_ids=input_ids, token_type_ids=token_type_ids)
         encodings = self.transformer(embeddings)
-        output_ids = self.embedding.unembed(encodings)
-        return output_ids
+        logits = self.lm_head(encodings)
+        return BertOutput(logits=logits, encodings=encodings)
 
 
 def my_bert_from_hf_weights():
@@ -208,7 +230,7 @@ def my_bert_from_hf_weights():
     my_model.embedding.position_embedding.weight = model.embeddings.position_embeddings.weight
     my_model.embedding.token_embedding.weight = model.embeddings.word_embeddings.weight
     my_model.embedding.token_type_embedding.weight = model.embeddings.token_type_embeddings.weight
-    copy_weight_bias(model.embeddings.LayerNorm, my_model.embedding.layer_norm)
+    copy_weight_bias(my_model.embedding.layer_norm, model.embeddings.LayerNorm)
 
     my_layers = list(my_model.transformer)
     official_layers = list(model.encoder.layer)
@@ -228,4 +250,7 @@ def my_bert_from_hf_weights():
         copy_weight_bias(my_layer.residual.mlp2, their_layer.output.dense)
         copy_weight_bias(my_layer.residual.layer_norm, their_layer.output.LayerNorm)
 
+    copy_weight_bias(my_model.lm_head.mlp, model.cls.transform.dense)
+    copy_weight_bias(my_model.lm_head.layer_norm, model.cls.transform.LayerNorm)
+    copy_weight_bias(my_model.lm_head.unembedding, model.cls.decoder)
     return my_model, model

@@ -54,6 +54,35 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=10, lr=1e-5):
                 print(f"Loss: {loss.cpu().item()}")
 
 
+def ids_to_strings(tokenizer, ids):
+    token_strings = tokenizer.convert_ids_to_tokens(ids)
+    token_strings = [tokenizer.convert_tokens_to_string([string]) for string in token_strings]
+    return token_strings
+
+
+def infer_bert(model, tokenizer, text):
+    input_ids = t.LongTensor(tokenizer(text).input_ids).unsqueeze(0)
+    logits = model(input_ids=input_ids).logits.squeeze(0)
+    return logits
+
+
+def infer_show_bert(model, tokenizer, text):
+    tokens = tokenizer(text).input_ids
+    mask_idx = tokens.index(tokenizer.mask_token_id)
+    print(mask_idx)
+    logits = infer_bert(model, tokenizer, text)
+    top10 = t.topk(logits[mask_idx], 10).indices
+    topk_words = [ids_to_strings(tokenizer, [tok])[0] for tok in top10]
+    print(topk_words)
+
+
+def eval_bert_mlm(model, dataset):
+    fun_texts = ["my name is Amy. Also, my name is [MASK].", "Hello, my name is [MASK].", "[MASK], my name is Amy."]
+
+    for fun_text in fun_texts:
+        infer_show_bert(model, tokenizer, fun_text)
+
+
 if __name__ == "__main__":
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
     model = Bert({"hidden_size": 256, "intermediate_size": 1024, "num_layers": 3, "num_heads": 8})
@@ -62,6 +91,10 @@ if __name__ == "__main__":
     train_data_sentence_iterator = torchtext.datasets.WikiText2(split="valid")
     train_data = "\n".join(train_data_sentence_iterator).replace("<unk>", "[UNK]")
 
+    val_data_sentence_iterator = torchtext.datasets.WikiText2(split="valid")
+    val_data = "\n".join(val_data_sentence_iterator).replace("<unk>", "[UNK]")
+
     bert_mlm_pretrain(model, tokenizer, train_data)
 
+    eval_bert_mlm(model, val_data)
 # bert mlm training notes: loss you get from predicting random tokens out of 10k is 9.3, 1k is 6.7
