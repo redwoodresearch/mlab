@@ -1,4 +1,5 @@
 from torch import nn
+import torch.nn.functional as F
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_feats, out_feats, stride=1):
@@ -7,18 +8,18 @@ class ResidualBlock(nn.Module):
             nn.Conv2d(in_feats, out_feats, kernel_size=3, stride=stride, padding=1, bias=False),
             nn.BatchNorm2d(out_feats),
             nn.ReLU(),
-            nn.Conv2d(out_feats, out_feats, kernel_size=3, bias=False),
+            nn.Conv2d(out_feats, out_feats, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_feats),
         )
         self.downsample = nn.Sequential(
-            nn.Conv2d(in_feats, out_feats, kernel_size=1, stride=stride, padding=1, bias=False),
+            nn.Conv2d(in_feats, out_feats, kernel_size=1, stride=stride, bias=False),
             nn.BatchNorm2d(out_feats),
         ) if stride != 1 else None
 
     def forward(self, x):
         y_out = self.net(x)
         x_out = x if self.downsample is None else self.downsample(x)
-        out = self.relu(x_out + y_out)
+        out = F.relu(x_out + y_out)
         return out
 
 class ResNet(nn.Module):
@@ -52,14 +53,18 @@ class ResNet(nn.Module):
         )
 
     def forward(self, x):
-        x = self.in_layer(x)
+        x = self.in_layers(x)
         x = self.residual_layers(x)
-        x = self.out_layer(x)
+        x = self.out_layers(x)
         return x
 
-simple_resnet34 = ResNet([3, 4, 6, 3])
-from torchvision import models
-torch_resnet34 = models.resnet34()
-
-print(simple_resnet34)
-print(torch_resnet34)
+def resnet34_with_pretrained_weights():
+    simple_resnet34 = ResNet([3, 4, 6, 3])
+    from torchvision import models
+    torch_resnet34 = models.resnet34(pretrained=True)
+    new_state_dict = {k1:v2 for (k1, _), (k2, v2) in zip(simple_resnet34.state_dict().items(), torch_resnet34.state_dict().items())}
+    simple_resnet34.load_state_dict(new_state_dict)
+    import torch
+    x = torch.randn((5, 3, 224, 224))
+    assert torch.allclose(simple_resnet34(x), torch_resnet34(x))
+    return simple_resnet34
