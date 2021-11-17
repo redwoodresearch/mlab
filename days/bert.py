@@ -152,7 +152,11 @@ class Bert(Module):
         self.embedding = BertEmbedding(self.config)
         self.transformer = Sequential(*[BertLayer(self.config) for _ in range(self.config["num_layers"])])
 
-    def forward(self, input_ids, token_type_ids):
+    def forward(self, input_ids, token_type_ids=None):
+
+        if token_type_ids is None:
+            token_type_ids = t.zeros_like(input_ids).to(next(self.parameters()).device)
+
         embeddings = self.embedding.embed(input_ids=input_ids, token_type_ids=token_type_ids)
         encodings = self.transformer(embeddings)
         output_ids = self.embedding.unembed(encodings)
