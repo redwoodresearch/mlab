@@ -1,7 +1,6 @@
 import torch as t
 import numpy as np
 from modules import cross_entropy_loss
-from torchtyping import TensorType
 from einops import rearrange
 from days.bert import Bert
 from utils import tpeek, tstat
@@ -11,7 +10,7 @@ import gin
 
 from torch.optim import Adam
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda" if t.cuda.is_available() else "cpu"
 
 
 @gin.configurable

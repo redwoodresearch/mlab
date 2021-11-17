@@ -3,7 +3,6 @@ import numpy as np
 from torch.nn import Module, Parameter, Sequential
 
 from days.modules import gelu, Embedding, Dropout, LayerNorm, softmax, Linear
-from torchtyping import TensorType
 from einops import rearrange
 from utils import tpeek, tstat
 
@@ -22,7 +21,7 @@ class BertEmbedding(Module):
         self.layer_norm = LayerNorm((embedding_size,))
         self.dropout = Dropout(config["dropout"])
 
-    def embed(self, token_ids: TensorType[..., t.long], token_type_ids):
+    def embed(self, token_ids: t.LongTRensor, token_type_ids):
         seq_length = token_ids.shape[1]
         token_embeddings = self.token_embedding(token_ids)
         token_type_embeddings = self.token_type_embedding(token_type_ids)
@@ -32,7 +31,7 @@ class BertEmbedding(Module):
         embeddings = self.dropout(embeddings)
         return embeddings
 
-    def unembed(self, embeddings: TensorType["...", "embed_dim"]):
+    def unembed(self, embeddings: t.Tensor):
         return self.token_embedding.unembed(embeddings)
 
 

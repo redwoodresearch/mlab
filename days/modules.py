@@ -2,7 +2,6 @@ import torch as t
 import numpy as np
 from torch.nn import Module, Parameter
 
-from torchtyping import TensorType
 from utils import tpeek
 
 
@@ -71,7 +70,7 @@ class Linear(Module):
         else:
             self.bias = None
 
-    def forward(self, x: TensorType[..., "ni_channels"]) -> TensorType[..., "out_channels"]:
+    def forward(self, x: t.Tensor) -> t.Tensor:
         x = t.einsum("...j,kj->...k", x, self.weight)
         if self.bias is not None:
             x += self.bias
