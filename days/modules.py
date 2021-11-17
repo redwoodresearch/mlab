@@ -31,7 +31,7 @@ def normalize(tensor: t.Tensor, dim: int = -1, eps=1e-12):
 
 
 class LayerNorm(Module):
-    def __init__(self, shape, eps=1e-05):
+    def __init__(self, shape, eps=1e-6):
         super(LayerNorm, self).__init__()
         self.bias = Parameter(t.zeros(shape))
         self.weight = Parameter(t.ones(shape))

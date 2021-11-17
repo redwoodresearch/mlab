@@ -3,7 +3,9 @@ import numpy as np
 from torch.nn import Module, Parameter, Sequential  # not allowed to use other stuff from nn
 from transformers import AutoTokenizer
 
-from days.modules import gelu, Embedding, Dropout, LayerNorm, softmax, Linear
+# from days.modules import gelu, Embedding, Dropout, LayerNorm, softmax, Linear
+from torch.nn import Embedding, Dropout, LayerNorm, Linear
+from torch.nn.functional import gelu, softmax
 from einops import rearrange
 from utils import tpeek, tstat
 
