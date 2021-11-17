@@ -92,14 +92,14 @@ class Embedding(Module):
         return t.einsum("...j,kj->...k", embeddings, self.weight) / np.sqrt(self.embedding_size)
 
 
-def cross_entropy_loss(input, target, dim=-1, ignore_id=None):
+def cross_entropy(input, target, ignore_index=None):
     exps = np.e ** input
-    exp_sums = exps.sum(dim=dim)
+    exp_sums = exps.sum(dim=-1)
     exp_sum_logs = t.log(exp_sums)
-    gathered = t.gather(input, dim, target.unsqueeze(-1)).squeeze(-1)
+    gathered = t.gather(input, -1, target.unsqueeze(-1)).squeeze(-1)
     token_losses = exp_sum_logs - gathered
-    if ignore_id is not None:
-        live_mask = target != ignore_id
+    if ignore_index is not None:
+        live_mask = target != ignore_index
         token_losses *= live_mask
         live_fraction = t.sum(live_mask) / live_mask.nelement()
         if live_fraction == 0:

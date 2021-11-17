@@ -1,6 +1,6 @@
 import torch as t
 import numpy as np
-from modules import cross_entropy_loss
+from modules import cross_entropy
 from einops import rearrange
 from days.bert import Bert, my_bert_from_hf_weights
 from utils import tpeek, tstat
@@ -45,7 +45,7 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=2, lr=1e-4):
 
             hidden_input_ids = input_ids * mask_ids
 
-            loss = cross_entropy_loss(model_output, hidden_input_ids, dim=-1, ignore_id=0)
+            loss = cross_entropy(model_output, hidden_input_ids, dim=-1, ignore_index=0)
             loss.backward()
             optimizer.step()
             if i % print_every_n == print_every_n - 1:
@@ -61,3 +61,5 @@ if __name__ == "__main__":
     train_data = "\n".join(train_data_sentence_iterator).replace("<unk>", "[UNK]")
 
     bert_mlm_pretrain(model, tokenizer, train_data)
+
+# bert mlm training notes: loss you get from predicting random tokens out of 10k is 9.25
