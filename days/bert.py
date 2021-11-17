@@ -28,7 +28,7 @@ class BertEmbedding(Module):
         seq_length = input_ids.shape[1]
         token_embeddings = self.token_embedding(input_ids)
         token_type_embeddings = self.token_type_embedding(token_type_ids)
-        position_embeddings = self.position_embedding(t.arange(seq_length))
+        position_embeddings = self.position_embedding(t.arange(seq_length).to(next(self.parameters())))
         embeddings = token_embeddings + token_type_embeddings + position_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
