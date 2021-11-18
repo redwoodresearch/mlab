@@ -194,10 +194,17 @@ def test_gpt2():
     inputs = {
         "input_ids": t.LongTensor([[0, 1, 2, 3], [5, 6, 7, 8]]),
     }
-    their_output = their_gpt2(**inputs).logits
-    tpeek("their logits", their_output)
-    my_output = my_gpt2(**inputs).logits
-    tpeek("my logits", my_output)
+
+    example_hidden_layer = t.FloatTensor(2, 4, 768).uniform_(-1, 1)
+    their_output = their_gpt2.transformer.h[0](example_hidden_layer)[0]
+    print(their_output)
+    tpeek("their encodings", their_output)
+    my_output = my_gpt2.transformer.blocks[0](example_hidden_layer)
+    tpeek("my encodings", my_output)
+    # their_output = their_gpt2(**inputs).logits[:, -1]
+    # tpeek("their logits", their_output)
+    # my_output = my_gpt2(**inputs).logits
+    # tpeek("my logits", my_output)
 
 
 if __name__ == "__main__":

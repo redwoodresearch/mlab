@@ -32,6 +32,10 @@ class GPT2Attention(Module):
         value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
 
         attention_raw = t.einsum("bhfc,bhtc->bhft", query, key) / np.sqrt(head_size)
+
+        unidirectional_mask = t.BoolTensor()
+        attention_raw *= unidirectional_mask
+
         if attention_masks is not None:
             attention_raw = attention_raw * attention_masks
         attention_patterns = softmax(attention_raw, dim=-1)
@@ -118,21 +122,20 @@ class GPT2(Module):
 
 def my_gpt_from_hf_weights():
     their_lm_model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
-    print(their_lm_model)
     their_model: transformers.models.gpt2.modeling_gpt2.GPT2Model = their_lm_model.transformer
     my_model = GPT2({})
 
     my_model.token_embedding = their_model.wte
     my_model.token_embedding = their_model.wpe
     for their_layer, my_layer in zip(their_model.h, my_model.transformer.blocks):
-        copy_weight_bias(my_layer.fc1, their_layer.mlp.c_fc)
-        copy_weight_bias(my_layer.fc2, their_layer.mlp.c_proj)
+        copy_weight_bias(my_layer.fc1, their_layer.mlp.c_fc, transpose=True)
+        copy_weight_bias(my_layer.fc2, their_layer.mlp.c_proj, transpose=True)
 
         copy_weight_bias(my_layer.layer_norm_1, their_layer.ln_1)
         copy_weight_bias(my_layer.layer_norm_2, their_layer.ln_2)
 
-        copy_weight_bias(my_layer.attention.c_attn, their_layer.attn.c_attn)
-        copy_weight_bias(my_layer.attention.c_proj, their_layer.attn.c_proj)
+        copy_weight_bias(my_layer.attention.c_attn, their_layer.attn.c_attn, transpose=True)
+        copy_weight_bias(my_layer.attention.c_proj, their_layer.attn.c_proj, transpose=True)
 
     copy_weight_bias(my_model.layer_norm_final, their_model.ln_f)
     # not supporting cross attention

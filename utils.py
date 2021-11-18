@@ -19,10 +19,10 @@ def has_not_null(obj, prop):
     return hasattr(obj, prop) and (getattr(obj, prop) is not None)
 
 
-def copy_weight_bias(mine, theirs):
+def copy_weight_bias(mine, theirs, transpose=False):
     # support weights called 'w' because sometimes oai does that
-    if hasattr(theirs, "w") and not hasattr(theirs, "weight"):
-        mine.weight = rearrange(theirs.w, "a b -> b a")
+    if transpose:
+        mine.weight = t.nn.Parameter(rearrange(theirs.weight, "a b -> b a"))
     else:
         mine.weight = theirs.weight
 
