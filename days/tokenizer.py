@@ -11,7 +11,7 @@ import functools
 # how unigram lm works: pick the tokenization such that a unigram lm on them has the best loss
 # https://everdark.github.io/k9/notebooks/ml/natural_language_understanding/subword_units/subword_units.nb.html
 class ViterbiTokenizer:
-    def __init__(self, token_list, pad=0, sep=1, cls=2, unk=3, mask=4, normalizer=str.lower):
+    def __init__(self, token_list, pad=0, sep=1, cls=None, bot=2, eot = 2, unk=3, mask=4, normalizer=str.lower):
         self.replacements = {"▁": " "}
         for obj in token_list:
             obj["piece"] = self._replace_all(obj["piece"])
@@ -19,7 +19,12 @@ class ViterbiTokenizer:
         self.text_to_id = None
         self.id_to_text = None
         self.pad = pad
-        self.cls = cls
+        if cls:
+            self.eot = cls
+            self.bot = cls
+        else:
+            self.eot = eot
+            self.bot = bot
         self.mask = mask
         self.unk = unk
         self.vocab = {x["piece"]: x for x in token_list}
@@ -29,27 +34,31 @@ class ViterbiTokenizer:
     def _replace_all(self, text):
         return functools.reduce(lambda a, x: a.replace(x[0], x[1]), self.replacements.items(), text)
 
-    def tokenize(self, texts):
+    def tokenize(self, texts, **kwargs):
         if isinstance(texts, str):
-            return self._tokenize(texts)
+            return self._tokenize(texts,**kwargs)
         results = []
         for text in texts:
             results.append(self._tokenize(text))
         return results
 
-    def __call__(self, texts):
-        return self.tokenize(texts)
+    def __call__(self, texts,**kwargs):
+        return self.tokenize(texts,**kwargs)
 
-    def _tokenize(self, text):
+    def _tokenize(self, text, pad_length = None, ends = False):
         if self.normalizer is not None:
             text = self.normalizer(text)
         neg_loglik, best_subw_slices = self.viterbi_forward(text)
         ids = self.viterbi_backward(text, best_subw_slices)
         print("".join([self.vocab_by_id[id]["piece"] for id in ids]))
+        if ends:
+            ids  = [self.bot] + ids + [self.eot]
+        if pad_length:
+            ids.extend([self.pad]*(pad_length-len(ids)))
         return ids
 
     def viterbi_forward(self, sequence):
-        """Forward step of Viterbi given a single word."""
+        """Forward step of Viterbi."""
         # Create storage array for best substring recorded at each end-of-character position.
         best_subw_slices = [None] * (len(sequence) + 1)
         neg_loglik = np.zeros(len(sequence) + 1)
@@ -104,3 +113,49 @@ if __name__ == "__main__":
     with Timer():
         my_tokens = my_tokenizer(example_str)
     print(my_tokens)
+    btxt = """int:   git config pull.rebase false  # merge (the default strategy)
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+Updating e067129..b21c5a9
+Fast-forward
+ .gitignore       |   3 +-
+ days/bert.py     |  20 +-----
+ days/bert_run.py |  19 ++++--
+ days/gpt2.py     | 138 +++++++++++++++++++++++++++++++++++++++++
+ utils.py         |  15 +++++
+ 5 files changed, 173 insertions(+), 22 deletions(-)
+ create mode 100644 days/gpt2.py
+tao@Taos-MacBook-Air mlab % git pull
+hint: Pulling without specifying how to reconcile divergent branches is
+hint: discouraged. You can squelch this message by running one of the following
+hint: commands sometime before your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge (the default strategy)
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+Updating b21c5a9..4caa896
+Fast-forward
+ days/bert.py            |     46 +-
+ days/gpt2.py            |     92 +-
+ days/modules.py         |     75 +-
+ days/resnet.py          |     64 +-
+ days/sentencepiece.json | 180002 +++++++++++++++++++++++++++++++
+ days/spiece.model       |    Bin 0 -> 760289 bytes
+ days/tokenizer.py       |    106 +
+ test_all.py             |     30 +-
+ utils.py                |     29 +-
+ 9 files changed, 180344 insertions(+), 100 deletions(-)"""
+    with Timer():
+        my_tokens = my_tokenizer(example_str)
+    print(my_tokens)
+    
