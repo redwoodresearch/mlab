@@ -1,6 +1,7 @@
 from einops.einops import rearrange
 import torch as t
 import numpy as np
+import time
 
 
 def tstat(name, tensor):
@@ -13,6 +14,17 @@ def tpeek(name, tensor):
     print(
         f"{name} MEAN: {'{0:.4g}'.format(t.mean(tensor).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor).cpu().item())} SHAPE {tuple(tensor.shape)} VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}]"
     )
+
+
+class Timer:
+    def __enter__(self):
+        self.start = time.time()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.time()
+        self.interval = self.end - self.start
+        print("took", self.interval)
 
 
 def getprops(obj):

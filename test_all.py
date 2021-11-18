@@ -6,6 +6,7 @@ from torch.nn.modules import activation
 from transformers.utils.dummy_sentencepiece_objects import PegasusTokenizer
 import days.bert as bert
 import days.gpt2 as gpt2
+import days.resnet as resnet
 import pytest
 import transformers
 from utils import tpeek, tstat
@@ -207,6 +208,10 @@ def test_gpt2():
     # tpeek("my logits", my_output)
 
 
+def test_resnet():
+    resnet.resnet34_with_pretrained_weights()
+
+
 if __name__ == "__main__":
     # test_relu()
     # test_gelu()
@@ -215,6 +220,7 @@ if __name__ == "__main__":
     # test_layer_norm()
     # test_embedding()
     # test_bert()
+    test_resnet()
     test_gpt2()
 
     # test_self_attention_fundamentals() # this looks okay?
