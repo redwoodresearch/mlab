@@ -259,3 +259,27 @@ class BatchNorm2d(Module):
 
         rs = lambda u : u.reshape(1, -1, 1, 1)
         return rs(self.weight) * (x - rs(mean)) / t.sqrt(rs(var) + self.eps) + rs(self.bias)
+
+
+class AdaptiveAvgPool2d(Module):
+    def __init__(self, output_size):
+        super().__init__()
+        self.output_size = _pair(output_size)
+
+    def forward(self, x):
+        def kernels(in_dim, out_dim):
+            return [slice(math.floor((i * in_dim) / out_dim),
+                          math.ceil(((i + 1) * in_dim) / out_dim))
+                    for i in range(out_dim)]
+
+        B, C, iH, iW = x.shape
+        oH, oW = self.output_size
+
+        kHs = kernels(iH, oH)
+        kWs = kernels(iW, oW)
+
+        out = t.empty((B, C, oH, oW))
+        for i, ker_H in enumerate(kHs):
+            for j, ker_W in enumerate(kWs):
+                out[:, :, i, j] = t.mean(x[:, :, ker_H, ker_W], (-2, -1))
+        return out
