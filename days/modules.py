@@ -179,3 +179,50 @@ class Conv2d(Module):
 
         strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2*pW, 1))
         return t.einsum('bcxyij,ocij->boxy', strided_x, self.weight) + self.bias.reshape(1, -1, 1, 1)
+
+
+class MaxPool2d(Module):
+    def __init__(
+        self,
+        kernel_size,
+        stride=None,
+        padding=1,
+        dilation=1,
+    ):
+        super().__init__()
+        if stride is None:
+            stride = kernel_size
+
+        self.kernel_size = _pair(kernel_size)
+        self.stride = _pair(stride)
+        self.padding = _pair(padding)
+        self.dilation = _pair(dilation)
+
+    def forward(self, x):
+        sH, sW = self.stride
+        pH, pW = self.padding
+        B, iC, iH, iW = x.shape
+        kH, kW = self.kernel_size
+        oH = (iH + 2*pH - kH) // sH + 1
+        oW = (iW + 2*pW - kW) // sW + 1
+
+        from torch.nn.functional import pad
+        padded_x = pad(x, [pH, pH, pW, pW])
+
+        sx_stride = t.tensor(padded_x.stride())
+        sx_stride[-2] *= sH
+        sx_stride[-1] *= sW
+        sx_stride = tuple(sx_stride)
+
+        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2*pW, 1))
+        return strided_x.amax((-2, -1))
+
+
+class Flatten(Module):
+    def __init__(self, start_dim=1, end_dim=-1):
+        super().__init__()
+        self.start_dim = start_dim
+        self.end_dim = end_dim
+
+    def forward(self, x):
+        return x.flatten(self.start_dim, self.end_dim)

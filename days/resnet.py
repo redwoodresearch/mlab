@@ -1,7 +1,7 @@
 from torch import nn
 import torch.nn.functional as F
-from torch.nn import BatchNorm2d, MaxPool2d, AdaptiveAvgPool2d, Flatten
-from days.modules import Linear, ReLU, Conv2d
+from torch.nn import BatchNorm2d, AdaptiveAvgPool2d
+from days.modules import Linear, ReLU, Conv2d, MaxPool2d, Flatten
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_feats, out_feats, stride=1):
