@@ -1,19 +1,21 @@
 from torch import nn
 import torch.nn.functional as F
+from torch.nn import BatchNorm2d, MaxPool2d, AdaptiveAvgPool2d, Flatten
+from days.modules import Linear, ReLU, Conv2d
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_feats, out_feats, stride=1):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(in_feats, out_feats, kernel_size=3, stride=stride, padding=1, bias=False),
-            nn.BatchNorm2d(out_feats),
-            nn.ReLU(),
-            nn.Conv2d(out_feats, out_feats, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_feats),
+            Conv2d(in_feats, out_feats, kernel_size=3, stride=stride, padding=1, bias=False),
+            BatchNorm2d(out_feats),
+            ReLU(),
+            Conv2d(out_feats, out_feats, kernel_size=3, padding=1, bias=False),
+            BatchNorm2d(out_feats),
         )
         self.downsample = nn.Sequential(
-            nn.Conv2d(in_feats, out_feats, kernel_size=1, stride=stride, bias=False),
-            nn.BatchNorm2d(out_feats),
+            Conv2d(in_feats, out_feats, kernel_size=1, stride=stride, bias=False),
+            BatchNorm2d(out_feats),
         ) if stride != 1 else None
 
     def forward(self, x):
@@ -28,10 +30,10 @@ class ResNet(nn.Module):
         in_feats0 = 64
 
         self.in_layers = nn.Sequential(
-            nn.Conv2d(3, in_feats0, kernel_size=7, stride=2, padding=3, bias=False),
-            nn.BatchNorm2d(in_feats0),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            Conv2d(3, in_feats0, kernel_size=7, stride=2, padding=3, bias=False),
+            BatchNorm2d(in_feats0),
+            ReLU(),
+            MaxPool2d(kernel_size=3, stride=2, padding=1),
         )
 
         all_out_feats = [64, 128, 256, 512]
@@ -47,9 +49,9 @@ class ResNet(nn.Module):
         )
 
         self.out_layers = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(512, n_outs),
+            AdaptiveAvgPool2d((1, 1)),
+            Flatten(),
+            Linear(512, n_outs),
         )
 
     def forward(self, x):
@@ -66,5 +68,5 @@ def resnet34_with_pretrained_weights():
     simple_resnet34.load_state_dict(new_state_dict)
     import torch
     x = torch.randn((5, 3, 224, 224))
-    assert torch.allclose(simple_resnet34(x), torch_resnet34(x))
+    assert torch.allclose(simple_resnet34(x), torch_resnet34(x), atol=1e-4, rtol=1e-4)
     return simple_resnet34

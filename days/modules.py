@@ -32,6 +32,11 @@ def normalize(tensor: t.Tensor, dim: int = -1, eps=1e-12):
     return tensor
 
 
+class ReLU(Module):
+    def forward(self, x):
+        return relu(x)
+
+
 class LayerNorm(Module):
     def __init__(self, shape, eps=1e-6):
         if isinstance(shape, int):
@@ -138,9 +143,13 @@ class Conv2d(Module):
         groups=1,
         bias=True,
     ):
+        kernel_size = _pair(kernel_size)
+        self.stride = _pair(stride)
+        self.padding = _pair(padding)
+
         super().__init__()
         # uniform(-1/sqrt(k), 1/sqrt(k)), where k = weight.size(1) * prod(*kernel_size)
-        weight_size = (in_channels, out_channels // groups, *kernel_size)
+        weight_size = (out_channels, in_channels // groups, *kernel_size)
         bound = 1 / math.sqrt(weight_size[1] * math.prod(kernel_size))
         self.weight = Parameter(t.FloatTensor(*weight_size).uniform_(-bound, bound))
 
@@ -151,18 +160,22 @@ class Conv2d(Module):
         else:
             self.bias = t.zeros(out_channels)
 
-        self.stride = _pair(stride)
-        self.padding = _pair(padding)
 
     def forward(self, x):
         sH, sW = self.stride
         pH, pW = self.padding
         B, iC, iH, iW = x.shape
         oC, _, kH, kW = self.weight.shape
-        oH = (iH + 2*pH - kH + 1) // sH
-        oW = (iW + 2*pW - kW + 1) // sW
+        oH = (iH + 2*pH - kH) // sH + 1
+        oW = (iW + 2*pW - kW) // sW + 1
 
         from torch.nn.functional import pad
         padded_x = pad(x, [pH, pH, pW, pW])
-        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=padded_x.stride() + (iW * sH, sW))
+
+        sx_stride = t.tensor(padded_x.stride())
+        sx_stride[-2] *= sH
+        sx_stride[-1] *= sW
+        sx_stride = tuple(sx_stride)
+
+        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2*pW, 1))
         return t.einsum('bcxyij,ocij->boxy', strided_x, self.weight) + self.bias.reshape(1, -1, 1, 1)
