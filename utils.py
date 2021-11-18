@@ -15,6 +15,13 @@ def tpeek(name, tensor):
     )
 
 
+def getprops(obj):
+    props = set(dir(obj))
+    strprops = set(dir(" "))
+    justones = sorted(list(props - strprops))
+    print("props: \n", "\n    ".join(justones))
+
+
 def has_not_null(obj, prop):
     return hasattr(obj, prop) and (getattr(obj, prop) is not None)
 
