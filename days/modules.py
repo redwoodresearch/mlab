@@ -7,10 +7,10 @@ from torch.nn import Module, Parameter
 from utils import tpeek
 
 
-def softmax(tensor: t.Tensor, dim: int = 0):
+def softmax(tensor: t.Tensor, dim: int = 0, eps=1e-9):
     exps = np.e ** tensor
     exp_sums = exps.sum(dim=dim, keepdim=True)
-    result = exps / exp_sums
+    result = exps / (exp_sums)
     return result
 
 
@@ -122,6 +122,7 @@ def cross_entropy(input, target, ignore_index=None, max=1e12):
 def _ntuple(n):
     import collections
     from itertools import repeat
+
     def parse(x):
         if isinstance(x, collections.abc.Iterable):
             return tuple(x)
@@ -129,7 +130,9 @@ def _ntuple(n):
 
     return parse
 
+
 _pair = _ntuple(2)
+
 
 class Conv2d(Module):
     def __init__(
@@ -160,16 +163,16 @@ class Conv2d(Module):
         else:
             self.bias = t.zeros(out_channels)
 
-
     def forward(self, x):
         sH, sW = self.stride
         pH, pW = self.padding
         B, iC, iH, iW = x.shape
         oC, _, kH, kW = self.weight.shape
-        oH = (iH + 2*pH - kH) // sH + 1
-        oW = (iW + 2*pW - kW) // sW + 1
+        oH = (iH + 2 * pH - kH) // sH + 1
+        oW = (iW + 2 * pW - kW) // sW + 1
 
         from torch.nn.functional import pad
+
         padded_x = pad(x, [pH, pH, pW, pW])
 
         sx_stride = t.tensor(padded_x.stride())
@@ -177,8 +180,8 @@ class Conv2d(Module):
         sx_stride[-1] *= sW
         sx_stride = tuple(sx_stride)
 
-        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2*pW, 1))
-        return t.einsum('bcxyij,ocij->boxy', strided_x, self.weight) + self.bias.reshape(1, -1, 1, 1)
+        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2 * pW, 1))
+        return t.einsum("bcxyij,ocij->boxy", strided_x, self.weight) + self.bias.reshape(1, -1, 1, 1)
 
 
 class MaxPool2d(Module):
@@ -203,10 +206,11 @@ class MaxPool2d(Module):
         pH, pW = self.padding
         B, iC, iH, iW = x.shape
         kH, kW = self.kernel_size
-        oH = (iH + 2*pH - kH) // sH + 1
-        oW = (iW + 2*pW - kW) // sW + 1
+        oH = (iH + 2 * pH - kH) // sH + 1
+        oW = (iW + 2 * pW - kW) // sW + 1
 
         from torch.nn.functional import pad
+
         padded_x = pad(x, [pH, pH, pW, pW])
 
         sx_stride = t.tensor(padded_x.stride())
@@ -214,7 +218,7 @@ class MaxPool2d(Module):
         sx_stride[-1] *= sW
         sx_stride = tuple(sx_stride)
 
-        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2*pW, 1))
+        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2 * pW, 1))
         return strided_x.amax((-2, -1))
 
 
@@ -240,9 +244,9 @@ class BatchNorm2d(Module):
         self.momentum = momentum
         self.weight = Parameter(t.ones(num_features))
         self.bias = Parameter(t.zeros(num_features))
-        self.register_buffer('running_mean', t.zeros(num_features))
-        self.register_buffer('running_var', t.ones(num_features))
-        self.register_buffer('num_batches_tracked', t.tensor(0))
+        self.register_buffer("running_mean", t.zeros(num_features))
+        self.register_buffer("running_var", t.ones(num_features))
+        self.register_buffer("num_batches_tracked", t.tensor(0))
 
     def forward(self, x):
         ids = (0, 2, 3)
@@ -257,5 +261,5 @@ class BatchNorm2d(Module):
             mean = self.running_mean
             var = self.running_var
 
-        rs = lambda u : u.reshape(1, -1, 1, 1)
+        rs = lambda u: u.reshape(1, -1, 1, 1)
         return rs(self.weight) * (x - rs(mean)) / t.sqrt(rs(var) + self.eps) + rs(self.bias)

@@ -192,16 +192,27 @@ def test_bert():
 
 def test_gpt2():
     my_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
+    my_gpt2.eval()
+    their_gpt2.eval()
+
     inputs = {
-        "input_ids": t.LongTensor([[0, 1, 2, 3], [5, 6, 7, 8]]),
+        "input_ids": t.LongTensor([[0, 1], [2, 3]]),
     }
 
-    example_hidden_layer = t.FloatTensor(2, 4, 768).uniform_(-1, 1)
-    their_output = their_gpt2.transformer.h[0](example_hidden_layer)[0]
-    print(their_output)
-    tpeek("their encodings", their_output)
-    my_output = my_gpt2.transformer.blocks[0](example_hidden_layer)
-    tpeek("my encodings", my_output)
+    example_encoding = t.FloatTensor(2, 2, 768).uniform_(-1, 1)
+
+    # their_output = their_gpt2.transformer.h[0].attn(example_encoding)[0]
+    # tpeek("their attentionss", their_output)
+    # my_output = my_gpt2.transformer.blocks[0].attention(example_encoding)
+    # their_output = their_gpt2.transformer.h[0].attn(example_encoding)[0]
+
+    # tpeek("their encodings", their_output)
+    my_output = my_gpt2.transformer.blocks[0](example_encoding)
+    their_output = their_gpt2.transformer.h[0](example_encoding)[0]
+    tpeek("my layer", my_output)
+    tpeek("their layer", their_output)
+    # tpeek("my encodings", my_output)
+
     # their_output = their_gpt2(**inputs).logits[:, -1]
     # tpeek("their logits", their_output)
     # my_output = my_gpt2(**inputs).logits
@@ -220,8 +231,8 @@ if __name__ == "__main__":
     # test_layer_norm()
     # test_embedding()
     # test_bert()
-    test_resnet()
     test_gpt2()
+    # test_resnet()
 
     # test_self_attention_fundamentals() # this looks okay?
     # test_linear()  # idk why this isn't producing same result

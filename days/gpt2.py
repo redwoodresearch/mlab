@@ -12,37 +12,47 @@ from utils import tpeek, tstat, copy_weight_bias
 from dataclasses import dataclass
 import transformers
 
+from torch import nn
+
 
 class GPT2Attention(Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
         hidden_size = config["hidden_size"]
+        max_positions = config["max_position_embeddings"]
         self.c_attn = Linear(hidden_size, hidden_size * 3)
         self.c_proj = Linear(hidden_size, hidden_size)
         self.dropout = Dropout(config["dropout"])
+        self.register_buffer(
+            "mask",
+            t.tril(t.ones((max_positions, max_positions), dtype=t.bool)).view(1, 1, max_positions, max_positions),
+        )
+        self.masked_bias = t.tensor(-1e4)
 
-    def forward(self, encodings, attention_masks=None):
+    def forward(self, encodings, attention_masks=None, past_key_values=None):
         num_heads = self.config["num_heads"]
         head_size = self.config["hidden_size"] // num_heads
-
-        key, query, value = t.split(self.c_attn(encodings), self.config["hidden_size"], -1)
+        sequence_length = encodings.shape[1]
+        cattn = self.c_attn(encodings)
+        query, key, value = t.split(cattn, self.config["hidden_size"], -1)
         query = rearrange(query, "b s (h c) -> b h s c", h=num_heads)
         key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
         value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
 
         attention_raw = t.einsum("bhfc,bhtc->bhft", query, key) / np.sqrt(head_size)
 
-        unidirectional_mask = t.BoolTensor()
-        attention_raw *= unidirectional_mask
-
-        if attention_masks is not None:
-            attention_raw = attention_raw * attention_masks
-        attention_patterns = softmax(attention_raw, dim=-1)
+        unidirectional_mask = self.mask[:, :, :sequence_length, :sequence_length]
+        attention_raw = t.where(unidirectional_mask, attention_raw, self.masked_bias)
+        # if attention_masks is not None:
+        #     attention_raw = attention_raw * attention_masks
+        tpeek("my pre softmax", attention_raw)
+        attention_patterns = nn.Softmax(dim=-1)(attention_raw)
+        tpeek("my patterns", attention_patterns)
 
         context_layer = t.einsum("bhft,bhtc->bhfc", attention_patterns, value)
         attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
-
+        tpeek("my ctx", attention_values)
         return attention_values  # a, present, (attentions)
 
 
@@ -53,16 +63,16 @@ class GPT2Layer(Module):
         hidden_size = config["hidden_size"]
         self.layer_norm_1 = LayerNorm((hidden_size,), eps=config["layer_norm_eps"])
         self.attention = GPT2Attention(config)
-        # gpt2 calls these fully connected layers "conv1d", but they're actually just linear layers, not conv1d layers
+        # gpt2 calls these fully connected layers "Linear", but they're actually just linear layers, not Linear layers
         self.fc1 = Linear(hidden_size, hidden_size * 4)
         self.fc2 = Linear(hidden_size * 4, hidden_size)
         self.layer_norm_2 = LayerNorm((hidden_size,), eps=config["layer_norm_eps"])
+        self.dropout = Dropout(config["dropout"])
 
-    def forward(self, encodings: t.Tensor):
-        attention_output = self.attention(self.layer_norm_1(encodings))
-        mlp_input = self.layer_norm_2(encodings + attention_output)
-        mlp_output = self.fc2(gelu(self.fc1(mlp_input)))
-        return mlp_input + mlp_output
+    def forward(self, x: t.Tensor, past_key_values=None):
+        x = x + self.attention(self.layer_norm_1(x))
+        x = x + self.dropout(self.fc2(gelu(self.fc1(self.layer_norm_2(x)))))
+        return x
 
 
 @dataclass
@@ -76,9 +86,14 @@ class GPT2Core(Module):
         super().__init__()
         self.config = config
         self.blocks = ModuleList([GPT2Layer(config) for _ in range(config["num_layers"])])
+        # cache is map from inputs as tuples to sequences of key/values
+        self.cache = {}
 
-    def forward(self, embeddings):
-        return Sequential(*self.blocks)(embeddings)
+    def forward(self, embeddings, use_cache=False):
+        if use_cache:
+            return Sequential(*self.blocks)(embeddings)
+        else:
+            return Sequential(*self.blocks)(embeddings)
 
 
 class GPT2(Module):
@@ -100,6 +115,7 @@ class GPT2(Module):
             "vocab_size": 50257,
         }
         config = {**default_config, **config}
+        config["use_cache"] = False
         self.config = config
         self.token_embedding = Embedding(config["vocab_size"], config["hidden_size"])
         self.position_embedding = Embedding(config["max_position_embeddings"], config["hidden_size"])
@@ -125,8 +141,8 @@ def my_gpt_from_hf_weights():
     their_model: transformers.models.gpt2.modeling_gpt2.GPT2Model = their_lm_model.transformer
     my_model = GPT2({})
 
-    my_model.token_embedding = their_model.wte
-    my_model.token_embedding = their_model.wpe
+    my_model.token_embedding.weight = their_model.wte.weight
+    my_model.token_embedding.weight = their_model.wpe.weight
     for their_layer, my_layer in zip(their_model.h, my_model.transformer.blocks):
         copy_weight_bias(my_layer.fc1, their_layer.mlp.c_fc, transpose=True)
         copy_weight_bias(my_layer.fc2, their_layer.mlp.c_proj, transpose=True)
