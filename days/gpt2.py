@@ -1,3 +1,4 @@
+from typing import *
 import torch as t
 import numpy as np
 from torch.nn import Module, Parameter, ModuleList, Sequential  # not allowed to use other stuff from nn
@@ -83,22 +84,6 @@ class GPT2Output:
     final_encoding: t.Tensor
 
 
-class GPT2Core(Module):
-    def __init__(self, config):
-        super().__init__()
-        config = convert_hf_to_my_config(config)
-        self.config = config
-        self.blocks = ModuleList([GPT2Layer(config) for _ in range(config["num_layers"])])
-        # cache is map from inputs as tuples to sequences of key/values
-        self.cache = {}
-
-    def forward(self, embeddings, use_cache=False):
-        if use_cache:
-            return Sequential(*self.blocks)(embeddings)
-        else:
-            return Sequential(*self.blocks)(embeddings)
-
-
 class GPT2(Module):
     def __init__(self, config):
         super().__init__()
@@ -119,13 +104,15 @@ class GPT2(Module):
         }
         # convert config params from HF
         config = {**default_config, **config}
-        config["use_cache"] = False
         self.config = config
         self.token_embedding = Embedding(config["vocab_size"], config["hidden_size"])
         self.position_embedding = Embedding(config["max_position_embeddings"], config["hidden_size"])
         self.dropout = Dropout(config["dropout"])
-        self.transformer = GPT2Core(config)
+        self.blocks = Sequential([GPT2Layer(config) for _ in range(config["num_layers"])])
         self.layer_norm_final = LayerNorm((config["hidden_size"],), eps=config["layer_norm_epsilon"])
+
+        # cache one sequence of tokens
+        self.cache = []
 
     def forward(self, input_ids: t.LongTensor):
         seq_length = input_ids.shape[1]
@@ -134,8 +121,23 @@ class GPT2(Module):
         embeddings = token_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
 
-        encodings = self.transformer(embeddings)
+        if self.config["use_cache"]:
+            for i, (current_id, (id, layer_kvs, _last_embedding)) in enumerate(zip(input_ids, self.cache)):
+                if current_id != id:
+                    self.cache = self.cache[:i]
+                    break
 
+            encodings = embeddings[:, len(self.cache) :]
+            new_cache_stuff = [[id, None, None] for id in input_ids[len(self.cache) :]]
+            for i, block in enumerate(self.blocks):
+                encodings, kvs = block(encodings, past_kvs=[layer_kvs[i] for id, layer_kvs in self.cache])
+                for id, layer_kvs, _last_embedding in new_cache_stuff:
+                    layer_kvs.append(kvs[i])
+            for i, thing in enumerate(new_cache_stuff):
+                thing[2] = encodings[:, 0, i]
+
+        else:
+            encodings = self.blocks(embeddings)
         encodings = self.layer_norm_final(encodings)
         final_encoding = encodings[:, -1, :]
         print("final encoding shape", final_encoding.shape)
@@ -177,7 +179,7 @@ def copy_gpt2_weights(to_model, from_model):
     print(their_model.config)
     to_model.token_embedding.weight = their_model.wte.weight
     to_model.position_embedding.weight = their_model.wpe.weight
-    for their_layer, my_layer in zip(their_model.h, to_model.transformer.blocks):
+    for their_layer, my_layer in zip(their_model.h, to_model.blocks):
         copy_gpt2_layer_weights(my_layer, their_layer)
 
     copy_weight_bias(to_model.layer_norm_final, their_model.ln_f)

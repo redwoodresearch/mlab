@@ -40,7 +40,7 @@ def init_both(my_class, their_class, *args, **kwargs):
     return my_class, their_class
 
 
-def testy(my_out, their_out, name):
+def allclose(my_out, their_out, name):
 
     if not t.allclose(my_out, their_out):
         tpeek("mine", my_out)
@@ -52,7 +52,7 @@ def test_relu():
     input = t.FloatTensor(435, 234).uniform_(-10, 10)
     my_out = modules.relu(input)
     their_out = F.relu(input)
-    testy(my_out, their_out, "relu")
+    allclose(my_out, their_out, "relu")
 
 
 def test_gelu():
@@ -60,21 +60,21 @@ def test_gelu():
     input = t.FloatTensor(435, 234).uniform_(-10, 10)
     my_out = modules.gelu(input)
     their_out = hf_gelu(input)
-    testy(my_out, their_out, "gelu")
+    allclose(my_out, their_out, "gelu")
 
 
 def test_softmax():
     input = t.FloatTensor(435, 234).uniform_(-10, 10)
     my_out = modules.softmax(input, dim=1)
     their_out = F.softmax(input, dim=1)
-    testy(my_out, their_out, "softmax")
+    allclose(my_out, their_out, "softmax")
 
 
 def test_normalize():
     input = t.FloatTensor(435, 234).uniform_(-10, 10)
     my_out = modules.normalize(input, dim=1)
     their_out = F.normalize(input, dim=1)
-    testy(my_out, their_out, "normalize")
+    allclose(my_out, their_out, "normalize")
 
 
 def test_layer_norm():
@@ -86,7 +86,7 @@ def test_layer_norm():
 
     my_out = my_layer_norm(input)
     their_out = their_layer_norm(input)
-    testy(my_out, their_out, "layer_norm")
+    allclose(my_out, their_out, "layer_norm")
 
 
 def test_linear():
@@ -97,7 +97,7 @@ def test_linear():
 
     my_out = my_linear(input)
     their_out = their_linear(input)
-    testy(my_out, their_out, "linear")
+    allclose(my_out, their_out, "linear")
 
 
 def test_embedding():
@@ -105,7 +105,7 @@ def test_embedding():
     my_embedding, their_embedding = init_both(bert.Embedding, nn.Embedding, 234, 111)
     my_output = my_embedding(embed_input)
     their_output = their_embedding(embed_input)
-    testy(my_output, their_output, "embedding")
+    allclose(my_output, their_output, "embedding")
 
 
 def test_bert_attention():
@@ -120,7 +120,7 @@ def test_bert_attention():
     their_output = their_layer(input_encoding)[0]
     tpeek("my output", my_output)
     tpeek("their output", their_output)
-    testy(my_output, their_output, "bert attention")
+    allclose(my_output, their_output, "bert attention")
 
 
 def test_bert_layer():
@@ -135,7 +135,7 @@ def test_bert_layer():
     their_output = their_layer(input_encoding)[0]
     tpeek("my output", my_output)
     tpeek("their output", their_output)
-    testy(my_output, their_output, "bert layer")
+    allclose(my_output, their_output, "bert layer")
 
 
 def test_bert():
@@ -151,7 +151,7 @@ def test_bert():
     their_logits = their_bert(**inputs).logits
     tpeek("my logits", my_logits)
     tpeek("their logits", their_logits)
-    testy(my_logits, their_logits, "bert")
+    allclose(my_logits, their_logits, "bert")
 
 
 def test_gpt2_layer():
@@ -202,11 +202,36 @@ def test_gpt2():
     assert t.allclose(my_output, their_output, atol=0.1, rtol=0.1)
 
 
+def test_gpt2_cache_is_correct():
+    short_input_ids = t.LongTensor([[0, 1, 2]])
+    long_input_ids = t.LongTensor([[0, 1, 2, 3, 4, 5, 6, 7]])
+    other_input_ids = t.LongTensor([[88, 323, 134]])
+
+    model = gpt2.GPT2({"use_cache": False})
+    model.eval()
+    short_no_cache = model(short_input_ids).logits
+    long_no_cache = model(long_input_ids).logits
+    other_no_cache = model(other_input_ids).logits
+
+    model = gpt2.GPT2({"use_cache": True})
+    model.eval()
+    short_cache = model(short_input_ids).logits
+    long_cache = model(long_input_ids).logits
+    other_cache = model(other_input_ids).logits
+
+    allclose(short_no_cache, short_cache, "cache short")
+    allclose(long_no_cache, long_cache, "cache long")
+    allclose(other_no_cache, other_cache, "cache other")
+
+
 def test_resnet():
     resnet.resnet34_with_pretrained_weights()
 
 
 if __name__ == "__main__":
+
+    test_gpt2_cache_is_correct()
+
     test_relu()
     test_gelu()
     test_softmax()
