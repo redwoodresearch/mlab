@@ -2,7 +2,7 @@ import torch as t
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from torch.nn.modules import activation
+import days.modules as modules
 from transformers.utils.dummy_sentencepiece_objects import PegasusTokenizer
 import days.bert as bert
 import days.gpt2 as gpt2
@@ -31,9 +31,6 @@ def setmyexcepthook():
 
 setmyexcepthook()
 
-MAX_TOLERANCE = 5e-3
-AVG_TOLERANCE = 1e-4
-
 
 def init_both(my_class, their_class, *args, **kwargs):
     t.random.manual_seed(0)
@@ -44,39 +41,38 @@ def init_both(my_class, their_class, *args, **kwargs):
 
 
 def testy(my_out, their_out, name):
-    maxdif = t.max(t.abs(my_out - their_out))
-    avgdif = t.mean(my_out - their_out)
-    if maxdif > MAX_TOLERANCE or avgdif > AVG_TOLERANCE:
+
+    if not t.allclose(my_out, their_out):
         tpeek("mine", my_out)
         tpeek("theirs", their_out)
-        raise AssertionError(f"{name} avgdif {float(avgdif)} maxdif {float(maxdif)}")
-    print(f"{name} avgdif {float(avgdif)} maxdif {float(maxdif)}")
+        raise AssertionError(name)
 
 
 def test_relu():
     input = t.FloatTensor(435, 234).uniform_(-10, 10)
-    my_out = bert.relu(input)
+    my_out = modules.relu(input)
     their_out = F.relu(input)
     testy(my_out, their_out, "relu")
 
 
 def test_gelu():
+    hf_gelu = transformers.activations.gelu_new
     input = t.FloatTensor(435, 234).uniform_(-10, 10)
-    my_out = bert.gelu(input)
-    their_out = F.gelu(input)
+    my_out = modules.gelu(input)
+    their_out = hf_gelu(input)
     testy(my_out, their_out, "gelu")
 
 
 def test_softmax():
     input = t.FloatTensor(435, 234).uniform_(-10, 10)
-    my_out = bert.softmax(input, dim=1)
+    my_out = modules.softmax(input, dim=1)
     their_out = F.softmax(input, dim=1)
     testy(my_out, their_out, "softmax")
 
 
 def test_normalize():
     input = t.FloatTensor(435, 234).uniform_(-10, 10)
-    my_out = bert.normalize(input, dim=1)
+    my_out = modules.normalize(input, dim=1)
     their_out = F.normalize(input, dim=1)
     testy(my_out, their_out, "normalize")
 
@@ -105,38 +101,45 @@ def test_linear():
 
 
 def test_embedding():
-    unembed_input = t.FloatTensor(643, 23, 111).uniform_(-1, 1)
     embed_input = t.LongTensor([[1, 2, 3], [7, 8, 9]])
     my_embedding, their_embedding = init_both(bert.Embedding, nn.Embedding, 234, 111)
-    tstat("my embedding", my_embedding.weight)
-    tstat("their embedding", their_embedding.weight)
-
-    my_out = my_embedding.embed(embed_input)
-    their_out = their_embedding(embed_input)
-    testy(my_out, their_out, "embedding")
-
-    my_out = my_embedding.unembed(unembed_input)
+    my_output = my_embedding(embed_input)
+    their_output = their_embedding(embed_input)
+    testy(my_output, their_output, "embedding")
 
 
-def test_self_attention_fundamentals():
-    width = 16
-    activations = t.FloatTensor(10, 10, width).normal_(0, 1)
-    # activations = t.FloatTensor(10, 10, width).fill_(1)
-    q = t.eye(width)
-    k = t.eye(width)
-    v = t.eye(width)
-    tpeek("activations", activations)
-    output = bert.multi_head_self_attention(
-        activations, attention_masks=None, num_heads=4, project_query=q, project_key=k, project_value=v
-    )
-    print("shape", output.shape)
-    tpeek("output", output)
-    tstat("output", output)
+def test_bert_attention():
+    their_bert = transformers.AutoModelForMaskedLM.from_pretrained("bert-base-cased")
+    their_layer = their_bert.bert.encoder.layer[0].attention
+    my_layer = bert.SelfAttentionLayer(their_bert.config)
+    bert.copy_bert_attention(my_layer, their_layer)
+    their_layer.eval()
+    my_layer.eval()
+    input_encoding = t.FloatTensor(2, 2, 768).uniform_(-0.2, 0.2)
+    my_output = my_layer(input_encoding)
+    their_output = their_layer(input_encoding)[0]
+    tpeek("my output", my_output)
+    tpeek("their output", their_output)
+    testy(my_output, their_output, "bert attention")
+
+
+def test_bert_layer():
+    their_bert = transformers.AutoModelForMaskedLM.from_pretrained("bert-base-cased")
+    their_layer = their_bert.bert.encoder.layer[0]
+    my_layer = bert.BertLayer(their_bert.config)
+    bert.copy_bert_layer(my_layer, their_layer)
+    their_layer.eval()
+    my_layer.eval()
+    input_encoding = t.FloatTensor(2, 2, 768).uniform_(-0.2, 0.2)
+    my_output = my_layer(input_encoding)
+    their_output = their_layer(input_encoding)[0]
+    tpeek("my output", my_output)
+    tpeek("their output", their_output)
+    testy(my_output, their_output, "bert layer")
 
 
 def test_bert():
     my_bert, their_bert = bert.my_bert_from_hf_weights()
-    their_bert: transformers.models.bert.modeling_bert.BertModel
     my_bert.eval()
     their_bert.eval()
 
@@ -144,50 +147,43 @@ def test_bert():
         "token_type_ids": t.LongTensor([[0, 0, 0, 1], [0, 0, 0, 1]]),
         "input_ids": t.LongTensor([[0, 1, 2, 3], [5, 6, 7, 8]]),
     }
-
-    # my_embedded = my_bert.embedding.embed(**inputs)
-    # their_embedded = their_bert.embeddings(**inputs)
-    # # testy(my_embedded, their_embedded, "embeds")
-
-    # embedding_inputs = my_embedded
-
-    # my_encoded = my_bert.transformer[0].attention.layer_norm(embedding_inputs)
-    # their_encoded = their_bert.encoder.layer[0].attention.output.LayerNorm(embedding_inputs)
-    # tpeek("my layer norm", my_encoded)
-    # tpeek("their layer norm", their_encoded)
-    # print()
-
-    # my_encoded = my_bert.transformer[0].attention.attention(embedding_inputs)
-    # their_encoded = their_bert.encoder.layer[0].attention.self(embedding_inputs)[0]
-    # tpeek("my pure attention", my_encoded)
-    # tpeek("their pure attention", their_encoded)
-    # print()
-
-    # my_encoded = my_bert.transformer[0].attention(embedding_inputs)
-    # their_encoded = their_bert.encoder.layer[0].attention(embedding_inputs)[0]
-    # tpeek("my attention", my_encoded)
-    # tpeek("their attention", their_encoded)
-    # print()
-
-    # my_encoded = my_bert.transformer[0](embedding_inputs)
-    # their_encoded = their_bert.encoder.layer[0](
-    #     embedding_inputs[:, :, :100],
-    # )[0]
-    # tpeek("my encoded", my_encoded)
-    # tpeek("their encoded", their_encoded)
-    # print()
-
-    # my_encoded = my_bert.transformer(embedding_inputs)
-    # their_encoded = their_bert.encoder(embedding_inputs).last_hidden_state
-    # tpeek("my encoded", my_encoded)
-    # tpeek("their encoded", their_encoded)
-    # print()
-
     my_logits = my_bert(**inputs).logits
     their_logits = their_bert(**inputs).logits
     tpeek("my logits", my_logits)
     tpeek("their logits", their_logits)
-    assert t.allclose(my_logits, their_logits, rtol=0.1, atol=0.1)
+    testy(my_logits, their_logits, "bert")
+
+
+def test_gpt2_layer():
+    their_lm_model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
+    my_layer = gpt2.GPT2Layer(their_lm_model.config)
+    their_lm_model.eval()
+    my_layer.eval()
+    their_layer = their_lm_model.transformer.h[0]
+    gpt2.copy_gpt2_layer_weights(my_layer, their_layer)
+
+    example_encoding = t.FloatTensor(2, 2, 768).uniform_(-0.2, 0.2)
+    my_output = my_layer(example_encoding)
+    their_output = their_layer(example_encoding)[0]
+    tpeek("my layer", my_output)
+    tpeek("their layer", their_output)
+    assert t.allclose(my_output, their_output, rtol=0.01, atol=0.01)
+
+
+def test_gpt2_attention():
+    their_lm_model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
+    my_attn = gpt2.GPT2Attention(their_lm_model.config)
+    their_lm_model.eval()
+    my_attn.eval()
+    their_attention = their_lm_model.transformer.h[0].attn
+    gpt2.copy_gpt2_attention_weights(my_attn, their_attention)
+
+    example_encoding = t.FloatTensor(2, 2, 768).uniform_(-0.2, 0.2)
+    my_output = my_attn(example_encoding)
+    their_output = their_attention(example_encoding)[0]
+    tpeek("my attention", my_output)
+    tpeek("their attention", their_output)
+    assert t.allclose(my_output, their_output, rtol=0.001, atol=0.001)
 
 
 def test_gpt2():
@@ -198,25 +194,12 @@ def test_gpt2():
     inputs = {
         "input_ids": t.LongTensor([[0, 1], [2, 3]]),
     }
-
-    example_encoding = t.FloatTensor(2, 2, 768).uniform_(-1, 1)
-
-    # their_output = their_gpt2.transformer.h[0].attn(example_encoding)[0]
-    # tpeek("their attentionss", their_output)
-    # my_output = my_gpt2.transformer.blocks[0].attention(example_encoding)
-    # their_output = their_gpt2.transformer.h[0].attn(example_encoding)[0]
-
-    # tpeek("their encodings", their_output)
-    my_output = my_gpt2.transformer.blocks[0](example_encoding)
-    their_output = their_gpt2.transformer.h[0](example_encoding)[0]
+    my_output = my_gpt2(**inputs).logits
+    their_output = their_gpt2(**inputs).logits
     tpeek("my layer", my_output)
+    print(their_output)
     tpeek("their layer", their_output)
-    # tpeek("my encodings", my_output)
-
-    # their_output = their_gpt2(**inputs).logits[:, -1]
-    # tpeek("their logits", their_output)
-    # my_output = my_gpt2(**inputs).logits
-    # tpeek("my logits", my_output)
+    assert t.allclose(my_output, their_output, atol=0.1, rtol=0.1)
 
 
 def test_resnet():
@@ -224,15 +207,19 @@ def test_resnet():
 
 
 if __name__ == "__main__":
-    # test_relu()
-    # test_gelu()
-    # test_softmax()
-    # test_normalize()
-    # test_layer_norm()
-    # test_embedding()
-    # test_bert()
+    test_relu()
+    test_gelu()
+    test_softmax()
+    test_normalize()
+    test_layer_norm()
+    test_embedding()
+    test_linear()
+
+    test_bert_attention()
+    test_bert_layer()
+    test_bert()
+
+    test_gpt2_attention()
+    test_gpt2_layer()
     test_gpt2()
     # test_resnet()
-
-    # test_self_attention_fundamentals() # this looks okay?
-    # test_linear()  # idk why this isn't producing same result

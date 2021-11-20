@@ -3,9 +3,9 @@ import numpy as np
 from torch.nn import Module, Parameter, ModuleList, Sequential  # not allowed to use other stuff from nn
 from transformers import AutoTokenizer
 
-from days.modules import gelu, Embedding, Dropout, LayerNorm, softmax, Linear
+from days.modules import Embedding, Dropout, Linear, LayerNorm, gelu, softmax
 
-# from torch.nn import Embedding, Dropout, LayerNorm, Linear
+# from torch.nn import LayerNorm
 # from torch.nn.functional import gelu, softmax
 from einops import rearrange
 from utils import tpeek, tstat, copy_weight_bias
@@ -18,6 +18,7 @@ from torch import nn
 class GPT2Attention(Module):
     def __init__(self, config):
         super().__init__()
+        config = convert_hf_to_my_config(config)
         self.config = config
         hidden_size = config["hidden_size"]
         max_positions = config["max_position_embeddings"]
@@ -44,46 +45,48 @@ class GPT2Attention(Module):
 
         unidirectional_mask = self.mask[:, :, :sequence_length, :sequence_length]
         attention_raw = t.where(unidirectional_mask, attention_raw, self.masked_bias)
-        # if attention_masks is not None:
-        #     attention_raw = attention_raw * attention_masks
-        tpeek("my pre softmax", attention_raw)
+        if attention_masks is not None:
+            attention_raw = attention_raw * attention_masks
         attention_patterns = nn.Softmax(dim=-1)(attention_raw)
-        tpeek("my patterns", attention_patterns)
 
         context_layer = t.einsum("bhft,bhtc->bhfc", attention_patterns, value)
         attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
-        tpeek("my ctx", attention_values)
-        return attention_values  # a, present, (attentions)
+        attention_values = self.c_proj(attention_values)
+        return attention_values
 
 
 class GPT2Layer(Module):
     def __init__(self, config):
         super().__init__()
+        config = convert_hf_to_my_config(config)
         self.config = config
         hidden_size = config["hidden_size"]
-        self.layer_norm_1 = LayerNorm((hidden_size,), eps=config["layer_norm_eps"])
+        self.layer_norm_1 = LayerNorm((hidden_size,), eps=config["layer_norm_epsilon"])
         self.attention = GPT2Attention(config)
-        # gpt2 calls these fully connected layers "Linear", but they're actually just linear layers, not Linear layers
+        # gpt2 calls these fully connected layers "conv1d", but they're actually 100% identical to linear layers
         self.fc1 = Linear(hidden_size, hidden_size * 4)
         self.fc2 = Linear(hidden_size * 4, hidden_size)
-        self.layer_norm_2 = LayerNorm((hidden_size,), eps=config["layer_norm_eps"])
+        self.layer_norm_2 = LayerNorm((hidden_size,), eps=config["layer_norm_epsilon"])
         self.dropout = Dropout(config["dropout"])
 
     def forward(self, x: t.Tensor, past_key_values=None):
         x = x + self.attention(self.layer_norm_1(x))
-        x = x + self.dropout(self.fc2(gelu(self.fc1(self.layer_norm_2(x)))))
+        after_1_mlp = gelu(self.fc1(self.layer_norm_2(x)))
+        mlpout = self.dropout(self.fc2(after_1_mlp))
+        x = x + mlpout
         return x
 
 
 @dataclass
 class GPT2Output:
     logits: t.Tensor
-    final_embedding: t.Tensor
+    final_encoding: t.Tensor
 
 
 class GPT2Core(Module):
     def __init__(self, config):
         super().__init__()
+        config = convert_hf_to_my_config(config)
         self.config = config
         self.blocks = ModuleList([GPT2Layer(config) for _ in range(config["num_layers"])])
         # cache is map from inputs as tuples to sequences of key/values
@@ -99,12 +102,12 @@ class GPT2Core(Module):
 class GPT2(Module):
     def __init__(self, config):
         super().__init__()
+        config = convert_hf_to_my_config(config)
         default_config = {
             "bos_token_id": 50256,
             "eos_token_id": 50256,
             "initializer_range": 0.02,
-            "layer_norm_eps": 1e-05,
-            "ctx_size": 1024,
+            "layer_norm_epsilon": 1e-05,
             "hidden_size": 768,
             "num_heads": 12,
             "num_layers": 12,
@@ -114,6 +117,7 @@ class GPT2(Module):
             "use_cache": True,
             "vocab_size": 50257,
         }
+        # convert config params from HF
         config = {**default_config, **config}
         config["use_cache"] = False
         self.config = config
@@ -121,7 +125,7 @@ class GPT2(Module):
         self.position_embedding = Embedding(config["max_position_embeddings"], config["hidden_size"])
         self.dropout = Dropout(config["dropout"])
         self.transformer = GPT2Core(config)
-        self.layer_norm_final = LayerNorm((config["hidden_size"],), eps=config["layer_norm_eps"])
+        self.layer_norm_final = LayerNorm((config["hidden_size"],), eps=config["layer_norm_epsilon"])
 
     def forward(self, input_ids: t.LongTensor):
         seq_length = input_ids.shape[1]
@@ -129,31 +133,60 @@ class GPT2(Module):
         position_embeddings = self.position_embedding(t.arange(seq_length).to(next(self.parameters()).device))
         embeddings = token_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
+
         encodings = self.transformer(embeddings)
+
         encodings = self.layer_norm_final(encodings)
-        final_encoding = encodings[:, -1]
-        logits = t.einsum("...i,ji->...j", final_encoding, self.token_embedding.weight)
-        return GPT2Output(logits=logits, final_embedding=final_encoding)
+        final_encoding = encodings[:, -1, :]
+        print("final encoding shape", final_encoding.shape)
+        logits = t.einsum("...i,ji->...j", encodings, self.token_embedding.weight)
+        print("logits shape", logits.shape)
+        return GPT2Output(logits=logits, final_encoding=final_encoding)
+
+
+def convert_hf_to_my_config(hf_config):
+    if isinstance(hf_config, dict):
+        return hf_config
+    hf_config = hf_config.to_dict()
+    key_map = {
+        "resid_pdrop": "dropout",  # mine doesn't confiure attention and resid dropout seperately
+        "n_layer": "num_layers",
+        "n_embd": "hidden_size",
+        "n_head": "num_heads",
+        "n_ctx": "max_position_embeddings",
+    }
+    return {(key_map.get(k, k)): v for k, v in hf_config.items()}
+
+
+def copy_gpt2_attention_weights(my_attn, their_attn):
+    copy_weight_bias(my_attn.c_attn, their_attn.c_attn, transpose=True)
+    copy_weight_bias(my_attn.c_proj, their_attn.c_proj, transpose=True)
+
+
+def copy_gpt2_layer_weights(my_layer, their_layer):
+    copy_weight_bias(my_layer.fc1, their_layer.mlp.c_fc, transpose=True)
+    copy_weight_bias(my_layer.fc2, their_layer.mlp.c_proj, transpose=True)
+
+    copy_weight_bias(my_layer.layer_norm_1, their_layer.ln_1)
+    copy_weight_bias(my_layer.layer_norm_2, their_layer.ln_2)
+    copy_gpt2_attention_weights(my_layer.attention, their_layer.attn)
+
+
+def copy_gpt2_weights(to_model, from_model):
+    their_model: transformers.models.gpt2.modeling_gpt2.GPT2Model = from_model.transformer
+    print(their_model.config)
+    to_model.token_embedding.weight = their_model.wte.weight
+    to_model.position_embedding.weight = their_model.wpe.weight
+    for their_layer, my_layer in zip(their_model.h, to_model.transformer.blocks):
+        copy_gpt2_layer_weights(my_layer, their_layer)
+
+    copy_weight_bias(to_model.layer_norm_final, their_model.ln_f)
 
 
 def my_gpt_from_hf_weights():
     their_lm_model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
-    their_model: transformers.models.gpt2.modeling_gpt2.GPT2Model = their_lm_model.transformer
     my_model = GPT2({})
-
-    my_model.token_embedding.weight = their_model.wte.weight
-    my_model.token_embedding.weight = their_model.wpe.weight
-    for their_layer, my_layer in zip(their_model.h, my_model.transformer.blocks):
-        copy_weight_bias(my_layer.fc1, their_layer.mlp.c_fc, transpose=True)
-        copy_weight_bias(my_layer.fc2, their_layer.mlp.c_proj, transpose=True)
-
-        copy_weight_bias(my_layer.layer_norm_1, their_layer.ln_1)
-        copy_weight_bias(my_layer.layer_norm_2, their_layer.ln_2)
-
-        copy_weight_bias(my_layer.attention.c_attn, their_layer.attn.c_attn, transpose=True)
-        copy_weight_bias(my_layer.attention.c_proj, their_layer.attn.c_proj, transpose=True)
-
-    copy_weight_bias(my_model.layer_norm_final, their_model.ln_f)
+    copy_gpt2_weights(my_model, their_lm_model)
     # not supporting cross attention
     return my_model, their_lm_model
 

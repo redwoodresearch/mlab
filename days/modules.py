@@ -15,11 +15,12 @@ def softmax(tensor: t.Tensor, dim: int = 0, eps=1e-9):
 
 
 def relu(tensor: t.Tensor) -> t.Tensor:
+    tensor = tensor.clone()
     tensor[tensor < 0] = 0
     return tensor
 
 
-# gelu from openai github, not the same as torch's
+# gelu approximation used by gpt and bert
 def gelu(x):
     return 0.5 * x * (1 + t.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * t.pow(x, 3))))
 
@@ -272,9 +273,10 @@ class AdaptiveAvgPool2d(Module):
 
     def forward(self, x):
         def kernels(in_dim, out_dim):
-            return [slice(math.floor((i * in_dim) / out_dim),
-                          math.ceil(((i + 1) * in_dim) / out_dim))
-                    for i in range(out_dim)]
+            return [
+                slice(math.floor((i * in_dim) / out_dim), math.ceil(((i + 1) * in_dim) / out_dim))
+                for i in range(out_dim)
+            ]
 
         B, C, iH, iW = x.shape
         oH, oW = self.output_size
