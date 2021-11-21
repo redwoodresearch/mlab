@@ -38,8 +38,15 @@ def has_not_null(obj, prop):
     return hasattr(obj, prop) and (getattr(obj, prop) is not None)
 
 
+def copy_state_identical(from_module, to_module):
+    state_dict = from_module.state_dict()
+    to_state_keys = set(to_module.state_dict().keys())
+    from_state_keys = state_dict.keys()
+    shared_keys = to_state_keys * from_state_keys
+    to_module.load_state_dict(from_state_keys)
+
+
 def copy_weight_bias(mine, theirs, transpose=False):
-    # support weights called 'w' because sometimes oai does that
     if transpose:
         mine.weight = t.nn.Parameter(rearrange(theirs.weight, "a b -> b a"))
     else:
