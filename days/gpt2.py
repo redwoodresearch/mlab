@@ -56,14 +56,14 @@ class GPT2Attention(Module):
         attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
 
         unidirectional_mask = self.mask[:, :, :input_sequence_length, :output_sequence_length]
-        print("mask shape", unidirectional_mask.shape)
-        print("attention shape", attention_raw.shape)
         attention_raw = t.where(unidirectional_mask, attention_raw, self.masked_bias)
         if attention_masks is not None:
             attention_raw = attention_raw * attention_masks
         attention_patterns = nn.Softmax(dim=-1)(attention_raw)
 
-        context_layer = t.einsum("bhft,bhtc->bhtc", attention_patterns, value)
+        print("value shape", value.shape)
+        print("attention shape", attention_raw.shape)
+        context_layer = t.einsum("bhft,bhfc->bhtc", attention_patterns, value)
         attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
         attention_values = self.c_proj(attention_values)
         if past_key_values is not None:

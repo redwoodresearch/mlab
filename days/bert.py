@@ -73,13 +73,13 @@ def multi_head_self_attention(
     value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
 
     # my attention raw has twice the mean and half the variance of theirs
-    attention_raw = t.einsum("bhfc,bhtc->bhft", query, key) / np.sqrt(head_size)
+    attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
     if attention_masks is not None:
         attention_raw = attention_raw * attention_masks
     attention_patterns = softmax(attention_raw, dim=-1)
     attention_patterns = dropout(attention_patterns)
 
-    context_layer = t.einsum("bhft,bhtc->bhfc", attention_patterns, value)
+    context_layer = t.einsum("bhft,bhfc->bhtc", attention_patterns, value)
     attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
 
     return attention_values
@@ -176,8 +176,8 @@ class Bert(Module):
             "type_vocab_size": 2,
         }
         config = convert_hf_to_my_config(config)
-        self.config = {**default_config, **config}
-
+        config = {**default_config, **config}
+        self.config = config
         self.embedding = BertEmbedding(self.config)
         self.transformer = Sequential(*[BertLayer(self.config) for _ in range(self.config["num_layers"])])
         self.lm_head = BertLMHead(config)
