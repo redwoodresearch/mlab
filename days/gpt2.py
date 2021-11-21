@@ -35,24 +35,39 @@ class GPT2Attention(Module):
     def forward(self, encodings, attention_masks=None, past_key_values=None):
         num_heads = self.config["num_heads"]
         head_size = self.config["hidden_size"] // num_heads
-        sequence_length = encodings.shape[1]
+        output_sequence_length = encodings.shape[1]
+        input_sequence_length = encodings.shape[1]
         cattn = self.c_attn(encodings)
         query, key, value = t.split(cattn, self.config["hidden_size"], -1)
         query = rearrange(query, "b s (h c) -> b h s c", h=num_heads)
+
         key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
         value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
 
-        attention_raw = t.einsum("bhfc,bhtc->bhft", query, key) / np.sqrt(head_size)
+        if past_key_values is not None:
+            new_keys = t.split(key[0], key[0].shape[1], dim=1)
+            print("new keys shape", new_keys[0].shape)
+            new_values = t.split(value[0], value[0].shape[1], dim=1)
+            new_kvs = list(zip(new_keys, new_values))
+            print(past_key_values[0].shape, key.shape)
+            key = t.cat([past_key_values[0].unsqueeze(0), key], dim=2)
+            value = t.cat([past_key_values[0].unsqueeze(0), value], dim=2)
+            input_sequence_length += past_key_values[0].shape[1]
+        attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
 
-        unidirectional_mask = self.mask[:, :, :sequence_length, :sequence_length]
+        unidirectional_mask = self.mask[:, :, :input_sequence_length, :output_sequence_length]
+        print("mask shape", unidirectional_mask.shape)
+        print("attention shape", attention_raw.shape)
         attention_raw = t.where(unidirectional_mask, attention_raw, self.masked_bias)
         if attention_masks is not None:
             attention_raw = attention_raw * attention_masks
         attention_patterns = nn.Softmax(dim=-1)(attention_raw)
 
-        context_layer = t.einsum("bhft,bhtc->bhfc", attention_patterns, value)
+        context_layer = t.einsum("bhft,bhtc->bhtc", attention_patterns, value)
         attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
         attention_values = self.c_proj(attention_values)
+        if past_key_values is not None:
+            attention_values, new_kvs
         return attention_values
 
 
@@ -71,10 +86,16 @@ class GPT2Layer(Module):
         self.dropout = Dropout(config["dropout"])
 
     def forward(self, x: t.Tensor, past_key_values=None):
-        x = x + self.attention(self.layer_norm_1(x))
+        if past_key_values is not None:
+            attention_output, new_kvs = self.attention(self.layer_norm_1(x), past_key_values=past_key_values)
+        else:
+            attention_output = self.attention(self.layer_norm_1(x))
+        x = x + attention_output
         after_1_mlp = gelu(self.fc1(self.layer_norm_2(x)))
         mlpout = self.dropout(self.fc2(after_1_mlp))
         x = x + mlpout
+        if past_key_values is not None:
+            return x, new_kvs
         return x
 
 
@@ -108,41 +129,54 @@ class GPT2(Module):
         self.token_embedding = Embedding(config["vocab_size"], config["hidden_size"])
         self.position_embedding = Embedding(config["max_position_embeddings"], config["hidden_size"])
         self.dropout = Dropout(config["dropout"])
-        self.blocks = Sequential([GPT2Layer(config) for _ in range(config["num_layers"])])
+        self.blocks = Sequential(*[GPT2Layer(config) for _ in range(config["num_layers"])])
         self.layer_norm_final = LayerNorm((config["hidden_size"],), eps=config["layer_norm_epsilon"])
+        # cache is some sequences of tokens
+        # how much space per token? hidden_size*seq_length*(layers*2+1)
+        # 768*100*25 = 10M, aka very little. Definitely have space for 10 sequences
 
-        # cache one sequence of tokens
+        # I'm only caching batch size one rn because simple for teaching
         self.cache = []
 
     def forward(self, input_ids: t.LongTensor):
         seq_length = input_ids.shape[1]
         token_embeddings = self.token_embedding(input_ids)
         position_embeddings = self.position_embedding(t.arange(seq_length).to(next(self.parameters()).device))
+
         embeddings = token_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
 
-        if self.config["use_cache"]:
-            for i, (current_id, (id, layer_kvs, _last_embedding)) in enumerate(zip(input_ids, self.cache)):
+        # cache only works for batch size 1
+        if self.config["use_cache"] and input_ids.shape[0] == 1:
+            input_ids = input_ids[0]
+            for layer_num, (current_id, (id, layer_kvs, _last_embedding)) in enumerate(zip(input_ids, self.cache)):
                 if current_id != id:
-                    self.cache = self.cache[:i]
+                    self.cache = self.cache[:layer_num]
                     break
-
+            print("using cache")
             encodings = embeddings[:, len(self.cache) :]
-            new_cache_stuff = [[id, None, None] for id in input_ids[len(self.cache) :]]
-            for i, block in enumerate(self.blocks):
-                encodings, kvs = block(encodings, past_kvs=[layer_kvs[i] for id, layer_kvs in self.cache])
-                for id, layer_kvs, _last_embedding in new_cache_stuff:
-                    layer_kvs.append(kvs[i])
-            for i, thing in enumerate(new_cache_stuff):
-                thing[2] = encodings[:, 0, i]
-
+            new_cache_stuff = [[id, [], None] for id in input_ids[len(self.cache) :]]
+            for layer_num, block in enumerate(self.blocks):
+                # this silly if because t.cat doesn't work for 0 length list (which kinda makes sense)
+                if len(self.cache) > 0:
+                    past_keys = t.cat([layer_kvs[layer_num][0] for id, layer_kvs in self.cache])
+                    past_values = t.cat([layer_kvs[layer_num][1] for id, layer_kvs in self.cache])
+                else:
+                    past_keys = t.zeros(12, 1, self.config["hidden_size"] // self.config["num_heads"])
+                    past_values = t.zeros(12, 1, self.config["hidden_size"] // self.config["num_heads"])
+                encodings, kvs = block(encodings, past_key_values=(past_keys, past_values))
+                for id_num, (id, layer_kvs, _last_embedding) in enumerate(new_cache_stuff):
+                    layer_kvs.append(kvs[id_num])
+            for layer_num, thing in enumerate(new_cache_stuff):
+                thing[2] = encodings[:, 0, layer_num]
+            self.cache.extend(new_cache_stuff)
+            print(self.cache)
         else:
+            print("not using cache")
             encodings = self.blocks(embeddings)
         encodings = self.layer_norm_final(encodings)
         final_encoding = encodings[:, -1, :]
-        print("final encoding shape", final_encoding.shape)
         logits = t.einsum("...i,ji->...j", encodings, self.token_embedding.weight)
-        print("logits shape", logits.shape)
         return GPT2Output(logits=logits, final_encoding=final_encoding)
 
 
@@ -191,11 +225,3 @@ def my_gpt_from_hf_weights():
     copy_gpt2_weights(my_model, their_lm_model)
     # not supporting cross attention
     return my_model, their_lm_model
-
-
-if __name__ == "__main__":
-
-    my_gpt = GPT2({})
-    my_gpt(input_ids=t.LongTensor(2, 2).fill_(1))
-
-    their_model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
