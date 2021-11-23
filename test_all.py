@@ -256,8 +256,8 @@ def test_resnet():
 
 
 if __name__ == "__main__":
-    test_bert_attention()
-    test_bert_layer()
+    # test_bert_attention()
+    # test_bert_layer()
     test_bert()
 
     test_gpt2_cache_is_correct()
