@@ -66,7 +66,7 @@ class Dropout(Module):
     def forward(self, input):
         if self.training:
             mask = t.empty_like(input).uniform_(0, 1) > self.fraction
-            return mask * input
+            return mask * input / (1 - self.fraction)
         return input
 
 

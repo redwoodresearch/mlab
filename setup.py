@@ -10,5 +10,5 @@ setup(
     description="Machine Learning for Alignment Bootcamp",
     author="Redwood Research",
     author_email="tao@rdwrs.com",
-    packages=["days"],
+    packages=["days", "mlab_tests"],
 )

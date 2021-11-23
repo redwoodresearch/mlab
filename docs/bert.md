@@ -1,7 +1,6 @@
 # Making Bert
 
-
-Bert is a transformer trained on masked language modelling, which is where the model is given a text with some of the tokens replaced with `[MASK]`, and it has to predict the original token what was masked. 
+Bert is a pretrained language model that's meant to be fine-tuned on a variety of natural language tasks. Bert is pretrained on masked language modelling, which is where the model is given a text with some of the tokens replaced with `[MASK]`, and it has to predict the original token what was masked. We are going to implement our own Bert in PyTorch, initialize it with the weights from original BERT, and test that it produces the same output.
 
 ```
 
@@ -23,29 +22,36 @@ It will be composed of the following modules: BertEmbedding, BertAttention, and 
 ## Embedding
 
 `(LongTensor[batch_size, sequence_length], LongTensor[batch_size, sequence_length]) -> FloatTensor[batch_size, sequence_length, hidden_size]`
-The embedding converts the descrete tokens ( token number 11, '.'), into embedding vectors, which are a combination of token embeddings, position embeddings (there's an embedding vector for every sequence position), and token type embeddings, which are used to differentiate multiple texts in some NLP tasks like entailment.
-It has three Embedding modules, for tokens, positions, and token_types. It sums the embeddings from these, then layer norms them, and then applies dropout.
+The embedding converts the descrete tokens ( token number 11, '.'), into embedding vectors, which are the sum of token embeddings, position embeddings (there's an embedding vector for every sequence position), and token type embeddings, which are used to differentiate multiple texts in some NLP tasks like entailment. After summing the embeddings, it applies a layer norm and dropout.
+
+Now test your BertEmbedding. Here are some things you could check: Does the output have the same shape, mean, and variance that you would expect? Test that when you copy the weights from the reference implemention to yours, they both have the same output.
 
 Theory: this can be identical to concatentation if the model learns to only use a set fraction of the dimensions for each of the three embeddings. Or, might be beneficial to make the embeddings overlap. Note: the embedding dimensions aren't a privilaged basis, so any subspacing would happen in an arbitrary projection, not a subset of neurons.
-
 
 
 ## Block
 `FloatTensor[batch_size, sequence_length, embedding_size]->FloatTensor[batch_size, sequence_length, embedding_size]`
 
-This performs the core computation Bert. It is a residual network with an Attention module and an MLP module. Multiple of these are stacked together.
+The core of Bert, this performs two residual computations in series: attention, and then MLP. In BERT, a "residual" is dropout(layer_norm(layer(x) + x))*. 
+What do you expect the mean and variance of the output to be given 
+
 
 ## Attention
 `FloatTensor[batch_size, sequence_length, embedding_size]->FloatTensor[batch_size, sequence_length, embedding_size]`
 The Attention layer is the core of the Transformer architecture. It allows each token to integrate information from each other token in the network.
+
+
 ## MLP
 `FloatTensor[batch_size, sequence_length, embedding_size]->FloatTensor[batch_size, sequence_length, embedding_size]`
 
 ## Unembedding
 `FloatTensor[batch_size, sequence_length, embedding_size]->FloatTensor[batch_size, sequence_length, vocab_size]`
-BERT is a bidirectional transoformer
 
-Here's the rough outline:
+## Putting the modules together.
+
+Bert is just a sequential model with modules in this order: BertEmbedding, BertLayer * num_layers, BertLMHead. Test that it produces the same output as the original. If it doesn't, check that the intermediate values (after BertEmbeding, after all BertLayer's) match the original.
+
+If you print Bert, it should look something like this:
 ```
 Bert(
   (embedding): BertEmbedding(

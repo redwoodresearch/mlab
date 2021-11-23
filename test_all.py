@@ -102,6 +102,22 @@ def test_linear():
     allclose(my_out, their_out, "linear")
 
 
+def test_dropout():
+    # use a large input so its aggregates will be consistent
+    input = t.empty(10000, 1000).uniform_(-1, 1)
+    my_dropout = modules.Dropout(0.1)
+    their_dropout = nn.Dropout(0.1)
+    t.random.manual_seed(0)
+    their_output = their_dropout(input)
+    t.random.manual_seed(0)
+    my_output = my_dropout(input)
+
+    allclose(my_output.mean(), their_output.mean(), "dropout mean", 0.001)
+    allclose(my_output.var(), their_output.var(), "dropout var", 0.001)
+    my_fraction_zero = t.mean(my_output == 0)
+    allclose(my_fraction_zero, t.Tensor(0.1), "dropout frac zero")
+
+
 def test_embedding():
     embed_input = t.LongTensor([[1, 2, 3], [7, 8, 9]])
     my_embedding, their_embedding = init_both(bert.Embedding, nn.Embedding, 234, 111)
@@ -233,9 +249,13 @@ def test_resnet():
 
 
 if __name__ == "__main__":
+    # test_bert_attention()
+    test_bert_layer()
+    test_bert()
 
     test_gpt2_cache_is_correct()
 
+    test_dropout()
     test_relu()
     test_gelu()
     test_softmax()
@@ -243,10 +263,6 @@ if __name__ == "__main__":
     test_layer_norm()
     test_embedding()
     test_linear()
-
-    test_bert_attention()
-    test_bert_layer()
-    test_bert()
 
     test_gpt2_attention()
     test_gpt2_layer()
