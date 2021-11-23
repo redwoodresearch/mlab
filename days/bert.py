@@ -12,6 +12,8 @@ from utils import tpeek, tstat, copy_weight_bias
 from dataclasses import dataclass
 import transformers
 
+# Minor design decisions in this implementation of BERT: pass a config dict (rather than args or config class object), accepting a huggingface style config and converting in every module, using einops everywhere, not using Sequential very much
+
 
 class BertEmbedding(Module):
     def __init__(self, config):
@@ -52,42 +54,14 @@ class NormedResidualLayer(Module):
 
     def forward(self, input):
         intermediate = gelu(self.mlp1(input))
-        output = self.mlp2(intermediate) + input
+        output = self.dropout(self.mlp2(intermediate)) + input
         output = self.layer_norm(output)
-        output = self.dropout(output)
         return output
 
 
-def multi_head_self_attention(
-    token_activations, attention_masks, num_heads, project_query, project_key, project_value, dropout
-):
-    head_size = token_activations.shape[-1] // num_heads
-
-    query = project_query(token_activations)
-    query = rearrange(query, "b s (h c) -> b h s c", h=num_heads)
-
-    key = project_key(token_activations)
-    key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
-
-    value = project_value(token_activations)
-    value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
-
-    # my attention raw has twice the mean and half the variance of theirs
-    attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
-    if attention_masks is not None:
-        attention_raw = attention_raw * attention_masks
-    attention_patterns = softmax(attention_raw, dim=-1)
-    attention_patterns = dropout(attention_patterns)
-
-    context_layer = t.einsum("bhft,bhfc->bhtc", attention_patterns, value)
-    attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
-
-    return attention_values
-
-
-class PureSelfAttentionLayer(Module):
+class SelfAttentionLayer(Module):
     def __init__(self, config):
-        super(PureSelfAttentionLayer, self).__init__()
+        super(SelfAttentionLayer, self).__init__()
         config = convert_hf_to_my_config(config)
         self.config = config
         if config["hidden_size"] % config["num_heads"] != 0:
@@ -97,47 +71,53 @@ class PureSelfAttentionLayer(Module):
         self.project_key = Linear(hidden_size, hidden_size, bias=True)
         self.project_value = Linear(hidden_size, hidden_size, bias=True)
         self.dropout = Dropout(config["dropout"])
-
-    def forward(self, token_activations, attention_masks=None):
-        return multi_head_self_attention(
-            token_activations,
-            attention_masks,
-            self.config["num_heads"],
-            self.project_query,
-            self.project_key,
-            self.project_value,
-            self.dropout,
-        )
-
-
-class SelfAttentionLayer(Module):
-    def __init__(self, config):
-        super(SelfAttentionLayer, self).__init__()
-        config = convert_hf_to_my_config(config)
-        self.config = config
-        hidden_size = config["hidden_size"]
-        self.attention = PureSelfAttentionLayer(config)
         self.mlp = Linear(hidden_size, hidden_size, bias=True)
-        self.layer_norm = LayerNorm((hidden_size,))
-        self.dropout = Dropout()
 
     def forward(self, token_activations, attention_masks=None):
-        # should this function include layer norm?
-        post_attention = self.mlp(self.attention(token_activations, attention_masks))
-        return self.dropout(self.layer_norm(token_activations + post_attention))
+        num_heads = self.config["num_heads"]
+        head_size = token_activations.shape[-1] // num_heads
+
+        query = self.project_query(token_activations)
+        query = rearrange(query, "b s (h c) -> b h s c", h=num_heads)
+
+        key = self.project_key(token_activations)
+        key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
+
+        value = self.project_value(token_activations)
+        value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
+
+        # my attention raw has twice the mean and half the variance of theirs
+        attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
+        if attention_masks is not None:
+            attention_raw = attention_raw * attention_masks
+        attention_patterns = softmax(attention_raw, dim=-1)
+
+        # this changes the magnitude of the output, which is weird, because this is added to the residual before it's layer normed, which means this changes
+        attention_patterns = self.dropout(attention_patterns)
+
+        context_layer = t.einsum("bhft,bhfc->bhtc", attention_patterns, value)
+        attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
+
+        attention_values = self.mlp(attention_values)
+        return attention_values
 
 
 class BertLayer(Module):
     def __init__(self, config):
         super(BertLayer, self).__init__()
-
         config = convert_hf_to_my_config(config)
+        self.config = config
+        hidden_size = config["hidden_size"]
         self.attention = SelfAttentionLayer(config)
 
         self.residual = NormedResidualLayer(config["hidden_size"], config["intermediate_size"], config["dropout"])
+        self.layer_norm = LayerNorm((hidden_size,))
+        self.dropout = Dropout(config["dropout"])
 
     def forward(self, token_activations, attention_masks=None):
-        attention_output = self.attention(token_activations, attention_masks)
+        attention_output = self.layer_norm(
+            token_activations + self.dropout(self.attention(token_activations, attention_masks))
+        )
 
         return self.residual(attention_output)
 
@@ -206,16 +186,15 @@ def convert_hf_to_my_config(hf_config):
 
 
 def copy_bert_attention(my_attention, their_attention):
-    copy_weight_bias(my_attention.attention.project_key, their_attention.self.key)
-    copy_weight_bias(my_attention.attention.project_query, their_attention.self.query)
-    copy_weight_bias(my_attention.attention.project_value, their_attention.self.value)
+    copy_weight_bias(my_attention.project_key, their_attention.self.key)
+    copy_weight_bias(my_attention.project_query, their_attention.self.query)
+    copy_weight_bias(my_attention.project_value, their_attention.self.value)
 
     copy_weight_bias(my_attention.mlp, their_attention.output.dense)
 
-    copy_weight_bias(my_attention.layer_norm, their_attention.output.LayerNorm)
-
 
 def copy_bert_layer(my_layer, their_layer):
+    copy_weight_bias(my_layer.layer_norm, their_layer.attention.output.LayerNorm)
     copy_bert_attention(my_layer.attention, their_layer.attention)
     copy_weight_bias(my_layer.residual.mlp1, their_layer.intermediate.dense)
     copy_weight_bias(my_layer.residual.mlp2, their_layer.output.dense)
