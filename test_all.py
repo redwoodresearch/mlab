@@ -138,7 +138,7 @@ def test_bert_attention():
     their_output = their_layer(input_encoding)[0]
     tpeek("my output", my_output)
     tpeek("their output", their_output)
-    allclose(my_output, their_output, "bert attention", tol=0.01)
+    allclose(my_output, their_output, "bert attention", tol=0.001)
 
 
 def test_bert_layer():
@@ -162,13 +162,20 @@ def test_bert():
     their_bert.eval()
 
     inputs = {
-        "token_type_ids": t.LongTensor([[0, 0, 0, 1], [0, 0, 0, 1]]),
+        "token_type_ids": t.LongTensor([[0, 0, 0, 0], [0, 0, 0, 0]]),
         "input_ids": t.LongTensor([[0, 1, 2, 3], [5, 6, 7, 8]]),
     }
-    my_logits = my_bert(**inputs).logits
-    their_logits = their_bert(**inputs).logits
+    my_output = my_bert(**inputs)
+    their_output = their_bert(**inputs)
+    print(their_bert.bert(**inputs))
+    my_logits = my_output.logits
+    their_logits = their_output.logits
     tpeek("my logits", my_logits)
     tpeek("their logits", their_logits)
+    my_encodings = my_output.encodings
+    their_encodings = their_bert.bert(**inputs).last_hidden_state
+    tpeek("my encodings", my_encodings)
+    tpeek("their encodings", their_encodings)
     allclose(my_logits, their_logits, "bert", tol=0.1)
 
 
@@ -249,7 +256,7 @@ def test_resnet():
 
 
 if __name__ == "__main__":
-    # test_bert_attention()
+    test_bert_attention()
     test_bert_layer()
     test_bert()
 

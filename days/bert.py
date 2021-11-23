@@ -58,8 +58,9 @@ class NormedResidualLayer(Module):
         return output
 
 
+# removed mask for simplicity in trial day
 def multi_head_self_attention(
-    token_activations, attention_masks, num_heads, project_query, project_key, project_value, dropout
+    token_activations, num_heads, project_query, project_key, project_value, project_output, dropout
 ):
     head_size = token_activations.shape[-1] // num_heads
 
@@ -72,16 +73,15 @@ def multi_head_self_attention(
     value = project_value(token_activations)
     value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
 
-    # my attention raw has twice the mean and half the variance of theirs
     attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
-    if attention_masks is not None:
-        attention_raw = attention_raw * attention_masks
+    # if attention_masks is not None:
+    #     attention_raw = attention_raw * attention_masks
     attention_patterns = softmax(attention_raw, dim=-1)
     attention_patterns = dropout(attention_patterns)
 
     context_layer = t.einsum("bhft,bhfc->bhtc", attention_patterns, value)
     attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
-
+    attention_values = project_output(attention_values)
     return attention_values
 
 
@@ -101,7 +101,7 @@ class PureSelfAttentionLayer(Module):
     def forward(self, token_activations, attention_masks=None):
         return multi_head_self_attention(
             token_activations,
-            attention_masks,
+            # attention_masks,
             self.config["num_heads"],
             self.project_query,
             self.project_key,
@@ -176,6 +176,7 @@ class Bert(Module):
             "type_vocab_size": 2,
         }
         config = convert_hf_to_my_config(config)
+        print(config)
         config = {**default_config, **config}
         self.config = config
         self.embedding = BertEmbedding(self.config)
