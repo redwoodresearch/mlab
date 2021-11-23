@@ -56,6 +56,23 @@ class NormedResidualLayer(Module):
         return output
 
 
+def raw_attention_pattern(token_activations, num_heads, project_query, project_key, project_value):
+    head_size = token_activations.shape[-1] // num_heads
+
+    query = project_query(token_activations)
+    query = rearrange(query, "b s (h c) -> b h s c", h=num_heads)
+
+    key = project_key(token_activations)
+    key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
+
+    value = project_value(token_activations)
+    value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
+
+    # my attention raw has twice the mean and half the variance of theirs
+    attention_raw = t.einsum("bhfc,bhtc->bhft", query, key) / np.sqrt(head_size)
+    return attention_raw
+
+
 def multi_head_self_attention(
     token_activations, num_heads, project_query, project_key, project_value, project_out, dropout
 ):
