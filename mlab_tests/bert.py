@@ -19,6 +19,7 @@ def test_attention_layer(fn):
     allclose(
         fn(token_activations, num_heads, project_query, project_key, project_value, project_output, dropout),
         reference(token_activations, num_heads, project_query, project_key, project_value, project_output, dropout),
+        "attention",
     )
 
 
@@ -33,6 +34,7 @@ def test_attention_pattern_raw(fn):
     allclose(
         fn(token_activations, num_heads, project_query, project_key, project_value),
         reference(token_activations, num_heads, project_query, project_key, project_value),
+        "attention pattern raw",
     )
 
 
@@ -50,4 +52,5 @@ def test_mlp_layer(fn):
     allclose(
         fn(token_activations, num_heads, project_query, project_key, project_value, project_output, dropout),
         reference(token_activations, num_heads, project_query, project_key, project_value, project_output, dropout),
+        "transformer block",
     )
