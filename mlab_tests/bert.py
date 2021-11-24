@@ -32,8 +32,8 @@ def test_attention_pattern_raw(fn):
     project_key = nn.Linear(hidden_size, hidden_size)
     project_value = nn.Linear(hidden_size, hidden_size)
     allclose(
-        fn(token_activations, num_heads, project_query, project_key, project_value),
-        reference(token_activations, num_heads, project_query, project_key, project_value),
+        fn(token_activations, project_query, project_key, num_heads),
+        reference(token_activations, project_query, project_key, num_heads),
         "attention pattern raw",
     )
 
