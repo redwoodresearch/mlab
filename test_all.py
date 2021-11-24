@@ -47,6 +47,9 @@ def allclose(my_out, their_out, name, tol=1e-8):
     if not t.allclose(my_out, their_out, rtol=tol * 1000, atol=tol):
         errstring = f'error in {name}\n{tpeek("", my_out, ret=True)} \n!=\n{tpeek("", their_out, ret=True)}'
         raise AssertionError(errstring)
+    else:
+        print("they match!")
+        print(my_out)
 
 
 def test_relu():
