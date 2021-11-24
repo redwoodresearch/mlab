@@ -50,13 +50,12 @@ class NormedResidualLayer(Module):
 
     def forward(self, input):
         intermediate = gelu(self.mlp1(input))
-        output = self.mlp2(intermediate) + input
+        output = self.dropout(self.mlp2(intermediate)) + input
         output = self.layer_norm(output)
-        output = self.dropout(output)
         return output
 
 
-def raw_attention_pattern(token_activations, project_query, project_key, num_heads):
+def raw_attention_pattern(token_activations, num_heads, project_query, project_key):
     head_size = token_activations.shape[-1] // num_heads
 
     query = project_query(token_activations)
@@ -76,7 +75,7 @@ def multi_head_self_attention(
 
     # if attention_masks is not None:
     #     attention_raw = attention_raw * attention_masks
-    attention_raw = raw_attention_pattern(token_activations, project_query, project_key, num_heads)
+    attention_raw = raw_attention_pattern(token_activations, num_heads, project_query, project_key)
     attention_patterns = softmax(attention_raw, dim=-2)
     attention_patterns = dropout(attention_patterns)
 
@@ -115,31 +114,22 @@ class PureSelfAttentionLayer(Module):
         )
 
 
-class SelfAttentionLayer(Module):
-    def __init__(self, config):
-        super(SelfAttentionLayer, self).__init__()
-        self.config = config
-        hidden_size = config["hidden_size"]
-        self.attention = PureSelfAttentionLayer(config)
-        self.layer_norm = LayerNorm((hidden_size,))
-        self.dropout = Dropout()
-
-    def forward(self, token_activations, attention_masks=None):
-        # should this function include layer norm?
-        post_attention = self.attention(token_activations, attention_masks)
-        return self.dropout(self.layer_norm(token_activations + post_attention))
-
-
 class BertLayer(Module):
     def __init__(self, config):
         super(BertLayer, self).__init__()
 
-        self.attention = SelfAttentionLayer(config)
+        self.config = config
+        hidden_size = config["hidden_size"]
+        self.layer_norm = LayerNorm((hidden_size,))
+        self.dropout = Dropout()
+        self.attention = PureSelfAttentionLayer(config)
 
         self.residual = NormedResidualLayer(config["hidden_size"], config["intermediate_size"], config["dropout"])
 
     def forward(self, token_activations, attention_masks=None):
-        attention_output = self.attention(token_activations, attention_masks)
+        attention_output = self.layer_norm(
+            token_activations + self.dropout(self.attention(token_activations, attention_masks))
+        )
 
         return self.residual(attention_output)
 
@@ -215,13 +205,13 @@ def my_bert_from_hf_weights(their_lm_bert=None, config={}):
         my_layer: BertLayer
         # their_layer:transformers.
 
-        copy_weight_bias(my_layer.attention.attention.project_key, their_layer.attention.self.key)
-        copy_weight_bias(my_layer.attention.attention.project_query, their_layer.attention.self.query)
-        copy_weight_bias(my_layer.attention.attention.project_value, their_layer.attention.self.value)
+        copy_weight_bias(my_layer.attention.project_key, their_layer.attention.self.key)
+        copy_weight_bias(my_layer.attention.project_query, their_layer.attention.self.query)
+        copy_weight_bias(my_layer.attention.project_value, their_layer.attention.self.value)
 
-        copy_weight_bias(my_layer.attention.attention.project_out, their_layer.attention.output.dense)
+        copy_weight_bias(my_layer.attention.project_out, their_layer.attention.output.dense)
 
-        copy_weight_bias(my_layer.attention.layer_norm, their_layer.attention.output.LayerNorm)
+        copy_weight_bias(my_layer.layer_norm, their_layer.attention.output.LayerNorm)
 
         copy_weight_bias(my_layer.residual.mlp1, their_layer.intermediate.dense)
         copy_weight_bias(my_layer.residual.mlp2, their_layer.output.dense)
