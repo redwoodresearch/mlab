@@ -38,6 +38,12 @@ class ReLU(Module):
         return relu(x)
 
 
+def layer_norm(x, weight, bias):
+    x = (x - x.mean(-1, keepdim=True)) / t.sqrt(x.var(-1, keepdim=True) + 1e-5)
+    x = x * weight + bias
+    return
+
+
 class LayerNorm(Module):
     def __init__(self, shape, eps=1e-6):
         if isinstance(shape, int):

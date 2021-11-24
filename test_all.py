@@ -45,9 +45,8 @@ def init_both(my_class, their_class, *args, **kwargs):
 def allclose(my_out, their_out, name, tol=1e-8):
 
     if not t.allclose(my_out, their_out, rtol=tol * 1000, atol=tol):
-        tpeek("mine", my_out)
-        tpeek("theirs", their_out)
-        raise AssertionError(name)
+        errstring = f'{tpeek("", my_out, ret=True)} !={tpeek("", their_out, ret=True)}'
+        raise AssertionError(errstring)
 
 
 def test_relu():
