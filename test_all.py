@@ -45,7 +45,7 @@ def init_both(my_class, their_class, *args, **kwargs):
 def allclose(my_out, their_out, name, tol=1e-8):
 
     if not t.allclose(my_out, their_out, rtol=tol * 1000, atol=tol):
-        errstring = f'{tpeek("", my_out, ret=True)} !={tpeek("", their_out, ret=True)}'
+        errstring = f'error in {name}\n{tpeek("", my_out, ret=True)} \n!=\n{tpeek("", their_out, ret=True)}'
         raise AssertionError(errstring)
 
 

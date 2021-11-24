@@ -12,4 +12,4 @@ def test_layer_norm(fn):
     random_input = t.empty(8, 9)
     their_output = reference.layer_norm(random_input, random_weight, random_bias)
     my_output = reference.layer_norm(random_input, random_weight, random_bias)
-    allclose(my_output, their_output)
+    allclose(my_output, their_output, "layer norm")
