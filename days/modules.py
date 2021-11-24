@@ -41,7 +41,7 @@ class ReLU(Module):
 def layer_norm(x, weight, bias):
     x = (x - x.mean(-1, keepdim=True)) / t.sqrt(x.var(-1, keepdim=True) + 1e-5)
     x = x * weight + bias
-    return
+    return x
 
 
 class LayerNorm(Module):
