@@ -66,30 +66,22 @@ def raw_attention_pattern(token_activations, project_query, project_key, num_hea
     key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
 
     # my attention raw has twice the mean and half the variance of theirs
-    attention_raw = t.einsum("bhfc,bhtc->bhft", query, key) / np.sqrt(head_size)
+    attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
     return attention_raw
 
 
 def multi_head_self_attention(
     token_activations, num_heads, project_query, project_key, project_value, project_out, dropout
 ):
-    head_size = token_activations.shape[-1] // num_heads
 
-    query = project_query(token_activations)
-    query = rearrange(query, "b s (h c) -> b h s c", h=num_heads)
-
-    key = project_key(token_activations)
-    key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
+    # if attention_masks is not None:
+    #     attention_raw = attention_raw * attention_masks
+    attention_raw = raw_attention_pattern(token_activations, project_query, project_key, num_heads)
+    attention_patterns = softmax(attention_raw, dim=-2)
+    attention_patterns = dropout(attention_patterns)
 
     value = project_value(token_activations)
     value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
-
-    # my attention raw has twice the mean and half the variance of theirs
-    attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
-    # if attention_masks is not None:
-    #     attention_raw = attention_raw * attention_masks
-    attention_patterns = softmax(attention_raw, dim=-2)
-    attention_patterns = dropout(attention_patterns)
 
     context_layer = t.einsum("bhft,bhfc->bhtc", attention_patterns, value)
     attention_values = rearrange(context_layer, "b h s c -> b s (h c)")

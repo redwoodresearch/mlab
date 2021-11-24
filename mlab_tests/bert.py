@@ -23,6 +23,24 @@ def test_attention_layer(fn):
     )
 
 
+def test_attention_layer(fn):
+    reference = bert.multi_head_self_attention
+    hidden_size = 768
+    token_activations = t.empty(2, 3, hidden_size).uniform_(-1, 1)
+    num_heads = 12
+    project_query = nn.Linear(hidden_size, hidden_size)
+    project_key = nn.Linear(hidden_size, hidden_size)
+    project_value = nn.Linear(hidden_size, hidden_size)
+    project_output = nn.Linear(hidden_size, hidden_size)
+    dropout = t.nn.Dropout(0.1)
+    dropout.eval()
+    allclose(
+        fn(token_activations, num_heads, project_query, project_key, project_value, project_output, dropout),
+        reference(token_activations, num_heads, project_query, project_key, project_value, project_output, dropout),
+        "attention",
+    )
+
+
 def test_attention_pattern_raw(fn):
     reference = bert.raw_attention_pattern
     hidden_size = 768
@@ -33,6 +51,23 @@ def test_attention_pattern_raw(fn):
     project_value = nn.Linear(hidden_size, hidden_size)
     allclose(
         fn(token_activations, project_query, project_key, num_heads),
+        reference(token_activations, project_query, project_key, num_heads),
+        "attention pattern raw",
+    )
+
+
+def test_attention_pattern_raw_parameters(fn):
+    reference = bert.raw_attention_pattern
+    hidden_size = 768
+    token_activations = t.empty(2, 3, hidden_size).uniform_(-1, 1)
+    num_heads = 12
+    project_query = nn.Linear(hidden_size, hidden_size)
+    project_key = nn.Linear(hidden_size, hidden_size)
+    project_value = nn.Linear(hidden_size, hidden_size)
+    allclose(
+        fn(
+            token_activations, project_query.weight, project_query.bias, project_key.weight, project_key.bias, num_heads
+        ),
         reference(token_activations, project_query, project_key, num_heads),
         "attention pattern raw",
     )
