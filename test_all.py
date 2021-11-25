@@ -235,17 +235,20 @@ def test_gpt2_cache_is_correct():
     other_input_ids = t.LongTensor([[88, 323, 134]])
 
     t.random.manual_seed(0)
-    model = gpt2.GPT2({"use_cache": False})
-    model.eval()
-    short_no_cache = model(short_input_ids).logits
-    long_no_cache = model(long_input_ids).logits
-    other_no_cache = model(other_input_ids).logits
+    model_no_cache = gpt2.GPT2({"use_cache": False})
+    model_no_cache.eval()
+    short_no_cache = model_no_cache(short_input_ids).logits
+    long_no_cache = model_no_cache(long_input_ids).logits
     t.random.manual_seed(0)
 
     model = gpt2.GPT2({"use_cache": True})
     model.eval()
+    print("short cache")
     short_cache = model(short_input_ids).logits
+    print("model cache", model.cache)
     long_cache = model(long_input_ids).logits
+
+    other_no_cache = model_no_cache(other_input_ids).logits
     other_cache = model(other_input_ids).logits
 
     allclose(short_no_cache, short_cache, "cache short")
@@ -258,11 +261,14 @@ def test_resnet():
 
 
 if __name__ == "__main__":
+    # test_gpt2_attention()
+    # test_gpt2_layer()
+    test_gpt2()
+    test_gpt2_cache_is_correct()
+
     # test_bert_attention()
     # test_bert_layer()
     test_bert()
-
-    test_gpt2_cache_is_correct()
 
     test_dropout()
     test_relu()
@@ -273,7 +279,4 @@ if __name__ == "__main__":
     test_embedding()
     test_linear()
 
-    test_gpt2_attention()
-    test_gpt2_layer()
-    test_gpt2()
     # test_resnet()

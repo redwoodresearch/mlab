@@ -6,6 +6,7 @@ import json
 import functools
 import torch as t
 from unidecode import unidecode
+from collections import defaultdict
 
 
 def normalizer(str):
@@ -37,6 +38,18 @@ class ViterbiTokenizer:
         self.vocab = {x["piece"]: x for x in token_list}
         self.vocab_by_id = {x["id"]: x for x in token_list}
         self.normalizer = normalizer
+
+    def create_viterbi_tokenizer_from_corpus(corpus_string, max_token_length=20):
+        corpus_sentences = [x + "." for x in corpus_string.split(".")]
+        substring_frequencies = ViterbiTokenizer.get_substring_frequencies(corpus_sentences, max_token_length)
+
+    def get_substring_frequencies(sentences, max_length):
+        counter = defaultdict(lambda: 0)
+        for sentence in sentences:
+            for i in range(len(sentence)):
+                for ln in range(1, min(len(sentence) - i, max_length + 1)):
+                    counter[sentence[i:ln]] += 1
+        return counter
 
     def _replace_all(self, text):
         return functools.reduce(lambda a, x: a.replace(x[0], x[1]), self.replacements.items(), text)

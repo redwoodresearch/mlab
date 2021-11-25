@@ -5,6 +5,7 @@ from torch.nn import Module, Parameter, ModuleList, Sequential  # not allowed to
 from transformers import AutoTokenizer
 
 from days.modules import Embedding, Dropout, Linear, LayerNorm, gelu, softmax
+from torchtyping import TensorType
 
 # from torch.nn import LayerNorm
 # from torch.nn.functional import gelu, softmax
@@ -32,7 +33,12 @@ class GPT2Attention(Module):
         )
         self.masked_bias = t.tensor(-1e4)
 
-    def forward(self, encodings, attention_masks=None, past_key_values=None):
+    def forward(
+        self,
+        encodings,
+        attention_masks=None,
+        past_key_values: Optional[Tuple[TensorType["h", "s", "head_size"], ...]] = None,
+    ):
         num_heads = self.config["num_heads"]
         head_size = self.config["hidden_size"] // num_heads
         output_sequence_length = encodings.shape[1]
@@ -45,29 +51,27 @@ class GPT2Attention(Module):
         value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
 
         if past_key_values is not None:
-            new_keys = t.split(key[0], key[0].shape[1], dim=1)
-            print("new keys shape", new_keys[0].shape)
-            new_values = t.split(value[0], value[0].shape[1], dim=1)
-            new_kvs = list(zip(new_keys, new_values))
+            new_kvs = (key[0], value[0])
             print(past_key_values[0].shape, key.shape)
             key = t.cat([past_key_values[0].unsqueeze(0), key], dim=2)
-            value = t.cat([past_key_values[0].unsqueeze(0), value], dim=2)
+            value = t.cat([past_key_values[1].unsqueeze(0), value], dim=2)
             input_sequence_length += past_key_values[0].shape[1]
+
         attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
 
         unidirectional_mask = self.mask[:, :, :input_sequence_length, :output_sequence_length]
         attention_raw = t.where(unidirectional_mask, attention_raw, self.masked_bias)
         if attention_masks is not None:
             attention_raw = attention_raw * attention_masks
-        attention_patterns = nn.Softmax(dim=-1)(attention_raw)
+        attention_patterns = nn.Softmax(dim=-2)(attention_raw)
 
-        print("value shape", value.shape)
-        print("attention shape", attention_raw.shape)
+        # print("value shape", value.shape)
+        # print("attention shape", attention_raw.shape)
         context_layer = t.einsum("bhft,bhfc->bhtc", attention_patterns, value)
         attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
         attention_values = self.c_proj(attention_values)
         if past_key_values is not None:
-            attention_values, new_kvs
+            return attention_values, new_kvs
         return attention_values
 
 
@@ -120,7 +124,7 @@ class GPT2(Module):
             "max_position_embeddings": 1024,
             "dropout": 0.1,
             "scale_attn_weights": True,
-            "use_cache": True,
+            "use_cache": False,
             "vocab_size": 50257,
         }
         # convert config params from HF
@@ -155,7 +159,7 @@ class GPT2(Module):
                     break
             print("using cache")
             encodings = embeddings[:, len(self.cache) :]
-            new_cache_stuff = [[id, [], None] for id in input_ids[len(self.cache) :]]
+            new_cache_stuff = [[id, [], None] for id in input_ids[len(encodings) :]]
             for layer_num, block in enumerate(self.blocks):
                 # this silly if because t.cat doesn't work for 0 length list (which kinda makes sense)
                 if len(self.cache) > 0:
@@ -165,8 +169,12 @@ class GPT2(Module):
                     past_keys = t.zeros(12, 1, self.config["hidden_size"] // self.config["num_heads"])
                     past_values = t.zeros(12, 1, self.config["hidden_size"] // self.config["num_heads"])
                 encodings, kvs = block(encodings, past_key_values=(past_keys, past_values))
+                print("len kvs", len(kvs))
+                print(len(kvs[0]))
+                tpeek("kvs 0", kvs[0][0])
+                tpeek("kvs 1", kvs[0][1])
                 for id_num, (id, layer_kvs, _last_embedding) in enumerate(new_cache_stuff):
-                    layer_kvs.append(kvs[id_num])
+                    layer_kvs.append((kvs[0][:, id_num], kvs[1][:, id_num]))
             for layer_num, thing in enumerate(new_cache_stuff):
                 thing[2] = encodings[:, 0, layer_num]
             self.cache.extend(new_cache_stuff)
@@ -174,6 +182,7 @@ class GPT2(Module):
         else:
             print("not using cache")
             encodings = self.blocks(embeddings)
+
         encodings = self.layer_norm_final(encodings)
         final_encoding = encodings[:, -1, :]
         logits = t.einsum("...i,ji->...j", encodings, self.token_embedding.weight)
@@ -221,7 +230,7 @@ def copy_gpt2_weights(to_model, from_model):
 
 def my_gpt_from_hf_weights():
     their_lm_model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
-    my_model = GPT2({})
+    my_model = GPT2({"use_cache": False})
     copy_gpt2_weights(my_model, their_lm_model)
     # not supporting cross attention
     return my_model, their_lm_model

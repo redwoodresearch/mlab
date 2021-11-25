@@ -11,7 +11,7 @@ def tstat(name, tensor):
 
 
 def tpeek(name, tensor, ret: bool = False):
-    string = f"{name} MEAN: {'{0:.4g}'.format(t.mean(tensor).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor).cpu().item())} SHAPE {tuple(tensor.shape)} VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}]"
+    string = f"{name} SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor).cpu().item())} VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}...]"
     if ret:
         return string
     print(string)

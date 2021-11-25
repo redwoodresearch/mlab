@@ -40,6 +40,10 @@ class BertEmbedding(Module):
         return self.token_embedding.unembed(embeddings)
 
 
+def bert_mlp(token_activations, linear_1, linear_2, dropout):
+    return dropout(linear_2(gelu(linear_1(token_activations))))
+
+
 class NormedResidualLayer(Module):
     def __init__(self, size, intermediate_size, dropout):
         super(NormedResidualLayer, self).__init__()
@@ -88,9 +92,9 @@ def multi_head_self_attention(
     return attention_values
 
 
-class PureSelfAttentionLayer(Module):
+class SelfAttentionLayer(Module):
     def __init__(self, config):
-        super(PureSelfAttentionLayer, self).__init__()
+        super(SelfAttentionLayer, self).__init__()
         self.config = config
         if config["hidden_size"] % config["num_heads"] != 0:
             raise AssertionError("head num must divide hidden size")
@@ -122,7 +126,7 @@ class BertLayer(Module):
         hidden_size = config["hidden_size"]
         self.layer_norm = LayerNorm((hidden_size,))
         self.dropout = Dropout()
-        self.attention = PureSelfAttentionLayer(config)
+        self.attention = SelfAttentionLayer(config)
 
         self.residual = NormedResidualLayer(config["hidden_size"], config["intermediate_size"], config["dropout"])
 
@@ -203,7 +207,6 @@ def my_bert_from_hf_weights(their_lm_bert=None, config={}):
     official_layers = list(model.encoder.layer)
     for my_layer, their_layer in zip(my_layers, official_layers):
         my_layer: BertLayer
-        # their_layer:transformers.
 
         copy_weight_bias(my_layer.attention.project_key, their_layer.attention.self.key)
         copy_weight_bias(my_layer.attention.project_query, their_layer.attention.self.query)
