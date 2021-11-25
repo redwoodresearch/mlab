@@ -166,8 +166,8 @@ class GPT2(Module):
                     past_keys = t.cat([layer_kvs[layer_num][0] for id, layer_kvs in self.cache])
                     past_values = t.cat([layer_kvs[layer_num][1] for id, layer_kvs in self.cache])
                 else:
-                    past_keys = t.zeros(12, 1, self.config["hidden_size"] // self.config["num_heads"])
-                    past_values = t.zeros(12, 1, self.config["hidden_size"] // self.config["num_heads"])
+                    past_keys = t.zeros(12, 0, self.config["hidden_size"] // self.config["num_heads"])
+                    past_values = t.zeros(12, 0, self.config["hidden_size"] // self.config["num_heads"])
                 encodings, kvs = block(encodings, past_key_values=(past_keys, past_values))
                 print("len kvs", len(kvs))
                 print(len(kvs[0]))
@@ -175,15 +175,16 @@ class GPT2(Module):
                 tpeek("kvs 1", kvs[0][1])
                 for id_num, (id, layer_kvs, _last_embedding) in enumerate(new_cache_stuff):
                     layer_kvs.append((kvs[0][:, id_num], kvs[1][:, id_num]))
+            encodings = self.layer_norm_final(encodings)
             for layer_num, thing in enumerate(new_cache_stuff):
                 thing[2] = encodings[:, 0, layer_num]
             self.cache.extend(new_cache_stuff)
-            print(self.cache)
+            print("cache len", len(self.cache))
         else:
             print("not using cache")
             encodings = self.blocks(embeddings)
+            encodings = self.layer_norm_final(encodings)
 
-        encodings = self.layer_norm_final(encodings)
         final_encoding = encodings[:, -1, :]
         logits = t.einsum("...i,ji->...j", encodings, self.token_embedding.weight)
         return GPT2Output(logits=logits, final_encoding=final_encoding)

@@ -238,19 +238,21 @@ def test_gpt2_cache_is_correct():
     model_no_cache = gpt2.GPT2({"use_cache": False})
     model_no_cache.eval()
     short_no_cache = model_no_cache(short_input_ids).logits
+    short_no_cache_2 = model_no_cache(short_input_ids).logits
     long_no_cache = model_no_cache(long_input_ids).logits
     t.random.manual_seed(0)
 
-    model = gpt2.GPT2({"use_cache": True})
+    model = model_no_cache
+    model.config["use_cache"] = True
     model.eval()
     print("short cache")
     short_cache = model(short_input_ids).logits
-    print("model cache", model.cache)
     long_cache = model(long_input_ids).logits
 
     other_no_cache = model_no_cache(other_input_ids).logits
     other_cache = model(other_input_ids).logits
 
+    allclose(short_no_cache, short_no_cache_2, "determinism")
     allclose(short_no_cache, short_cache, "cache short")
     allclose(long_no_cache, long_cache, "cache long")
     allclose(other_no_cache, other_cache, "cache other")
