@@ -4,17 +4,17 @@ import numpy as np
 from torch.nn import Module, Parameter, ModuleList, Sequential  # not allowed to use other stuff from nn
 from transformers import AutoTokenizer
 
-from days.modules import Embedding, Dropout, Linear, LayerNorm, gelu, softmax
+from days.modules import Embedding, Dropout, Linear, LayerNorm, gelu, log_softmax, softmax
 from torchtyping import TensorType
 
 # from torch.nn import LayerNorm
 # from torch.nn.functional import gelu, softmax
-from einops import rearrange
-from utils import tpeek, tstat, copy_weight_bias
+from utils import getprops, tpeek, tstat, copy_weight_bias
 from dataclasses import dataclass
 import transformers
 
 from torch import nn
+from einops import reduce, rearrange, repeat
 
 
 class GPT2Attention(Module):
@@ -52,7 +52,6 @@ class GPT2Attention(Module):
 
         if past_key_values is not None:
             new_kvs = (key[0], value[0])
-            print(past_key_values[0].shape, key.shape)
             key = t.cat([past_key_values[0].unsqueeze(0), key], dim=2)
             value = t.cat([past_key_values[1].unsqueeze(0), value], dim=2)
             input_sequence_length += past_key_values[0].shape[1]
@@ -105,12 +104,12 @@ class GPT2Layer(Module):
 
 @dataclass
 class GPT2Output:
-    logits: t.Tensor
-    final_encoding: t.Tensor
+    logits: TensorType["batch_size", "seq_length", "vocab_size"]
+    final_encoding: TensorType["batch_size", "seq_length", "hidden_size"]
 
 
 class GPT2(Module):
-    def __init__(self, config):
+    def __init__(self, config, tokenizer=None):
         super().__init__()
         config = convert_hf_to_my_config(config)
         default_config = {
@@ -127,6 +126,7 @@ class GPT2(Module):
             "use_cache": False,
             "vocab_size": 50257,
         }
+        self.tokenizer = tokenizer
         # convert config params from HF
         config = {**default_config, **config}
         self.config = config
@@ -157,7 +157,6 @@ class GPT2(Module):
                 if current_id != id:
                     self.cache = self.cache[:layer_num]
                     break
-            print("using cache")
             encodings = embeddings[:, len(self.cache) :]
             new_cache_stuff = [[id, [], None] for id in input_ids[len(encodings) :]]
             for layer_num, block in enumerate(self.blocks):
@@ -169,25 +168,69 @@ class GPT2(Module):
                     past_keys = t.zeros(12, 0, self.config["hidden_size"] // self.config["num_heads"])
                     past_values = t.zeros(12, 0, self.config["hidden_size"] // self.config["num_heads"])
                 encodings, kvs = block(encodings, past_key_values=(past_keys, past_values))
-                print("len kvs", len(kvs))
-                print(len(kvs[0]))
-                tpeek("kvs 0", kvs[0][0])
-                tpeek("kvs 1", kvs[0][1])
                 for id_num, (id, layer_kvs, _last_embedding) in enumerate(new_cache_stuff):
                     layer_kvs.append((kvs[0][:, id_num], kvs[1][:, id_num]))
             encodings = self.layer_norm_final(encodings)
             for layer_num, thing in enumerate(new_cache_stuff):
                 thing[2] = encodings[:, 0, layer_num]
             self.cache.extend(new_cache_stuff)
-            print("cache len", len(self.cache))
         else:
-            print("not using cache")
             encodings = self.blocks(embeddings)
             encodings = self.layer_norm_final(encodings)
 
         final_encoding = encodings[:, -1, :]
         logits = t.einsum("...i,ji->...j", encodings, self.token_embedding.weight)
         return GPT2Output(logits=logits, final_encoding=final_encoding)
+
+    def next_token(self, input_ids, temperature, freq_penalty=0):
+        last_outputs = self(input_ids=input_ids.unsqueeze(0)).logits[0][-1]
+        last_outputs /= temperature
+        if freq_penalty > 0:
+            id_freqs = t.bincount(input_ids, minlength=self.config["vocab_size"]) * freq_penalty
+            last_outputs -= id_freqs
+        choice = t.distributions.categorical.Categorical(logits=last_outputs)
+        c = choice.sample()
+        return c
+
+    def generate_ids(self, input_ids, max_length=30, temperature=1, freq_penalty=2):
+        ids = input_ids
+        for _ in range(max_length):
+            c = self.next_token(input_ids=ids, temperature=temperature, freq_penalty=freq_penalty)
+            if self.tokenizer.eos_token_id is not None and c == self.tokenizer.eos_token_id:
+                break
+            ids = t.cat([ids, c.reshape(1)], dim=0)
+        tpeek("ids", ids)
+        return ids[input_ids.shape[0] :]
+
+    def specific_completion_probs_ids(self, input_ids, completions_ids):
+        result = []
+        for completion_ids in completions_ids:
+            ids = t.cat([input_ids, completion_ids], dim=0)
+            outputs = self(input_ids=ids.reshape(1, -1)).logits[0]
+            completion_outputs = outputs[input_ids.shape[0] :]
+            completion_logprobs = t.nn.functional.log_softmax(completion_outputs, dim=-1)
+            indices = t.stack([t.arange(0, completion_ids.shape[0]), completion_ids], dim=-1)
+            gathered = t.gather(completion_logprobs, -1, indices)
+            gathered = t.nan_to_num(gathered, nan=-15, posinf=-15, neginf=-15)
+            prob = reduce(gathered, "...->", "sum")
+            result.append(prob.item())
+        return result
+
+    def generate(self, text, max_length=30, temperature=1, freq_penalty=2):
+        assert self.tokenizer is not None
+        print(self.tokenizer(text))
+        input_ids = self.tokenizer(text, return_tensors="pt")["input_ids"][0]
+        generated_ids = self.generate_ids(
+            input_ids, max_length=max_length, temperature=temperature, freq_penalty=freq_penalty
+        )
+        completion_text = self.tokenizer.decode(generated_ids)
+        return completion_text
+
+    def specific_completion_probs(self, text, completion_texts):
+        assert self.tokenizer is not None
+        input_ids = self.tokenizer(text, return_tensors="pt")["input_ids"][0]
+        completion_ids = [self.tokenizer(t, return_tensors="pt")["input_ids"][0] for t in completion_texts]
+        return self.specific_completion_probs_ids(input_ids, completions_ids=completion_ids)
 
 
 def convert_hf_to_my_config(hf_config):
@@ -220,7 +263,6 @@ def copy_gpt2_layer_weights(my_layer, their_layer):
 
 def copy_gpt2_weights(to_model, from_model):
     their_model: transformers.models.gpt2.modeling_gpt2.GPT2Model = from_model.transformer
-    print(their_model.config)
     to_model.token_embedding.weight = their_model.wte.weight
     to_model.position_embedding.weight = their_model.wpe.weight
     for their_layer, my_layer in zip(their_model.h, to_model.blocks):
@@ -231,7 +273,9 @@ def copy_gpt2_weights(to_model, from_model):
 
 def my_gpt_from_hf_weights():
     their_lm_model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
-    my_model = GPT2({"use_cache": False})
+    tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
+
+    my_model = GPT2({"use_cache": True}, tokenizer=tokenizer)
     copy_gpt2_weights(my_model, their_lm_model)
     # not supporting cross attention
     return my_model, their_lm_model

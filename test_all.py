@@ -48,8 +48,7 @@ def allclose(my_out, their_out, name, tol=1e-8):
         errstring = f'error in {name}\n{tpeek("", my_out, ret=True)} \n!=\n{tpeek("", their_out, ret=True)}'
         raise AssertionError(errstring)
     else:
-        print("they match!")
-        print(my_out)
+        tpeek(f"{name} MATCH!!!!!!!!\n", my_out)
 
 
 def test_relu():
@@ -116,8 +115,16 @@ def test_dropout():
 
     allclose(my_output.mean(), their_output.mean(), "dropout mean", 0.001)
     allclose(my_output.var(), their_output.var(), "dropout var", 0.001)
-    my_fraction_zero = t.mean(my_output == 0)
-    allclose(my_fraction_zero, t.Tensor(0.1), "dropout frac zero")
+    my_fraction_zero = t.mean((my_output == 0).float())
+    print(my_fraction_zero)
+    allclose(my_fraction_zero, t.tensor(0.1), "dropout frac zero", tol=0.001)
+
+
+def test_log_softmax():
+    input = t.FloatTensor(435, 234).uniform_(-10, 10)
+    my_out = modules.log_softmax(input, dim=1)
+    their_out = F.log_softmax(input, dim=1)
+    allclose(my_out, their_out, "log_softmax")
 
 
 def test_embedding():
@@ -219,14 +226,13 @@ def test_gpt2():
     their_gpt2.eval()
 
     inputs = {
-        "input_ids": t.LongTensor([[0, 1], [2, 3]]),
+        "input_ids": t.LongTensor(my_gpt2.tokenizer(["I'm Alex Rider, i'm a writer"])["input_ids"]),
     }
     my_output = my_gpt2(**inputs).logits
     their_output = their_gpt2(**inputs).logits
     tpeek("my layer", my_output)
-    print(their_output)
     tpeek("their layer", their_output)
-    allclose(my_output, their_output, "gpt2 logits", tol=0.1)
+    allclose(my_output, their_output, "gpt2 logits", tol=0.01)
 
 
 def test_gpt2_cache_is_correct():
@@ -258,27 +264,72 @@ def test_gpt2_cache_is_correct():
     allclose(other_no_cache, other_cache, "cache other")
 
 
+def test_gpt2_generation():
+    my_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
+    my_gpt2.config["use_cache"] = False
+    prompt = "I'm Alex Rider,"
+    print("generating")
+    their_generated_text = my_gpt2.tokenizer.decode(
+        their_gpt2.generate(input_ids=my_gpt2.tokenizer([prompt], return_tensors="pt")["input_ids"], max_length=10)[0]
+        .cpu()
+        .tolist()
+    )
+    print("their generated text", their_generated_text)
+    generated_text = my_gpt2.generate(prompt, max_length=10, freq_penalty=0, temperature=1)
+    print("generated text", generated_text)
+
+
+def test_gpt2_specific_prob():
+    my_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
+    my_gpt2.config["use_cache"] = False
+    prompt = "I just ate my favorite food."
+    completions = [
+        " It was so good!",
+        " I loved it!",
+        " It was the best food ever!",
+        " I threw up afterward.",
+    ]
+    # prompt = "I'm Alex Rider,"
+    # completions = [" and I'm an MI6 agent", "and I'm a secret agent", "and I'm a writer", "gnwlkno63", "enxoilke"]
+    print("generating")
+    probs = my_gpt2.specific_completion_probs(prompt, completions)
+    print("probs", {x: y for x, y in zip(completions, probs)})
+    prompt = "I just ate some awful food."
+    completions = [
+        " It was so good!",
+        " I loved it!",
+        " It was the best food ever!",
+        " I threw up afterward.",
+    ]
+    probs = my_gpt2.specific_completion_probs(prompt, completions)
+    print("probs", {x: y for x, y in zip(completions, probs)})
+
+
 def test_resnet():
     resnet.resnet34_with_pretrained_weights()
 
 
 if __name__ == "__main__":
+    test_gpt2_specific_prob()
+    test_gpt2_generation()
+    raise AssertionError("hi")
+    test_gpt2()
     # test_gpt2_attention()
     # test_gpt2_layer()
-    test_gpt2()
     test_gpt2_cache_is_correct()
 
     # test_bert_attention()
     # test_bert_layer()
     test_bert()
 
-    test_dropout()
     test_relu()
     test_gelu()
+    test_log_softmax()
     test_softmax()
     test_normalize()
     test_layer_norm()
     test_embedding()
     test_linear()
+    test_dropout()
 
     # test_resnet()

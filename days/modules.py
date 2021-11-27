@@ -7,7 +7,14 @@ from torch.nn import Module, Parameter
 from utils import tpeek
 
 
-def softmax(tensor: t.Tensor, dim: int = 0, eps=1e-9):
+def log_softmax(tensor: t.Tensor, dim: int = 0):
+    exps = np.e ** tensor
+    exp_sums = exps.sum(dim=dim, keepdim=True)
+    result = tensor - t.log(exp_sums)
+    return result
+
+
+def softmax(tensor: t.Tensor, dim: int = 0):
     exps = np.e ** tensor
     exp_sums = exps.sum(dim=dim, keepdim=True)
     result = exps / (exp_sums)
@@ -295,3 +302,11 @@ class AdaptiveAvgPool2d(Module):
             for j, ker_W in enumerate(kWs):
                 out[:, :, i, j] = t.mean(x[:, :, ker_H, ker_W], (-2, -1))
         return out
+
+
+# TODO finish this
+def sample_from_distribution(dist):
+    rands = t.rand(*dist.shape[:-1], 1)
+    cumsum = t.cumsum(dist, dim=-1)
+    mask = cumsum <= rands
+    anti_mask = cumsum > rands

@@ -10,8 +10,10 @@ def tstat(name, tensor):
     )
 
 
-def tpeek(name, tensor, ret: bool = False):
-    string = f"{name} SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor).cpu().item())} VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}...]"
+def tpeek(name: str, tensor: t.Tensor, ret: bool = False):
+    contains_nan = t.any(t.isnan(tensor)).item()
+    contains_inf = t.any(t.isinf(tensor)).item()
+    string = f"{name} SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor.float()).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor.float()).cpu().item())} {'CONTAINS_NAN! ' if contains_nan else ''}{'CONTAINS_INF! ' if contains_inf else ''}VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}...]"
     if ret:
         return string
     print(string)
