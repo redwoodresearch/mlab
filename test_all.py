@@ -314,6 +314,7 @@ if __name__ == "__main__":
     test_gpt2_generation()
     test_gpt2_specific_prob()
     raise AssertionError("hi")
+
     test_gpt2()
     # test_gpt2_attention()
     # test_gpt2_layer()
