@@ -188,7 +188,7 @@ class GPT2(Module):
         if freq_penalty > 0:
             id_freqs = t.bincount(input_ids, minlength=self.config["vocab_size"]) * freq_penalty
             last_outputs -= id_freqs
-        choice = t.distributions.categorical.Categorical(logits=last_outputs)
+        choice = t.distributions.categorical.Categorical(probs=t.nn.functional.softmax(last_outputs, dim=-1))
         c = choice.sample()
         return c
 
@@ -199,7 +199,6 @@ class GPT2(Module):
             if self.tokenizer.eos_token_id is not None and c == self.tokenizer.eos_token_id:
                 break
             ids = t.cat([ids, c.reshape(1)], dim=0)
-        tpeek("ids", ids)
         return ids[input_ids.shape[0] :]
 
     def specific_completion_probs_ids(self, input_ids, completions_ids):
@@ -220,8 +219,9 @@ class GPT2(Module):
         assert self.tokenizer is not None
         print(self.tokenizer(text))
         input_ids = self.tokenizer(text, return_tensors="pt")["input_ids"][0]
+        tpeek("iids", input_ids)
         generated_ids = self.generate_ids(
-            input_ids, max_length=max_length, temperature=temperature, freq_penalty=freq_penalty
+            input_ids=input_ids, max_length=max_length, temperature=temperature, freq_penalty=freq_penalty
         )
         completion_text = self.tokenizer.decode(generated_ids)
         return completion_text
@@ -273,9 +273,11 @@ def copy_gpt2_weights(to_model, from_model):
 
 def my_gpt_from_hf_weights():
     their_lm_model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
+    their_lm_model.eval()
     tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
 
-    my_model = GPT2({"use_cache": True}, tokenizer=tokenizer)
+    my_model = GPT2({"use_cache": False}, tokenizer=tokenizer)
+    my_model.eval()
     copy_gpt2_weights(my_model, their_lm_model)
     # not supporting cross attention
     return my_model, their_lm_model

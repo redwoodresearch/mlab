@@ -1,3 +1,4 @@
+import time
 import torch as t
 import torch.nn as nn
 import torch.nn.functional as F
@@ -222,8 +223,6 @@ def test_gpt2_attention():
 
 def test_gpt2():
     my_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
-    my_gpt2.eval()
-    their_gpt2.eval()
 
     inputs = {
         "input_ids": t.LongTensor(my_gpt2.tokenizer(["I'm Alex Rider, i'm a writer"])["input_ids"]),
@@ -242,19 +241,20 @@ def test_gpt2_cache_is_correct():
 
     t.random.manual_seed(0)
     model_no_cache = gpt2.GPT2({"use_cache": False})
-    model_no_cache.eval()
     short_no_cache = model_no_cache(short_input_ids).logits
     short_no_cache_2 = model_no_cache(short_input_ids).logits
+    tstart = time.time()
     long_no_cache = model_no_cache(long_input_ids).logits
+    print("no cache took", time.time() - tstart)
     t.random.manual_seed(0)
 
     model = model_no_cache
     model.config["use_cache"] = True
-    model.eval()
     print("short cache")
     short_cache = model(short_input_ids).logits
+    tstart = time.time()
     long_cache = model(long_input_ids).logits
-
+    print("with cache took", time.time() - tstart)
     other_no_cache = model_no_cache(other_input_ids).logits
     other_cache = model(other_input_ids).logits
 
@@ -275,7 +275,7 @@ def test_gpt2_generation():
         .tolist()
     )
     print("their generated text", their_generated_text)
-    generated_text = my_gpt2.generate(prompt, max_length=10, freq_penalty=0, temperature=1)
+    generated_text = my_gpt2.generate(prompt, max_length=10, freq_penalty=1000, temperature=1)
     print("generated text", generated_text)
 
 
@@ -310,13 +310,13 @@ def test_resnet():
 
 
 if __name__ == "__main__":
-    test_gpt2_specific_prob()
+    test_gpt2_cache_is_correct()
     test_gpt2_generation()
+    test_gpt2_specific_prob()
     raise AssertionError("hi")
     test_gpt2()
     # test_gpt2_attention()
     # test_gpt2_layer()
-    test_gpt2_cache_is_correct()
 
     # test_bert_attention()
     # test_bert_layer()
