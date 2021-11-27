@@ -306,7 +306,6 @@ def test_gpt2_specific_prob():
 
 
 def test_resnet():
-
     resnet.resnet34_with_pretrained_weights()
 
 
