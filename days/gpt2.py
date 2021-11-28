@@ -231,7 +231,7 @@ class GPT2(Module):
         print(scores.cpu().tolist())
         return t.sum(scores)
 
-    def generate_beam_search_ids(self, input_ids, max_length=10, beam_width=5, freq_pentalty=2):
+    def generate_beam_search_ids(self, input_ids, max_length=10, beam_width=5, freq_penalty=2):
         candidates = [input_ids]
         for i in range(max_length):
             next_candidates = []
@@ -239,6 +239,9 @@ class GPT2(Module):
                 outputs = self(input_ids=input_ids.unsqueeze(0)).logits[0]
                 cost = self._get_logprob_of_logits(input_ids, outputs)
                 last_outputs = log_softmax(outputs[-1])
+                if freq_penalty > 0:
+                    id_freqs = t.bincount(input_ids, minlength=self.config["vocab_size"]) * freq_penalty
+                    last_outputs -= id_freqs
                 # Prune to the top k for each candidate because no more than k be in the top k of all candidates
                 topk_values, topk_indices = t.topk(last_outputs, dim=0)
                 candidates.extend([(cost + value, index) for value, index in zip(topk_values, topk_indices)])
@@ -246,10 +249,10 @@ class GPT2(Module):
             candidates = next_candidates
         return sorted(candidates)[0]
 
-    def generate_beam_search(self, text, max_length=10, beam_width=5, freq_pentalty=2):
+    def generate_beam_search(self, text, max_length=10, beam_width=5, freq_penalty=2):
         input_ids = self.tokenizer([text])["input_ids"][0]
         return self.generate_beam_search_ids(
-            input_ids, max_length=max_length, beam_width=beam_width, freq_panalty=freq_pentalty
+            input_ids, max_length=max_length, beam_width=beam_width, freq_penalty=freq_penalty
         )
 
     def specific_completion_probs_ids(self, input_ids, completions_ids):

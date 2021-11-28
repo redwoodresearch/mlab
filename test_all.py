@@ -290,7 +290,7 @@ def test_gpt2_generation_beam():
         .tolist()
     )
     print("their generated text", their_generated_text)
-    generated_text = my_gpt2.generate(prompt, max_length=10, freq_penalty=1000, temperature=1)
+    generated_text = my_gpt2.generate_beam_search(prompt, beam_width=3, max_length=10, freq_penalty=1000)
     print("generated text", generated_text)
 
 
@@ -325,9 +325,10 @@ def test_resnet():
 
 
 if __name__ == "__main__":
-    test_gpt2_cache_is_correct()
-    raise AssertionError("hi")
     test_gpt2_generation()
+    test_gpt2_generation_beam()
+    raise AssertionError("hi")
+    test_gpt2_cache_is_correct()
     test_gpt2_specific_prob()
     # test_gpt2_attention()
     # test_gpt2_layer()
