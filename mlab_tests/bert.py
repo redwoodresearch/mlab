@@ -5,6 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def test_back_forth_my_name_is_bert(string):
+    assert string == "[CLS] colleges 天 largest happened smile donation 夫 [SEP]"
+
+
 def test_attention_layer(fn):
     reference = bert.multi_head_self_attention
     hidden_size = 768
