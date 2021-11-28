@@ -29,7 +29,7 @@ class GPT2Attention(Module):
         self.dropout = Dropout(config["dropout"])
         self.register_buffer(
             "mask",
-            t.tril(t.ones((max_positions, max_positions), dtype=t.bool)).view(1, 1, max_positions, max_positions),
+            t.tril(t.ones((max_positions, max_positions), dtype=t.bool)).flip(0).flip(1).unsqueeze(0).unsqueeze(0),
         )
         self.masked_bias = t.tensor(-1e4)
 
@@ -50,15 +50,23 @@ class GPT2Attention(Module):
         key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
         value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
 
+        unidirectional_mask = self.mask[:, :, :output_sequence_length, :output_sequence_length]
+
         if past_key_values is not None:
             new_kvs = (key[0], value[0])
             key = t.cat([past_key_values[0].unsqueeze(0), key], dim=2)
             value = t.cat([past_key_values[1].unsqueeze(0), value], dim=2)
             input_sequence_length += past_key_values[0].shape[1]
+            unidirectional_mask = t.cat(
+                [
+                    t.full((1, 1, input_sequence_length - output_sequence_length, output_sequence_length), True),
+                    unidirectional_mask,
+                ],
+                2,
+            )
 
         attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
 
-        unidirectional_mask = self.mask[:, :, :input_sequence_length, :output_sequence_length]
         attention_raw = t.where(unidirectional_mask, attention_raw, self.masked_bias)
         if attention_masks is not None:
             attention_raw = attention_raw * attention_masks
@@ -152,18 +160,19 @@ class GPT2(Module):
 
         # cache only works for batch size 1
         if self.config["use_cache"] and input_ids.shape[0] == 1:
+            print("using cache")
             input_ids = input_ids[0]
-            for layer_num, (current_id, (id, layer_kvs, _last_embedding)) in enumerate(zip(input_ids, self.cache)):
+            for idx, (current_id, (id, layer_kvs, _last_embedding)) in enumerate(zip(input_ids, self.cache)):
                 if current_id != id:
-                    self.cache = self.cache[:layer_num]
+                    self.cache = self.cache[:idx]
                     break
             encodings = embeddings[:, len(self.cache) :]
-            new_cache_stuff = [[id, [], None] for id in input_ids[len(encodings) :]]
+            new_cache_stuff = [[id.item(), [], None] for id in input_ids[len(self.cache) :]]
             for layer_num, block in enumerate(self.blocks):
                 # this silly if because t.cat doesn't work for 0 length list (which kinda makes sense)
                 if len(self.cache) > 0:
-                    past_keys = t.cat([layer_kvs[layer_num][0] for id, layer_kvs in self.cache])
-                    past_values = t.cat([layer_kvs[layer_num][1] for id, layer_kvs in self.cache])
+                    past_keys = t.stack([layer_kvs[layer_num][0] for id, layer_kvs, _ in self.cache], dim=1)
+                    past_values = t.stack([layer_kvs[layer_num][1] for id, layer_kvs, _ in self.cache], dim=1)
                 else:
                     past_keys = t.zeros(12, 0, self.config["hidden_size"] // self.config["num_heads"])
                     past_values = t.zeros(12, 0, self.config["hidden_size"] // self.config["num_heads"])
@@ -171,8 +180,10 @@ class GPT2(Module):
                 for id_num, (id, layer_kvs, _last_embedding) in enumerate(new_cache_stuff):
                     layer_kvs.append((kvs[0][:, id_num], kvs[1][:, id_num]))
             encodings = self.layer_norm_final(encodings)
-            for layer_num, thing in enumerate(new_cache_stuff):
-                thing[2] = encodings[:, 0, layer_num]
+            for idx, thing in enumerate(new_cache_stuff):
+                thing[2] = encodings[0, idx]
+            if len(self.cache) > 0:
+                encodings = t.cat([t.stack([x[2] for x in self.cache], dim=0).unsqueeze(0), encodings], dim=1)
             self.cache.extend(new_cache_stuff)
         else:
             encodings = self.blocks(embeddings)
@@ -201,6 +212,46 @@ class GPT2(Module):
             ids = t.cat([ids, c.reshape(1)], dim=0)
         return ids[input_ids.shape[0] :]
 
+    def generate(self, text, max_length=30, temperature=1, freq_penalty=2):
+        assert self.tokenizer is not None
+        print(self.tokenizer(text))
+        input_ids = self.tokenizer(text, return_tensors="pt")["input_ids"][0]
+        tpeek("iids", input_ids)
+        generated_ids = self.generate_ids(
+            input_ids=input_ids, max_length=max_length, temperature=temperature, freq_penalty=freq_penalty
+        )
+        completion_text = self.tokenizer.decode(generated_ids)
+        return completion_text
+
+    def _get_logprob_of_logits(input_ids, logits):
+        logprobs = log_softmax(logits, dim=-1)
+        input_ids = input_ids[1:]
+        logits = logits[:-1]
+        scores = t.gather(logprobs, -1, input_ids)
+        print(scores.cpu().tolist())
+        return t.sum(scores)
+
+    def generate_beam_search_ids(self, input_ids, max_length=10, beam_width=5, freq_pentalty=2):
+        candidates = [input_ids]
+        for i in range(max_length):
+            next_candidates = []
+            for score, input_ids in candidates:
+                outputs = self(input_ids=input_ids.unsqueeze(0)).logits[0]
+                cost = self._get_logprob_of_logits(input_ids, outputs)
+                last_outputs = log_softmax(outputs[-1])
+                # Prune to the top k for each candidate because no more than k be in the top k of all candidates
+                topk_values, topk_indices = t.topk(last_outputs, dim=0)
+                candidates.extend([(cost + value, index) for value, index in zip(topk_values, topk_indices)])
+            candidates = sorted(candidates)[:beam_width]
+            candidates = next_candidates
+        return sorted(candidates)[0]
+
+    def generate_beam_search(self, text, max_length=10, beam_width=5, freq_pentalty=2):
+        input_ids = self.tokenizer([text])["input_ids"][0]
+        return self.generate_beam_search_ids(
+            input_ids, max_length=max_length, beam_width=beam_width, freq_panalty=freq_pentalty
+        )
+
     def specific_completion_probs_ids(self, input_ids, completions_ids):
         result = []
         for completion_ids in completions_ids:
@@ -214,17 +265,6 @@ class GPT2(Module):
             prob = reduce(gathered, "...->", "sum")
             result.append(prob.item())
         return result
-
-    def generate(self, text, max_length=30, temperature=1, freq_penalty=2):
-        assert self.tokenizer is not None
-        print(self.tokenizer(text))
-        input_ids = self.tokenizer(text, return_tensors="pt")["input_ids"][0]
-        tpeek("iids", input_ids)
-        generated_ids = self.generate_ids(
-            input_ids=input_ids, max_length=max_length, temperature=temperature, freq_penalty=freq_penalty
-        )
-        completion_text = self.tokenizer.decode(generated_ids)
-        return completion_text
 
     def specific_completion_probs(self, text, completion_texts):
         assert self.tokenizer is not None

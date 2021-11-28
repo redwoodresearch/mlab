@@ -154,7 +154,7 @@ def test_bert_attention():
 def test_bert_layer():
     their_bert = transformers.AutoModelForMaskedLM.from_pretrained("bert-base-cased")
     their_layer = their_bert.bert.encoder.layer[0]
-    my_layer = bert.BertLayer(their_bert.config)
+    my_layer = bert.BertBlock(their_bert.config)
     bert.copy_bert_layer(my_layer, their_layer)
     their_layer.eval()
     my_layer.eval()
@@ -235,14 +235,14 @@ def test_gpt2():
 
 
 def test_gpt2_cache_is_correct():
-    short_input_ids = t.LongTensor([[0, 1, 2]])
-    long_input_ids = t.LongTensor([[0, 1, 2, 3, 4, 5, 6, 7]])
+    short_input_ids = t.arange(0, 398).unsqueeze(0)
+    long_input_ids = t.arange(0, 400).unsqueeze(0)
     other_input_ids = t.LongTensor([[88, 323, 134]])
 
     t.random.manual_seed(0)
     model_no_cache = gpt2.GPT2({"use_cache": False})
+    model_no_cache.eval()
     short_no_cache = model_no_cache(short_input_ids).logits
-    short_no_cache_2 = model_no_cache(short_input_ids).logits
     tstart = time.time()
     long_no_cache = model_no_cache(long_input_ids).logits
     print("no cache took", time.time() - tstart)
@@ -252,19 +252,34 @@ def test_gpt2_cache_is_correct():
     model.config["use_cache"] = True
     print("short cache")
     short_cache = model(short_input_ids).logits
+    print("long cache")
     tstart = time.time()
     long_cache = model(long_input_ids).logits
     print("with cache took", time.time() - tstart)
     other_no_cache = model_no_cache(other_input_ids).logits
     other_cache = model(other_input_ids).logits
 
-    allclose(short_no_cache, short_no_cache_2, "determinism")
     allclose(short_no_cache, short_cache, "cache short")
-    allclose(long_no_cache, long_cache, "cache long")
     allclose(other_no_cache, other_cache, "cache other")
+    allclose(long_no_cache, long_cache, "cache long", tol=0.01)
 
 
 def test_gpt2_generation():
+    my_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
+    my_gpt2.config["use_cache"] = False
+    prompt = "I'm Alex Rider,"
+    print("generating")
+    their_generated_text = my_gpt2.tokenizer.decode(
+        their_gpt2.generate(input_ids=my_gpt2.tokenizer([prompt], return_tensors="pt")["input_ids"], max_length=10)[0]
+        .cpu()
+        .tolist()
+    )
+    print("their generated text", their_generated_text)
+    generated_text = my_gpt2.generate(prompt, max_length=10, freq_penalty=1000, temperature=1)
+    print("generated text", generated_text)
+
+
+def test_gpt2_generation_beam():
     my_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
     my_gpt2.config["use_cache"] = False
     prompt = "I'm Alex Rider,"
@@ -311,12 +326,12 @@ def test_resnet():
 
 if __name__ == "__main__":
     test_gpt2_cache_is_correct()
+    raise AssertionError("hi")
     test_gpt2_generation()
     test_gpt2_specific_prob()
-    raise AssertionError("hi")
-    test_gpt2()
     # test_gpt2_attention()
     # test_gpt2_layer()
+    test_gpt2()
 
     # test_bert_attention()
     # test_bert_layer()

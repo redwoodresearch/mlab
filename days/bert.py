@@ -118,9 +118,9 @@ class SelfAttentionLayer(Module):
         )
 
 
-class BertLayer(Module):
+class BertBlock(Module):
     def __init__(self, config):
-        super(BertLayer, self).__init__()
+        super(BertBlock, self).__init__()
 
         self.config = config
         hidden_size = config["hidden_size"]
@@ -173,7 +173,7 @@ class Bert(Module):
         self.config = {**default_config, **config}
 
         self.embedding = BertEmbedding(self.config)
-        self.transformer = Sequential(*[BertLayer(self.config) for _ in range(self.config["num_layers"])])
+        self.transformer = Sequential(*[BertBlock(self.config) for _ in range(self.config["num_layers"])])
         self.lm_head = BertLMHead(config)
 
     def forward(self, input_ids, token_type_ids=None):
@@ -206,7 +206,7 @@ def my_bert_from_hf_weights(their_lm_bert=None, config={}):
     my_layers = list(my_model.transformer)
     official_layers = list(model.encoder.layer)
     for my_layer, their_layer in zip(my_layers, official_layers):
-        my_layer: BertLayer
+        my_layer: BertBlock
 
         copy_weight_bias(my_layer.attention.project_key, their_layer.attention.self.key)
         copy_weight_bias(my_layer.attention.project_query, their_layer.attention.self.query)
