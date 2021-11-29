@@ -7,7 +7,13 @@ import gin
 import sys
 
 
-def run(rank, size):
+@gin.configurable(denyList=["rank", "size"])
+def run(
+    rank,
+    size,
+    dataloader_fn,
+    model_init_fn,
+):
     tensor = torch.zeros(1)
     req = None
     if rank == 0:
@@ -23,27 +29,34 @@ def run(rank, size):
     print("Rank ", rank, " has data ", tensor[0])
 
 
-def init_process(rank, size, fn, backend="gloo"):
+@gin.configurable
+def init_process(rank, size, backend="mpi"):
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = "29500"
     dist.init_process_group(backend, rank=rank, world_size=size)
-    fn(rank, size)
+    run(rank, size)
 
 
-if __name__ == "__main__":
-    if sys.argv[1]=="master":
-        gin.parse_config_file(sys.argv[1])
-    else:
-        gin.parse_config_file(sys.argv[1])
-        
-    if sys.argv[2] == ''
+@gin.configurable
+def create_processes(local_parallelism=gin.REQUIRED):
     processes = []
     mp.set_start_method("spawn")
-    for rank in range(size):
-        p = mp.Process(target=init_process, args=(rank, size, run))
+    for rank in range(local_parallelism):
+        p = mp.Process(target=init_process, args=(rank, local_parallelism, run))
         p.start()
         processes.append(p)
 
     for p in processes:
         p.join()
+
+
+if __name__ == "__main__":
+    if sys.argv[1] == "master":
+        gin.parse_config_file(sys.argv[1])
+        local_parallelism = sys.argv[2]
+    else:
+        tmpfilename = ".ginny_weasly"
+        with open(tmpfilename, "w") as f:
+            f.write(sys.argv[1])
+        gin.parse_config_file(tmpfilename)
