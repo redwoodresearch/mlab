@@ -69,9 +69,7 @@ def import_object_from_qualified_name(qname: str):
     last_period = qname.rindex(".")
     module_name = qname[:last_period]
     object_name = qname[last_period + 1 :]
-    print(f"module name {module_name}, object_name {object_name}")
     module = importlib.import_module(module_name)
-    print(f"imported {module_name}")
     out = getattr(module, object_name)
     assert out is not None
     return out
