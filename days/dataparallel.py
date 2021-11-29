@@ -10,8 +10,6 @@ from utils import import_object_from_qualified_name
 import torch as t
 import numpy as np
 
-test_all.test_relu()
-
 
 def load_data():
     randns = t.rand(1000, 2, 10)
