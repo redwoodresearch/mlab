@@ -1,3 +1,4 @@
+import test_all
 import os
 import random
 import torch.distributed as dist
@@ -9,9 +10,12 @@ from utils import import_object_from_qualified_name
 import torch as t
 import numpy as np
 
+test_all.test_relu()
+
 
 def load_data():
-    return [t.rand(2, 10) for _ in range(1000)]
+    randns = t.rand(1000, 2, 10)
+    return [randns[i] for i in range(1000)]
 
 
 def init_model():
@@ -20,7 +24,7 @@ def init_model():
     return model
 
 
-# @gin.configurable
+@gin.configurable
 class DistributedDataLoader:
     def __init__(self, rank, size, data_fn="days.dataparallel.load_data", mini_batch_size=8, random_seed=0):
         self.rank = rank
@@ -64,7 +68,7 @@ def alladd_grad(model):
         op.wait()
 
 
-# @gin.configurable()
+@gin.configurable()
 def run(
     rank,
     size,
@@ -78,8 +82,8 @@ def run(
     model.to(device)
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
     dataloader = DistributedDataLoader(rank=rank, size=size)
-    print("le dataloader", rank, "is", len(dataloader))
     for batch in dataloader:
+        # print("batch", batch)
         out = model(batch[0])
         loss = t.sum(out - batch[1])
         loss.backward()
@@ -87,23 +91,26 @@ def run(
         optimizer.step()
         optimizer.zero_grad()
         print("loss", loss.cpu().detach().numpy())
+        raise AssertionError("I want to error!")
 
 
-# @gin.configurable
+@gin.configurable
 def init_process(rank, size, run, backend="gloo"):
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = "29500"
     dist.init_process_group(backend, rank=rank, world_size=size)
     print("inited process group", rank)
+    import test_all
+
     run(rank, size)
 
 
-# @gin.configurable
+@gin.configurable
 def create_processes(
     local_parallelism=2,
 ):
-
+    # raise AssertionError(":)")
     processes = []
     mp.set_start_method("spawn")
     for rank in range(local_parallelism):
