@@ -291,7 +291,9 @@ def test_gpt2_generation_beam():
     )
     print("their generated text", their_generated_text)
     generated_text = my_gpt2.generate_beam_search(prompt, beam_width=3, max_length=10, freq_penalty=1000)
+    generated_text_2 = my_gpt2.generate_beam_search(prompt, beam_width=3, max_length=10, freq_penalty=1000)
     print("generated text", generated_text)
+    assert generated_text_2 == generated_text
 
 
 def test_gpt2_specific_prob():
@@ -325,8 +327,9 @@ def test_resnet():
 
 
 if __name__ == "__main__":
-    test_gpt2_generation()
     test_gpt2_generation_beam()
+    test_bert()
+    test_gpt2_generation()
     raise AssertionError("hi")
     test_gpt2_cache_is_correct()
     test_gpt2_specific_prob()
@@ -336,7 +339,6 @@ if __name__ == "__main__":
 
     # test_bert_attention()
     # test_bert_layer()
-    test_bert()
 
     test_relu()
     test_gelu()

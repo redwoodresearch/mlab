@@ -13,10 +13,11 @@ def test_back_forth_my_name_is_bert(string):
 def test_attention_layer(fn):
     reference = bert.multi_head_self_attention
     hidden_size = 768
-    token_activations = t.empty(2, 3, hidden_size).uniform_(-1, 1)
+    batch_size = 2
+    seq_length = 3
+    token_activations = t.empty(batch_size, seq_length, hidden_size).uniform_(-1, 1)
     num_heads = 12
-    project_query = nn.Linear(hidden_size, hidden_size)
-    project_key = nn.Linear(hidden_size, hidden_size)
+    attention_pattern = t.rand(batch_size, num_heads, seq_length, seq_length)
     project_value = nn.Linear(hidden_size, hidden_size)
     project_output = nn.Linear(hidden_size, hidden_size)
     dropout = t.nn.Dropout(0.1)
@@ -25,8 +26,7 @@ def test_attention_layer(fn):
         fn(
             token_activations=token_activations,
             num_heads=num_heads,
-            project_query=project_query,
-            project_key=project_key,
+            attention_pattern=attention_pattern,
             project_value=project_value,
             project_output=project_output,
             dropout=dropout,
@@ -34,8 +34,7 @@ def test_attention_layer(fn):
         reference(
             token_activations=token_activations,
             num_heads=num_heads,
-            project_query=project_query,
-            project_key=project_key,
+            attention_pattern=attention_pattern,
             project_value=project_value,
             project_output=project_output,
             dropout=dropout,

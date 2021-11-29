@@ -223,16 +223,16 @@ class GPT2(Module):
         completion_text = self.tokenizer.decode(generated_ids)
         return completion_text
 
-    def _get_logprob_of_logits(input_ids, logits):
+    def _get_logprob_of_logits(self, input_ids, logits):
         logprobs = log_softmax(logits, dim=-1)
         input_ids = input_ids[1:]
         logits = logits[:-1]
-        scores = t.gather(logprobs, -1, input_ids)
-        print(scores.cpu().tolist())
+        scores = t.gather(logprobs, -1, input_ids.unsqueeze(-1)).squeeze(-1)
+        scores = t.nan_to_num(scores, nan=-30, posinf=-30, neginf=-30)
         return t.sum(scores)
 
     def generate_beam_search_ids(self, input_ids, max_length=10, beam_width=5, freq_penalty=2):
-        candidates = [input_ids]
+        candidates = [(0, input_ids)]
         for i in range(max_length):
             next_candidates = []
             for score, input_ids in candidates:
@@ -243,16 +243,23 @@ class GPT2(Module):
                     id_freqs = t.bincount(input_ids, minlength=self.config["vocab_size"]) * freq_penalty
                     last_outputs -= id_freqs
                 # Prune to the top k for each candidate because no more than k be in the top k of all candidates
-                topk_values, topk_indices = t.topk(last_outputs, dim=0)
-                candidates.extend([(cost + value, index) for value, index in zip(topk_values, topk_indices)])
-            candidates = sorted(candidates)[:beam_width]
+                topk_values, topk_indices = t.topk(last_outputs, dim=0, k=beam_width)
+                next_candidates.extend(
+                    [
+                        (cost + value, t.cat([input_ids, index.reshape(1)], dim=0))
+                        for value, index in zip(topk_values, topk_indices)
+                    ]
+                )
+            next_candidates = sorted(next_candidates, key=lambda x: x[0])[:beam_width]
             candidates = next_candidates
-        return sorted(candidates)[0]
+        return sorted(candidates, key=lambda x: x[0])[0][1]
 
     def generate_beam_search(self, text, max_length=10, beam_width=5, freq_penalty=2):
-        input_ids = self.tokenizer([text])["input_ids"][0]
-        return self.generate_beam_search_ids(
-            input_ids, max_length=max_length, beam_width=beam_width, freq_penalty=freq_penalty
+        input_ids = self.tokenizer([text], return_tensors="pt")["input_ids"][0]
+        return self.tokenizer.decode(
+            self.generate_beam_search_ids(
+                input_ids, max_length=max_length, beam_width=beam_width, freq_penalty=freq_penalty
+            )
         )
 
     def specific_completion_probs_ids(self, input_ids, completions_ids):
