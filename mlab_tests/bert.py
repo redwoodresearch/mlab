@@ -1,17 +1,23 @@
 import torch as t
+import transformers
 import days.bert as bert
 from test_all import allclose
 import torch.nn as nn
 import torch.nn.functional as F
 
 
+def test_back_forth_my_name_is_bert(string):
+    assert string == "[CLS] colleges 天 largest happened smile donation 夫 [SEP]"
+
+
 def test_attention_layer(fn):
     reference = bert.multi_head_self_attention
     hidden_size = 768
-    token_activations = t.empty(2, 3, hidden_size).uniform_(-1, 1)
+    batch_size = 2
+    seq_length = 3
+    token_activations = t.empty(batch_size, seq_length, hidden_size).uniform_(-1, 1)
     num_heads = 12
-    project_query = nn.Linear(hidden_size, hidden_size)
-    project_key = nn.Linear(hidden_size, hidden_size)
+    attention_pattern = t.rand(batch_size, num_heads, seq_length, seq_length)
     project_value = nn.Linear(hidden_size, hidden_size)
     project_output = nn.Linear(hidden_size, hidden_size)
     dropout = t.nn.Dropout(0.1)
@@ -20,8 +26,7 @@ def test_attention_layer(fn):
         fn(
             token_activations=token_activations,
             num_heads=num_heads,
-            project_query=project_query,
-            project_key=project_key,
+            attention_pattern=attention_pattern,
             project_value=project_value,
             project_output=project_output,
             dropout=dropout,
@@ -29,8 +34,7 @@ def test_attention_layer(fn):
         reference(
             token_activations=token_activations,
             num_heads=num_heads,
-            project_query=project_query,
-            project_key=project_key,
+            attention_pattern=attention_pattern,
             project_value=project_value,
             project_output=project_output,
             dropout=dropout,
@@ -81,21 +85,59 @@ def test_bert_mlp(fn):
 
 
 # TODO write this
-def test_bert_block(fn):
-    raise NotImplementedError()
-    reference = bert.d
-    hidden_size = 768
-    intermediate_size = 4 * hidden_size
-
-    token_activations = t.empty(2, 3, hidden_size).uniform_(-1, 1)
-    attention = bert.SelfAttentionLayer(config)
-    mlp_2 = nn.Linear(intermediate_size, hidden_size)
-    dropout = t.nn.Dropout(0.1)
-    dropout.eval()
+def test_bert_block(your_module):
+    config = {
+        "vocab_size": 28996,
+        "intermediate_size": 3072,
+        "hidden_size": 768,
+        "num_layers": 12,
+        "num_heads": 12,
+        "max_position_embeddings": 512,
+        "dropout": 0.1,
+        "type_vocab_size": 2,
+    }
+    t.random.manual_seed(0)
+    reference = bert.Bert(config)
+    reference.eval()
+    t.random.manual_seed(0)
+    theirs = your_module(**config)
+    theirs.eval()
+    tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
+    input_ids = tokenizer("hello there", return_tensors="pt")["input_ids"]
     allclose(
-        fn(token_activations=token_activations, linear_1=mlp_1, linear_2=mlp_2),
-        reference(token_activations=token_activations, linear_1=mlp_1, linear_2=mlp_2),
-        "bert mlp",
+        theirs(input_ids=input_ids),
+        reference(input_ids=input_ids),
+        "bert",
+    )
+
+
+def test_bert_block(your_module):
+    config = {
+        "vocab_size": 28996,
+        "intermediate_size": 3072,
+        "hidden_size": 768,
+        "num_layers": 12,
+        "num_heads": 12,
+        "max_position_embeddings": 512,
+        "dropout": 0.1,
+        "type_vocab_size": 2,
+    }
+    t.random.manual_seed(0)
+    reference = bert.BertBlock(config)
+    reference.eval()
+    t.random.manual_seed(0)
+    theirs = your_module(
+        intermediate_size=config["intermediate_size"],
+        hidden_size=config["hidden_size"],
+        num_heads=config["num_heads"],
+        dropout=config["dropout"],
+    )
+    theirs.eval()
+    input_activations = t.rand((2, 3, 768))
+    allclose(
+        theirs(input_activations),
+        reference(input_activations),
+        "bert",
     )
 
 
