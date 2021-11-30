@@ -212,6 +212,12 @@ def layer_norm(x: torch.FloatTensor, reduce_dims, weight: torch.FloatTensor, bia
     var = ((x - xmean)**2).mean(dim=red_dim_indices, keepdim=True)
     xnorm = (x - xmean) / var.sqrt()
 
+    n_batch_dims = len(x.shape) - len(weight.shape)
+    conversion_formula = '... ->' + ' ()' * n_batch_dims + ' ...'
+    weight_reshaped = einops.rearrange(weight, conversion_formula)
+    bias_reshaped = einops.rearrange(bias, conversion_formula)
+    return xnorm * weight_reshaped + bias_reshaped
+
 def test_cases15():
     out = []
     for i in range(10):
