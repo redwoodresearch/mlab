@@ -168,6 +168,7 @@ class BertLMHead(Module):
 class BertOutput:
     logits: t.Tensor
     encodings: t.Tensor
+    classification: t.Tensor
 
 
 class Bert(Module):
@@ -183,13 +184,17 @@ class Bert(Module):
             "max_position_embeddings": 512,
             "dropout": 0.1,
             "type_vocab_size": 2,
+            "num_classes": 2,
         }
+        config = {**default_config, **config}
         self.tokenizer = tokenizer
-        self.config = {**default_config, **config}
+        self.config = config
 
         self.embedding = BertEmbedding(self.config)
         self.transformer = Sequential(*[BertBlock(self.config) for _ in range(self.config["num_layers"])])
         self.lm_head = BertLMHead(config)
+        self.classification_head = Linear(config["hidden_size"], config["num_classes"])
+        self.classification_dropout = Dropout(config["dropout"])
 
     def forward(self, input_ids, token_type_ids=None):
 
@@ -199,7 +204,8 @@ class Bert(Module):
         embeddings = self.embedding.embed(input_ids=input_ids, token_type_ids=token_type_ids)
         encodings = self.transformer(embeddings)
         logits = self.lm_head(encodings)
-        return BertOutput(logits=logits, encodings=encodings)
+        classification = self.classification_head(self.classification_dropout(encodings[:, 0]))
+        return BertOutput(logits=logits, encodings=encodings, classification=classification)
 
 
 def my_bert_from_hf_weights(their_lm_bert=None, config={}):

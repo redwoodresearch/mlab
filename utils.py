@@ -11,10 +11,15 @@ def tstat(name, tensor):
     )
 
 
-def tpeek(name: str, tensor: t.Tensor, ret: bool = False):
+def itpeek(tensor: t.Tensor):
     contains_nan = t.any(t.isnan(tensor)).item()
     contains_inf = t.any(t.isinf(tensor)).item()
-    string = f"{name} SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor.float()).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor.float()).cpu().item())} {'CONTAINS_NAN! ' if contains_nan else ''}{'CONTAINS_INF! ' if contains_inf else ''}VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}...]"
+    string = f"SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor.float()).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor.float()).cpu().item())} {'CONTAINS_NAN! ' if contains_nan else ''}{'CONTAINS_INF! ' if contains_inf else ''}VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}...]"
+    return string
+
+
+def tpeek(name: str, tensor: t.Tensor, ret: bool = False):
+    string = f"{name} {itpeek(tensor)}"
     if ret:
         return string
     print(string)
@@ -45,8 +50,11 @@ def has_not_null(obj, prop):
 def copy_state_identical(from_module, to_module):
     state_dict = from_module.state_dict()
     to_state_keys = set(to_module.state_dict().keys())
-    from_state_keys = state_dict.keys()
-    shared_keys = to_state_keys * from_state_keys
+    from_state_keys = set(state_dict.keys())
+    from_only = from_state_keys - to_state_keys
+    to_only = to_state_keys - from_state_keys
+    if len(to_only) > 0 or len(from_only) > 0:
+        raise AssertionError(f"{from_only} only in from module, {to_only} only in to module")
     to_module.load_state_dict(from_state_keys)
 
 
