@@ -139,14 +139,14 @@ def test_cases7():
 
 
 def ex8(scores: torch.Tensor, y: torch.Tensor, k: int):
-    return (torch.argsort(scores)[:, -2:] == y[:, None]).any(dim=-1).to(float).mean()
+    return (torch.argsort(scores)[:, -k:] == y[:, None]).any(dim=-1).to(float).mean()
 
 
 def test_cases8():
     out = []
     for i in range(10):
         n_inputs = np.random.randint(50, 100)
-        n_classes = np.random.randint(5, 20)
+        n_classes = np.random.randint(10, 20)
         scores = torch.randn((n_inputs, n_classes))
         y = torch.randint(n_classes, (n_inputs,))
         k = np.random.randint(2, n_classes // 2)
