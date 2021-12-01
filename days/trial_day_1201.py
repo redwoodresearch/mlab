@@ -20,8 +20,8 @@ def ex2(temp: torch.Tensor):
     assert len(temp) % 7 == 0, 'Input length must be a multiple of 7.'
     
     weekly = einops.rearrange(temp, '(h w) -> h w', w=7)
-    weekly_means = weekly.mean(dim=1)
-    weekly_zeromean = weekly - weekly.mean(dim=1, keepdim=True)
+    weekly_means = einops.reduce(temp, '(h 7) -> h', 'mean')
+    weekly_zeromean = weekly - weekly_means[:, None]
     weekly_normalised = weekly_zeromean / weekly.std(dim=1, keepdim=True)
     return [weekly_means, weekly_zeromean, weekly_normalised]
 
@@ -76,7 +76,7 @@ def test_cases5():
 
 
 def ex6(n: int, probs: torch.Tensor):
-    assert probs.sum() == 1.0
+    assert abs(probs.sum() - 1.0) < 0.001
     return (torch.rand((n, 1)) > torch.cumsum(probs, dim=0)).sum(dim=-1)
 
 def test_cases6():
@@ -211,12 +211,7 @@ def layer_norm(x: torch.FloatTensor, reduce_dims, weight: torch.FloatTensor, bia
     xmean = x.mean(dim=red_dim_indices, keepdim=True)
     var = ((x - xmean)**2).mean(dim=red_dim_indices, keepdim=True)
     xnorm = (x - xmean) / var.sqrt()
-
-    n_batch_dims = len(x.shape) - len(weight.shape)
-    conversion_formula = '... ->' + ' ()' * n_batch_dims + ' ...'
-    weight_reshaped = einops.rearrange(weight, conversion_formula)
-    bias_reshaped = einops.rearrange(bias, conversion_formula)
-    return xnorm * weight_reshaped + bias_reshaped
+    return xnorm * weight + bias
 
 def test_cases15():
     out = []
@@ -260,12 +255,20 @@ def test_cases17():
     return out
 
 
-def cross_entropy_loss(probs: torch.FloatTensor, y: torch.LongTensor):
-    return - torch.gather(probs, 1, y[:, None]).log().sum()
+def logsoftmax(tensor: torch.FloatTensor):
+    C = tensor.max(dim=1, keepdim=True).values
+    return tensor - C - (tensor - C).exp().sum(dim=1, keepdim=True).log()
+
+test_cases18 = test_cases17
+
+
+def cross_entropy_loss(logits: torch.FloatTensor, y: torch.LongTensor):
+    logprobs = logsoftmax(logits)
+    return - torch.gather(logprobs, 1, y[:, None]).sum()
 
 def test_cases18():
     out = []
-    for logits in test_cases16():
+    for logits in test_cases17():
         probs = softmax(logits)
         y = torch.randint(0, probs.shape[1], (probs.shape[0],))
         out += [[probs, y]]
