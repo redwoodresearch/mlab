@@ -266,7 +266,7 @@ def cross_entropy_loss(logits: torch.FloatTensor, y: torch.LongTensor):
     logprobs = logsoftmax(logits)
     return - torch.gather(logprobs, 1, y[:, None]).sum()
 
-def test_cases18():
+def test_cases19():
     out = []
     for logits in test_cases17():
         probs = softmax(logits)
@@ -281,4 +281,5 @@ ex14 = linear
 ex15 = layer_norm
 ex16 = embed
 ex17 = softmax
-ex18 = cross_entropy_loss
+ex18 = logsoftmax
+ex19 = cross_entropy_loss
