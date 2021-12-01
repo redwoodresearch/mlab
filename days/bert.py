@@ -21,7 +21,8 @@ class BertEmbedding(Module):
         # as opposed to a linear layer, which is initialized to _produce_ normalized vectors
         self.token_embedding = Embedding(config["vocab_size"], embedding_size)
         self.position_embedding = Embedding(config["max_position_embeddings"], embedding_size)
-        self.token_type_embedding = Embedding(config["type_vocab_size"], embedding_size)
+        if config["type_vocab_size"] is not None:
+            self.token_type_embedding = Embedding(config["type_vocab_size"], embedding_size)
 
         self.layer_norm = LayerNorm((embedding_size,))
         self.dropout = Dropout(config["dropout"])
@@ -29,9 +30,13 @@ class BertEmbedding(Module):
     def embed(self, input_ids: t.LongTensor, token_type_ids):
         seq_length = input_ids.shape[1]
         token_embeddings = self.token_embedding(input_ids)
-        token_type_embeddings = self.token_type_embedding(token_type_ids)
         position_embeddings = self.position_embedding(t.arange(seq_length).to(next(self.parameters()).device))
-        embeddings = token_embeddings + token_type_embeddings + position_embeddings
+        embeddings = token_embeddings + position_embeddings
+
+        if self.config["type_vocab_size"] is not None:
+            token_type_embeddings = self.token_type_embedding(token_type_ids)
+            embeddings += token_type_embeddings
+
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -75,10 +80,26 @@ def raw_attention_pattern(token_activations, num_heads, project_query, project_k
     return attention_raw
 
 
-def multi_head_self_attention(token_activations, num_heads, attention_pattern, project_value, project_out, dropout):
+def multi_head_self_attention(
+    token_activations,
+    num_heads,
+    attention_pattern,
+    project_value,
+    project_out,
+    dropout,
+    attention_masks=None,
+    unidirectional=False,
+):
 
     # if attention_masks is not None:
     #     attention_raw = attention_raw * attention_masks
+    seq_length = token_activations.shape[1]
+    if unidirectional:
+        unidirectional_mask = (
+            t.tril(t.ones((seq_length, seq_length), dtype=t.bool)).flip(0).flip(1).unsqueeze(0).unsqueeze(0)
+        )
+        attention_pattern = t.where(unidirectional_mask, attention_pattern, t.tensor(-1e4))
+
     attention_patterns = softmax(attention_pattern, dim=-2)
     attention_patterns = dropout(attention_patterns)
 
@@ -99,12 +120,13 @@ class AttentionPattern(Module):
         self.project_query = Linear(hidden_size, hidden_size, bias=True)
         self.project_key = Linear(hidden_size, hidden_size, bias=True)
 
-    def forward(self, token_activations, attention_masks):
+    def forward(self, token_activations, attention_masks=None):
         return raw_attention_pattern(
             token_activations=token_activations,
             num_heads=self.config["num_heads"],
             project_key=self.project_key,
             project_query=self.project_query,
+            attention_mask=attention_masks,
         )
 
 
@@ -129,6 +151,7 @@ class SelfAttentionLayer(Module):
             self.project_value,
             self.project_out,
             self.dropout,
+            unidirectional=self.config["unidirectional"],
         )
 
 
@@ -157,11 +180,13 @@ class BertLMHead(Module):
         super(BertLMHead, self).__init__()
         hidden_size = config["hidden_size"]
         self.mlp = Linear(hidden_size, hidden_size, bias=True)
-        self.unembedding = Linear(hidden_size, config["vocab_size"], bias=True)
         self.layer_norm = LayerNorm((hidden_size,))
+        self.unembedding = Linear(hidden_size, config["vocab_size"], bias=True)
 
     def forward(self, activations):
-        return self.unembedding(self.layer_norm(gelu(self.mlp(activations))))
+        if self.mlp is not None:
+            activations = gelu(self.mlp(activations))
+        return self.unembedding(self.layer_norm(activations))
 
 
 @dataclass
@@ -185,6 +210,7 @@ class Bert(Module):
             "dropout": 0.1,
             "type_vocab_size": 2,
             "num_classes": 2,
+            "unidirectional": False,
         }
         config = {**default_config, **config}
         self.tokenizer = tokenizer
@@ -250,5 +276,70 @@ def my_bert_from_hf_weights(their_lm_bert=None, config={}):
     return my_model, their_lm_bert
 
 
+def my_bert_from_gpt2_weights():
+    import transformers
+
+    their_gpt2: transformers.models.bert.modeling_bert.BertModel = transformers.AutoModelForCausalLM.from_pretrained(
+        "gpt2"
+    )
+    tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
+    my_model = Bert(
+        {"unidirectional": True, "type_vocab_size": None, "vocab_size": 50257, "max_position_embeddings": 1024},
+        tokenizer,
+    )
+    print(their_gpt2)
+    print(my_model)
+    model = their_gpt2.transformer
+    # copy embeddings
+    my_model.embedding.position_embedding.weight = model.wpe.weight
+    my_model.embedding.token_embedding.weight = model.wte.weight
+
+    # they put the layer norm on the beginning of their block instead of in the embedding module.
+    # I prefer the layer norm to go at the end of the block, because I like every block getting the 'same' distribution as input.
+    with t.no_grad():
+        copy_weight_bias(my_model.embedding.layer_norm, model.h[0].ln_1)
+
+        my_layers = list(my_model.transformer)
+        official_layers = list(model.h)
+        for i in range(len(official_layers)):
+            my_layer = my_layers[i]
+            my_layer: BertBlock
+            their_layer = official_layers[i]
+
+            if i < len(official_layers) - 1:
+                their_next_layer = official_layers[i + 1]
+                copy_weight_bias(my_layer.residual.layer_norm, their_next_layer.ln_1)
+            else:
+                my_layer.residual.layer_norm = t.nn.Identity()
+
+            their_query_weight, their_key_weight, their_value_weight = rearrange(
+                their_layer.attn.c_attn.weight, "i (x o) -> x o i", x=3
+            )
+            their_query_bias, their_key_bias, their_value_bias = rearrange(
+                their_layer.attn.c_attn.bias, "(x o) -> x o", x=3
+            )
+            my_layer.attention.pattern.project_query.weight.copy_(their_query_weight)
+            my_layer.attention.pattern.project_key.weight.copy_(their_key_weight)
+            my_layer.attention.project_value.weight.copy_(their_value_weight)
+
+            my_layer.attention.pattern.project_query.bias.copy_(their_query_bias)
+            my_layer.attention.pattern.project_key.bias.copy_(their_key_bias)
+            my_layer.attention.project_value.bias.copy_(their_value_bias)
+
+            copy_weight_bias(my_layer.attention.project_out, their_layer.attn.c_proj, transpose=True)
+
+            copy_weight_bias(my_layer.layer_norm, their_layer.ln_2)
+
+            copy_weight_bias(my_layer.residual.mlp1, their_layer.mlp.c_fc, transpose=True)
+            copy_weight_bias(my_layer.residual.mlp2, their_layer.mlp.c_proj, transpose=True)
+        # bias is output_specific, weight is from embedding
+        my_model.lm_head.mlp = None
+        my_model.lm_head.layer_norm = model.ln_f
+        print(my_model.lm_head.unembedding.weight.shape, model.wte.weight.shape)
+        copy_weight_bias(my_model.lm_head.unembedding, their_gpt2.lm_head)
+    return my_model, their_gpt2
+
+
 if __name__ == "__main__":
-    my_bert_from_hf_weights()
+    # my_bert_from_hf_weights()
+    my_bert_from_gpt2_weights()

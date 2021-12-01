@@ -3,8 +3,70 @@ import math
 import torch as t
 import numpy as np
 from torch.nn import Module, Parameter
-
+from einops import reduce, rearrange
 from utils import tpeek
+
+
+def conv1d_v0(x, weight):
+    x = rearrange(x, "b c s -> b s c")
+    out_channels, _, kernel_size = weight.shape
+    B, S, C = x.shape
+    x = x.contiguous()
+    strided_input = t.as_strided(x, (B, S - kernel_size + 1, kernel_size, C, out_channels), (S * C, C, C, 1, 0), 0)
+    weight_rearranged = rearrange(weight, "o i k -> k i o")
+    added = strided_input * weight_rearranged
+    summed = reduce(added, "b s c in_channels out_channels -> b s out_channels", "sum")
+    summed = rearrange(summed, "b s c->b c s")
+    return summed
+
+
+def conv2d_v0(x, weight):
+    x = rearrange(x, "b c h w -> b h w c")
+    out_channels, _, k_h, k_w = weight.shape
+    B, H, W, C = x.shape
+    x = x.contiguous()
+    strided_input = t.as_strided(
+        x,
+        (B, H - k_h + 1, W - k_w + 1, k_h, k_w, C, out_channels),
+        (H * W * C, C * W, C, C * W, C, 1, 0),
+        0,
+    )
+    weight_rearranged = rearrange(weight, "o i k_h k_w -> k_h k_w i o")
+    added = strided_input * weight_rearranged
+    summed = reduce(added, "b h w k_h k_w in_channels out_channels -> b h w out_channels", "sum")
+    summed = rearrange(summed, "b h w c->b c h w")
+    return summed
+
+
+def conv2d_tao(x, weight, padding=0, stride=1):
+    padded_x = t.nn.functional.pad(x, [padding, padding, padding, padding]).contiguous()
+    x = rearrange(x, "b c h w -> b h w c")
+
+    out_channels, _, k_h, k_w = weight.shape
+    B, H, W, C = x.shape
+    h_out = (H - k_h + padding * 2) // stride + 1
+    w_out = (W - k_w + padding * 2) // stride + 1
+    strided_input = t.as_strided(
+        padded_x,
+        (B, h_out, w_out, k_h, k_w, C, out_channels),
+        (H * W * C, C * W * stride, C * stride, C * W, C, 1, 0),
+        storage_offset=0,
+    )
+    weight_rearranged = rearrange(weight, "o i k_h k_w -> k_h k_w i o")
+    added = strided_input * weight_rearranged
+    summed = reduce(added, "b h w k_h k_w i_c o_c -> b o_c h w", "sum")
+    return summed
+
+
+class Conv1d(Module):
+    def __init__(self, size, channels):
+        super().__init__()
+        self.weight = Parameter(t.randn(size, channels))
+        self.size = size
+        self.channels = channels
+
+    def forward(self, x: t.FloatTensor):
+        return conv1d_v0(input, self.weight)
 
 
 def log_softmax(tensor: t.Tensor, dim: int = 0):
@@ -49,6 +111,15 @@ def layer_norm(x, weight, bias):
     x = (x - x.mean(-1, keepdim=True)) / t.sqrt(x.var(-1, keepdim=True) + 1e-5)
     x = x * weight + bias
     return x
+
+
+def layer_norm_multidim(x, weight, bias):
+    red_dim_indices = list(range(len(x.shape) - len(weight.shape), len(x.shape)))
+    xmean = x.mean(dim=red_dim_indices, keepdim=True)
+    var = ((x - xmean) ** 2).mean(dim=red_dim_indices, keepdim=True)
+    xnorm = (x - xmean) / var.sqrt()
+
+    return xnorm * weight + bias
 
 
 class LayerNorm(Module):

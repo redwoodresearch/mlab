@@ -11,6 +11,10 @@ def tstat(name, tensor):
     )
 
 
+def chunk(list, chunk_size):
+    return [list[i * chunk_size : (i + 1) * chunk_size] for i in range(len(list) // chunk_size)]
+
+
 def itpeek(tensor: t.Tensor):
     contains_nan = t.any(t.isnan(tensor)).item()
     contains_inf = t.any(t.isinf(tensor)).item()
@@ -54,23 +58,26 @@ def copy_state_identical(from_module, to_module):
     from_only = from_state_keys - to_state_keys
     to_only = to_state_keys - from_state_keys
     if len(to_only) > 0 or len(from_only) > 0:
-        raise AssertionError(f"{from_only} only in from module, {to_only} only in to module")
+        raise AssertionError(f"{from_only} only in from module, {to_only} only in to module".replace('"', ""))
     to_module.load_state_dict(from_state_keys)
 
 
 def copy_weight_bias(mine, theirs, transpose=False):
     if transpose:
-        mine.weight = t.nn.Parameter(rearrange(theirs.weight, "a b -> b a"))
+        mine.weight.copy_(rearrange(theirs.weight, "a b -> b a"))
     else:
-        mine.weight = theirs.weight
+        mine.weight.copy_(theirs.weight)
 
     theirs_has_bias = has_not_null(theirs, "bias")
     mine_has_bias = has_not_null(mine, "bias")
-    if theirs_has_bias != mine_has_bias:
-        print(mine.bias)
-        raise AssertionError("yikes")
-    if mine_has_bias and theirs_has_bias:
+    if theirs_has_bias and not mine_has_bias:
         mine.bias = theirs.bias
+        print("theirs has bias, mine doesn't")
+    elif mine_has_bias and not theirs_has_bias:
+        mine.bias.zero_()
+        print("mine has bias, theirs doesnt")
+    if mine_has_bias and theirs_has_bias:
+        mine.bias.copy_(theirs.bias)
 
 
 def import_object_from_qualified_name(qname: str):

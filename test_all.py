@@ -60,7 +60,7 @@ def allclose(my_out, their_out, name, tol=1e-8):
         errstring = f'error in {name}\n{tpeek("", my_out, ret=True)} \n!=\n{tpeek("", their_out, ret=True)}'
         raise AssertionError(errstring)
     else:
-        tpeek(f"{name} MATCH!!!!!!!!\n", my_out)
+        tpeek(f"    {name} MATCH!!!!!!!!\n", my_out)
 
 
 def test_relu():
@@ -83,6 +83,16 @@ def test_softmax():
     my_out = modules.softmax(input, dim=1)
     their_out = F.softmax(input, dim=1)
     allclose(my_out, their_out, "softmax")
+
+
+def test_cross_entropy():
+    input = t.FloatTensor(435, 234).uniform_(-10, 10)
+    y = t.randint(0, 200, (435,))
+    my_out = modules.cross_entropy(input, y)
+    their_out = F.cross_entropy(input, y)
+    tpeek("their ce", their_out)
+    tpeek("my ce", my_out)
+    allclose(my_out, their_out, "cross_entropy")
 
 
 def test_normalize():
@@ -145,6 +155,36 @@ def test_embedding():
     my_output = my_embedding(embed_input)
     their_output = their_embedding(embed_input)
     allclose(my_output, their_output, "embedding")
+
+
+def test_conv1d():
+    weight = t.rand(20, 10, 5)
+    input = t.rand(2, 10, 12)
+    my_output = modules.conv1d_v0(input, weight)
+    their_output = F.conv1d(input, weight)
+    tpeek("their conv1d", their_output)
+    tpeek("my conv1d", my_output)
+    allclose(my_output, their_output, "conv1d")
+
+
+def test_conv2d():
+    weight = t.rand(20, 10, 5, 5)
+    input = t.rand(2, 10, 22, 22)
+    my_output = modules.conv2d_v0(input, weight)
+    their_output = F.conv2d(input, weight)
+    tpeek("their conv1d", their_output)
+    tpeek("my conv1d", my_output)
+    allclose(my_output, their_output, "conv2d")
+
+
+def test_conv2d_tao():
+    weight = t.rand(20, 10, 5, 5)
+    input = t.rand(2, 10, 22, 22)
+    my_output = modules.conv2d_tao(input, weight, stride=1, padding=1)
+    their_output = F.conv2d(input, weight, stride=1, padding=1)
+    tpeek("my conv1d", my_output)
+    tpeek("their conv1d", their_output)
+    allclose(my_output, their_output, "conv2d")
 
 
 def test_bert_attention():
@@ -333,7 +373,30 @@ def test_gpt2_specific_prob():
     print("probs", {x: y for x, y in zip(completions, probs)})
 
 
-def test_dp():
+def test_gpt2_to_bert():
+    my_gpt2, their_gpt2 = bert.my_bert_from_gpt2_weights()
+    my_gpt2.eval()
+    their_gpt2.eval()
+
+    inputs = {
+        "input_ids": t.LongTensor(
+            my_gpt2.tokenizer(["I'm Alex Rider, i'm a writer"], return_tensors="pt")["input_ids"]
+        ),
+    }
+
+    activations = t.randn((2, 3, 768))
+
+    my_encodings = my_gpt2.transformer[0](activations)
+    their_encodings = their_gpt2.transformer
+
+    my_output = my_gpt2(**inputs).logits
+    their_output = their_gpt2(**inputs).logits
+    tpeek("my layer", my_output)
+    tpeek("their layer", their_output)
+    allclose(my_output, their_output, "gpt2 to bert logits")
+
+
+def test_dataparallel():
     dp.create_processes()
 
 
@@ -342,11 +405,16 @@ def test_resnet():
 
 
 if __name__ == "__main__":
-    test_dp()
+    test_conv2d_tao()
+    raise AssertionError("hi")
+    test_conv2d()
+    test_conv1d()
+    test_gpt2_to_bert()
+    test_cross_entropy()
+    test_dataparallel()
     test_gpt2_generation_beam()
     test_bert()
     test_gpt2_generation()
-    raise AssertionError("hi")
     test_gpt2_cache_is_correct()
     test_gpt2_specific_prob()
     # test_gpt2_attention()
