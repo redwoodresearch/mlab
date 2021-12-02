@@ -13,13 +13,13 @@ def _allclose_tensorlists(tensorlist1, tensorlist2):
         if not torch.allclose(t1, t2):
             return False
     return True
-    
+
 
 def test_function(f, ex_num):
     g = globals()
-    ex = g.get(f'ex{ex_num}')
+    ex = g.get(f"ex{ex_num}")
     assert ex, f"There's no solution for exercise {ex_num}"
-    test_cases = g.get(f'test_cases{ex_num}')
+    test_cases = g.get(f"test_cases{ex_num}")
 
     deterministic_exercises = {2, 3, 5, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20}
     
@@ -351,12 +351,28 @@ def test_cases19():
 
 
 def test_cases20():
-    weight = torch.rand(5, 4)
-    data = torch.rand(22, 5)
+    weight = torch.rand(5)
+    data = torch.rand(22)
     return [[weight, data]]
 
 
 def ex20(x, weight):
+    kernel_size = weight.shape
+    S = x.shape
+    x = x.contiguous()
+    strided_input = torch.as_strided(x, (S - kernel_size + 1, kernel_size), (S, 1), 0)
+    added = strided_input * weight
+    summed = reduce(added, "s k -> s", "sum")
+    return summed
+
+
+def test_cases21():
+    weight = torch.rand(6, 5, 4)
+    data = torch.rand(2, 22, 5)
+    return [[weight, data]]
+
+
+def ex21(x, weight):
     x = rearrange(x, "b c s -> b s c")
     out_channels, _, kernel_size = weight.shape
     B, S, C = x.shape
