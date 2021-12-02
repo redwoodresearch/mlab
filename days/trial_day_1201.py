@@ -1,6 +1,6 @@
 import einops
 import math
-from einops.einops import rearrange
+from einops.einops import rearrange, reduce
 import numpy as np
 import torch
 import typing
@@ -211,7 +211,7 @@ def ex11(T: torch.Tensor, K: int, values: typing.Optional[torch.Tensor] = None):
     if values is None:
         values = torch.ones(T.shape[0])
     onehot = torch.zeros(T.shape + (K,))
-    return onehot.scatter(-1, T.to(int)[...,None], values[...,None])
+    return onehot.scatter(1, T.to(int).unsqueeze(-1), values.unsqueeze(-1))
 
 
 def test_cases11():
@@ -344,6 +344,25 @@ def test_cases19():
         y = torch.randint(0, probs.shape[1], (probs.shape[0],))
         out += [[probs, y]]
     return out
+
+
+def test_cases20():
+    weight = torch.rand(5, 4)
+    data = torch.rand(22, 5)
+    return [[weight, data]]
+
+
+def ex20(x, weight):
+    x = rearrange(x, "b c s -> b s c")
+    out_channels, _, kernel_size = weight.shape
+    B, S, C = x.shape
+    x = x.contiguous()
+    strided_input = torch.as_strided(x, (B, S - kernel_size + 1, kernel_size, C, out_channels), (S * C, C, C, 1, 0), 0)
+    weight_rearranged = rearrange(weight, "o i k -> k i o")
+    added = strided_input * weight_rearranged
+    summed = reduce(added, "b s c in_channels out_channels -> b s out_channels", "sum")
+    summed = rearrange(summed, "b s c->b c s")
+    return summed
 
 
 ex12 = relu
