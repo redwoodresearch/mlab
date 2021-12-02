@@ -6,6 +6,30 @@ import torch
 import typing
 
 
+def _allclose_tensorlists(tensorlist1, tensorlist2):
+    for t1, t2 in zip(tensorlist1, tensorlist2):
+        if t1.shape != t2.shape:
+            return False
+        if not torch.allclose(t1, t2):
+            return False
+    return True
+    
+
+def test_function(f, ex_num):
+    g = globals()
+    ex = g.get(f'ex{ex_num}')
+    assert ex, f"There's no solution for exercise {ex_num}"
+    test_cases = g.get(f'test_cases{ex_num}')
+
+    if ex_num == 1:
+        return _allclose_tensorlists(f(), ex1())
+    elif ex_num in {2, 3, 5, 7, 8, 9}:
+        for tc in test_cases():
+            if not _allclose_tensorlists(f(*tc), ex(*tc)):
+                return False
+        return True
+    
+
 def ex1():
     return [
         einops.rearrange(torch.arange(3, 9), "(h w) -> h w", h=3, w=2),
@@ -187,7 +211,7 @@ def ex11(T: torch.Tensor, K: int, values: typing.Optional[torch.Tensor] = None):
     if values is None:
         values = torch.ones(T.shape[0])
     onehot = torch.zeros(T.shape + (K,))
-    return onehot.scatter(1, T.to(int)[:, None], values[:, None])
+    return onehot.scatter(-1, T.to(int)[...,None], values[...,None])
 
 
 def test_cases11():
