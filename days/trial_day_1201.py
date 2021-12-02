@@ -22,17 +22,17 @@ def test_function(f, ex_num):
     test_cases = g.get(f"test_cases{ex_num}")
 
     deterministic_exercises = {2, 3, 5, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20}
-    
+
     if ex_num == 1:
         return _allclose_tensorlists(f(), ex1())
-    elif ex_num in deterministic exercises:
+    elif ex_num in deterministic_exercises:
         for tc in test_cases():
             if not _allclose_tensorlists(f(*tc), ex(*tc)):
                 return False
         return True
 
-    print("Sorry, can't test probabilistic outputs.")    
-    
+    print("Sorry, can't test probabilistic outputs.")
+
 
 def ex1():
     return [
