@@ -4,11 +4,11 @@ import numpy as np
 from torch.nn import Module, Parameter, ModuleList, Sequential  # not allowed to use other stuff from nn
 from transformers import AutoTokenizer
 
-from days.modules import Embedding, Dropout, Linear, LayerNorm, gelu, log_softmax, softmax
+# from days.modules import Embedding, Dropout, Linear, LayerNorm, gelu, log_softmax, softmax
 from torchtyping import TensorType
 
-# from torch.nn import LayerNorm
-# from torch.nn.functional import gelu, softmax
+from torch.nn import LayerNorm, Embedding, Dropout, Linear
+from torch.nn.functional import gelu, softmax, log_softmax
 from utils import getprops, tpeek, tstat, copy_weight_bias
 from dataclasses import dataclass
 import transformers
@@ -100,7 +100,10 @@ class GPT2Layer(Module):
         if past_key_values is not None:
             attention_output, new_kvs = self.attention(self.layer_norm_1(x), past_key_values=past_key_values)
         else:
-            attention_output = self.attention(self.layer_norm_1(x))
+            lned = self.layer_norm_1(x)
+            tpeek("g lned", lned)
+            attention_output = self.attention(lned)
+        # tpeek("g attn", attention_output)
         x = x + attention_output
         after_1_mlp = gelu(self.fc1(self.layer_norm_2(x)))
         mlpout = self.dropout(self.fc2(after_1_mlp))
@@ -328,6 +331,7 @@ def my_gpt_from_hf_weights():
 
     my_model = GPT2({"use_cache": False}, tokenizer=tokenizer)
     my_model.eval()
-    copy_gpt2_weights(my_model, their_lm_model)
+    with t.no_grad():
+        copy_gpt2_weights(my_model, their_lm_model)
     # not supporting cross attention
     return my_model, their_lm_model

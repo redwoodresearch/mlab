@@ -36,8 +36,8 @@ class BertEmbedding(Module):
         if self.config["type_vocab_size"] is not None:
             token_type_embeddings = self.token_type_embedding(token_type_ids)
             embeddings += token_type_embeddings
-
         embeddings = self.layer_norm(embeddings)
+        tpeek("b lned", embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -168,9 +168,9 @@ class BertBlock(Module):
         self.residual = NormedResidualLayer(config["hidden_size"], config["intermediate_size"], config["dropout"])
 
     def forward(self, token_activations, attention_masks=None):
-        attention_output = self.layer_norm(
-            token_activations + self.dropout(self.attention(token_activations, attention_masks))
-        )
+        attn_out = self.attention(token_activations, attention_masks)
+        tpeek("b attn", attn_out)
+        attention_output = self.layer_norm(token_activations + self.dropout(attn_out))
 
         return self.residual(attention_output)
 
@@ -287,8 +287,8 @@ def my_bert_from_gpt2_weights():
         {"unidirectional": True, "type_vocab_size": None, "vocab_size": 50257, "max_position_embeddings": 1024},
         tokenizer,
     )
-    print(their_gpt2)
-    print(my_model)
+    # print(their_gpt2)
+    # print(my_model)
     model = their_gpt2.transformer
     # copy embeddings
     my_model.embedding.position_embedding.weight = model.wpe.weight

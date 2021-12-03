@@ -375,22 +375,18 @@ def test_gpt2_specific_prob():
 
 def test_gpt2_to_bert():
     my_gpt2, their_gpt2 = bert.my_bert_from_gpt2_weights()
+    my_other_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
     my_gpt2.eval()
     their_gpt2.eval()
 
     inputs = {
-        "input_ids": t.LongTensor(
-            my_gpt2.tokenizer(["I'm Alex Rider, i'm a writer"], return_tensors="pt")["input_ids"]
-        ),
+        "input_ids": t.LongTensor(my_gpt2.tokenizer(["I'm Alex"], return_tensors="pt")["input_ids"]),
     }
 
     activations = t.randn((2, 3, 768))
 
-    my_encodings = my_gpt2.transformer[0](activations)
-    their_encodings = their_gpt2.transformer
-
     my_output = my_gpt2(**inputs).logits
-    their_output = their_gpt2(**inputs).logits
+    their_output = my_other_gpt2(**inputs).logits
     tpeek("my layer", my_output)
     tpeek("their layer", their_output)
     allclose(my_output, their_output, "gpt2 to bert logits")
@@ -405,7 +401,7 @@ def test_resnet():
 
 
 if __name__ == "__main__":
-    test_conv2d_tao()
+    test_gpt2_to_bert()
     raise AssertionError("hi")
     test_conv2d()
     test_conv1d()
