@@ -2,8 +2,9 @@ import einops
 import math
 from einops.einops import rearrange, reduce
 import numpy as np
+from scipy.stats import chisquare
 import torch
-import typing
+from typing import Collection, Optional
 
 
 def _allclose_tensorlists(tensorlist1, tensorlist2):
@@ -15,24 +16,97 @@ def _allclose_tensorlists(tensorlist1, tensorlist2):
     return True
 
 
-def test_function(f, ex_num):
+def _set_seeds(seed):
+    rs = np.random.RandomState(seed)
+    torch.manual_seed(seed)
+    return rs
+
+
+def _rand_shape(rs: np.random.RandomState, n_dims: Collection[int]):
+    n_dim = rs.choice(n_dims)
+    return list(rs.randint(3, 6, n_dim))
+    
+
+def _rand_tensor(shape: list[int], std=10.0):
+    return (torch.randn(shape) * std).round()
+
+
+def _count(sample, keys):
+    counts = dict(zip(*np.unique(sample, return_counts=True)))
+    return [counts.get(i, 0) for i in keys]
+    
+
+def am_i_done(f, ex_num, n_tests=10):
     g = globals()
     ex = g.get(f"ex{ex_num}")
+    testcase = g.get(f"testcase{ex_num}")
     assert ex, f"There's no solution for exercise {ex_num}"
-    test_cases = g.get(f"test_cases{ex_num}")
 
-    deterministic_exercises = {2, 3, 5, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20}
+    deterministic_exercises = {1, 2, 3, 5, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21}
 
-    if ex_num == 1:
-        return _allclose_tensorlists(f(), ex1())
-    elif ex_num in deterministic_exercises:
-        for tc in test_cases():
+    if ex_num in deterministic_exercises:
+        for seed in range(n_tests):
+            tc = testcase(seed)
             if not _allclose_tensorlists(f(*tc), ex(*tc)):
-                return False
-        return True
+                print(f"Wrong answer for testcase{ex_num}({seed}).")
+                return
 
-    print("Sorry, can't test probabilistic outputs.")
+    if ex_num == 4:
+        for seed in range(n_tests):
+            tc = testcase(seed)
+            ex_coords = {(xy[0].item(), xy[1].item()) for xy in ex(*tc)}
+            f_coords = {(xy[0].item(), xy[1].item()) for xy in f(*tc)}
+            if f_coords != ex_coords:
+                print(f"Wrong answer for testcase{ex_num}({seed}).")
+                return
 
+    if ex_num == 6:
+        for seed in range(n_tests):
+            tc = testcase(seed)
+            frequencies = _count(f(*tc), range(len(tc[1])))
+            chisq, p = chisquare(frequencies, tc[0]*tc[1], axis=None)
+            if p < 0.01:
+                print("Your function returned an unexpected sample for "
+                      f"testcase{ex_num}({seed}). (p-value = {p})")
+                return
+
+    if ex_num == 10:
+        for seed in range(n_tests):
+            A, n = testcase(seed)
+            B = f(A, n)
+            for i, (Arow, Brow) in enumerate(zip(A, B)):
+                expected = _count(Arow, {a.item() for a in Arow})
+                observed = _count(Brow, {a.item() for a in Arow})
+                chisq, p = chisquare(observed, expected/sum(expected)*sum(observed), axis=None)
+                if p < 0.01:
+                    print("Your function returned an unexpected sample for "
+                          f"testcase{ex_num}({seed}), row {i}. (p-value = {p})")
+                    return
+
+    if ex_num == 13:
+        for seed in range(n_tests):
+            tensor, dropout_p, is_train  = testcase(seed)
+            if is_train:
+                out = f(tensor, dropout_p, is_train)
+                is_zero = (out == 0.0)
+                if not torch.allclose(out[~is_zero], tensor[~is_zero]/(1 - dropout_p)):
+                    print(f"Wrong answer for testcase{ex_num}({seed}).")
+                    return
+
+                if abs(is_zero.sum() - dropout_p * len(tensor.flatten())) > 5:
+                    print("Your function zeroed out an unexpected number of elements for "
+                          f"testcase{ex_num}({seed}).")
+                    return
+            else:
+                if not torch.allclose(tensor, f(tensor, dropout_p, is_train)):
+                    print(f"Wrong answer for testcase{ex_num}({seed}).")
+                    return
+
+    print(f"Your function passed {n_tests} tests. Congrats!")
+    return
+
+                
+############################################################################    
 
 def ex1():
     return [
@@ -42,7 +116,7 @@ def ex1():
     ]
 
 
-def test_cases1():
+def testcase1(seed=0):
     return []
 
 
@@ -56,50 +130,21 @@ def ex2(temp: torch.Tensor):
     return [weekly_means, weekly_zeromean, weekly_normalised]
 
 
-def test_cases2():
-    return [
-        torch.Tensor([71, 72, 70, 75, 71, 72, 70, 68, 65, 60, 68, 60, 55, 59, 75, 80, 85, 80, 78, 72, 83]),
-        torch.Tensor(
-            [
-                57.1928,
-                63.4550,
-                67.5766,
-                66.8976,
-                51.4928,
-                60.0626,
-                69.2239,
-                73.3777,
-                58.3225,
-                53.6842,
-                72.8498,
-                56.8322,
-                79.1494,
-                72.5929,
-                79.7508,
-                66.5618,
-                54.4778,
-                75.0086,
-                79.7727,
-                72.2138,
-                77.9900,
-            ]
-        ),
-        torch.rand((70,)) * 70 + 30,
-    ]
-
+def testcase2(seed=0):
+    rs = _set_seeds(seed)
+    n_weeks = rs.randint(2, 5)
+    return [torch.randint(30, 100, (n_weeks * 7,)).float()]
+    
 
 def ex3(tensor1: torch.Tensor, tensor2: torch.Tensor):
     assert tensor1.shape == tensor2.shape, "Input tensors must have the same shape."
     return (tensor1 * tensor2).sum(dim=-1)
 
 
-def test_cases3():
-    out = []
-    for i in range(10):
-        n_dims = np.random.randint(2, 5)
-        shape = list(np.random.randint(10, 50, n_dims))
-        out += [[torch.randn(shape), torch.randn(shape)]]
-    return out
+def testcase3(seed=0):
+    rs = _set_seeds(seed)
+    shape = _rand_shape(rs, [2, 3])
+    return [_rand_tensor(shape), _rand_tensor(shape)]
 
 
 def ex4(H: float, W: float, n: int):
@@ -110,24 +155,22 @@ def ex4(H: float, W: float, n: int):
     return torch.stack([einops.rearrange(xtile, "h w -> (h w)"), einops.rearrange(ytile, "h w -> (h w)")]).T
 
 
-def test_cases4():
-    out = []
-    for i in range(10):
-        n = np.random.randint(2, 10)
-        w = np.random.randint(5, 20)
-        h = np.random.randint(5, 20)
-        out += [(h * n, w * n, n)]
-    return out
+def testcase4(seed=0):
+    rs = _set_seeds(seed)
+    n = rs.randint(2, 10)
+    w = rs.randint(5, 20)
+    h = rs.randint(5, 20)
+    return [h * n, w * n, n]
 
 
 def ex5(n: int):
     matrix = (rearrange(torch.arange(n), "i->i 1") == torch.arange(n)).float()
-
     return matrix
 
 
-def test_cases5():
-    return list(range(2, 11))
+def testcase5(seed=0):
+    rs = _set_seeds(seed)
+    return [rs.randint(2, 10)]
 
 
 def ex6(n: int, probs: torch.Tensor):
@@ -141,60 +184,54 @@ def test_fn_6(fn):
     assert t.allclose(probs, t, atol=0.05, rtol=0.1)
 
 
-def test_cases6():
-    out = []
-    for i in range(10):
-        n = np.random.randint(10, 100)
-        k = np.random.randint(2, 10)
-        probs = np.random.rand(k)
-        out += [(n, probs / probs.sum())]
-    return out
+def testcase6(seed=0):
+    rs = _set_seeds(seed)
+    n = 100
+    k = rs.randint(3, 10)
+    probs = rs.rand(k)
+    probs /= probs.sum()
+    probs = rs.multinomial(100, probs) / 100
+    return [n, torch.Tensor(probs)]
 
 
 def ex7(scores: torch.Tensor, y: torch.Tensor):
     return (scores.argmax(dim=1) == y).to(float).mean()
 
 
-def test_cases7():
-    out = []
-    for i in range(10):
-        n_inputs = np.random.randint(50, 100)
-        n_classes = np.random.randint(5, 20)
-        scores = torch.randn((n_inputs, n_classes))
-        y = torch.randint(n_classes, (n_inputs,))
-        out += [[scores, y]]
-    return out
+def testcase7(seed=0):
+    rs = _set_seeds(seed)
+    n_inputs = rs.randint(10, 20)
+    n_classes = rs.randint(3, 8)
+    scores = _rand_tensor((n_inputs, n_classes))
+    y = torch.randint(n_classes, (n_inputs,))
+    return [scores, y]
 
 
 def ex8(scores: torch.Tensor, y: torch.Tensor, k: int):
     return (torch.argsort(scores)[:, -k:] == y[:, None]).any(dim=-1).to(float).mean()
 
 
-def test_cases8():
-    out = []
-    for i in range(10):
-        n_inputs = np.random.randint(50, 100)
-        n_classes = np.random.randint(10, 20)
-        scores = torch.randn((n_inputs, n_classes))
-        y = torch.randint(n_classes, (n_inputs,))
-        k = np.random.randint(2, n_classes // 2)
-        out += [[scores, y, k]]
-    return out
+def testcase8(seed=0):
+    rs = _set_seeds(seed)
+    n_inputs = rs.randint(10, 20)
+    n_classes = rs.randint(4, 8)
+    scores = _rand_tensor((n_inputs, n_classes))
+    y = torch.randint(n_classes, (n_inputs,))
+    k = rs.randint(2, n_classes // 2 + 1)
+    return [scores, y, k]
 
 
 def ex9(prices: torch.Tensor, items: torch.Tensor):
     return torch.gather(prices, 0, items.to(int)).sum()
 
 
-def test_cases9():
-    out = []
-    for i in range(10):
-        n_items = np.random.randint(5, 20)
-        prices = torch.rand(n_items) * 100
-        n_buys = np.random.randint(40, 200)
-        items = torch.randint(n_items, (n_buys,))
-        out += [[prices, items]]
-    return out
+def testcase9(seed=0):
+    rs = _set_seeds(seed)
+    n_items = rs.randint(5, 10)
+    prices = (torch.rand(n_items) * 100).round()
+    n_buys = rs.randint(30, 50)
+    items = torch.randint(n_items, (n_buys,))
+    return [prices, items]
 
 
 def ex10(A: torch.Tensor, N: int):
@@ -202,31 +239,26 @@ def ex10(A: torch.Tensor, N: int):
     return torch.gather(A, 1, index)
 
 
-def test_cases10():
-    out = []
-    for i in range(10):
-        m, k, n = np.random.randint(20, 100, (3,))
-        A = torch.randn((m, k))
-        out += [[A, n]]
-    return out
+def testcase10(seed=0):
+    rs = _set_seeds(seed)
+    m, k, n = rs.randint(5, 10, (3,))
+    A = _rand_tensor((m, k))
+    return [A, n]
 
 
-def ex11(T: torch.Tensor, K: int, values: typing.Optional[torch.Tensor] = None):
+def ex11(T: torch.Tensor, K: int, values: Optional[torch.Tensor] = None):
     if values is None:
         values = torch.ones(T.shape[0])
     onehot = torch.zeros(T.shape + (K,))
-    return onehot.scatter(1, T.to(int).unsqueeze(-1), values.unsqueeze(-1))
+    return onehot.scatter(-1, T.to(int).unsqueeze(-1), values.unsqueeze(-1))
 
 
-def test_cases11():
-    out = []
-    for i in range(10):
-        n_dim = np.random.randint(1, 3)
-        K = np.random.randint(5, 10)
-        shape = list(np.random.randint(2, 10, (n_dim,)))
-        values = torch.rand(shape) * 100
-        out += [[torch.randint(K, shape), K, values]]
-    return out
+def testcase11(seed=0):
+    rs = _set_seeds(seed)
+    K = rs.randint(5, 10)
+    shape = _rand_shape(rs, [1, 2])
+    values = _rand_tensor(shape, 100.0)
+    return [torch.randint(K, shape), K, values]
 
 
 def relu(tensor: torch.FloatTensor) -> torch.Tensor:
@@ -235,13 +267,10 @@ def relu(tensor: torch.FloatTensor) -> torch.Tensor:
     return tensor
 
 
-def test_cases12():
-    out = []
-    for i in range(10):
-        n_dim = np.random.randint(1, 4)
-        shape = list(np.random.randint(5, 10, (n_dim,)))
-        out += [torch.randn(shape)]
-    return out
+def testcase12(seed=0):
+    rs = _set_seeds(seed)
+    shape = _rand_shape(rs, [1, 2, 3])
+    return [_rand_tensor(shape)]
 
 
 def dropout(tensor: torch.FloatTensor, drop_fraction: float, is_train: bool):
@@ -251,29 +280,31 @@ def dropout(tensor: torch.FloatTensor, drop_fraction: float, is_train: bool):
     return tensor
 
 
-def test_cases13():
-    tensors = test_cases12()
-    drop_fractions = np.random.rand(10) * 0.6 + 0.2
-    is_train = np.random.randint(0, 2, (10,)).astype(bool)
-    return list(zip(tensors, drop_fractions, is_train))
+def testcase13(seed=0):
+    rs = _set_seeds(seed)
+    shape = _rand_shape(rs, [1, 2, 3])
+    drop_fraction = np.round(rs.rand() * 0.6 + 0.2, 2)
+    is_train = bool(rs.randint(0, 2))
+    return [_rand_tensor(shape), drop_fraction, is_train]
 
 
-def linear(tensor: torch.FloatTensor, weight: torch.FloatTensor, bias: typing.Optional[torch.FloatTensor]):
+def linear(tensor: torch.FloatTensor, weight: torch.FloatTensor,
+           bias: Optional[torch.FloatTensor]):
     x = torch.einsum("...j,kj->...k", tensor, weight)
     if bias is not None:
         x += bias
     return x
 
 
-def test_cases14():
-    out = []
-    for tensor in test_cases12():
-        j = tensor.shape[-1]
-        k = np.random.randint(10, 100)
-        weight = torch.randn((k, j))
-        bias = torch.randn((k,))
-        out += [[tensor, weight, bias]]
-    return out
+def testcase14(seed=0):
+    rs = _set_seeds(seed)
+    shape = _rand_shape(rs, [2, 3])
+    j = shape[-1]
+    k = rs.randint(3, 10)
+    weight = _rand_tensor((k, j))
+    bias = _rand_tensor((k,))
+    tensor = _rand_tensor(shape)
+    return [tensor, weight, bias]
 
 
 def layer_norm(x: torch.FloatTensor, reduce_dims, weight: torch.FloatTensor, bias: torch.FloatTensor):
@@ -284,34 +315,28 @@ def layer_norm(x: torch.FloatTensor, reduce_dims, weight: torch.FloatTensor, bia
     return xnorm * weight + bias
 
 
-def test_cases15():
-    out = []
-    for i in range(10):
-        n_red_dims = np.random.randint(1, 3)
-        n_batch_dims = np.random.randint(1, 3)
-        reduce_dims = list(np.random.randint(10, 20, (n_red_dims,)))
-        batch_dims = list(np.random.randint(20, 50, (n_batch_dims,)))
-        x = torch.randn(batch_dims + reduce_dims)
-        weight = torch.randn(reduce_dims)
-        bias = torch.randn(reduce_dims)
-        out += [[x, reduce_dims, weight, bias]]
-    return out
+def testcase15(seed=0):
+    rs = _set_seeds(seed)
+    reduce_dims = _rand_shape(rs, [1, 2])
+    batch_dims = _rand_shape(rs, [1, 2])
+    x = _rand_tensor(batch_dims + reduce_dims)
+    weight = _rand_tensor(reduce_dims)
+    bias = _rand_tensor(reduce_dims)
+    return [x, reduce_dims, weight, bias]
 
 
 def embed(x: torch.LongTensor, embeddings: torch.FloatTensor):
     return embeddings[x]
 
 
-def test_cases16():
-    out = []
-    for i in range(10):
-        vocab_size = np.random.randint(50, 100)
-        embed_size = np.random.randint(8, 32)
-        embeddings = torch.randn((vocab_size, embed_size))
-        x_len = np.random.randint(10, 20)
-        x = torch.randint(0, vocab_size, (x_len,))
-        out += [[x, embeddings]]
-    return out
+def testcase16(seed=0):
+    rs = _set_seeds(seed)
+    vocab_size = rs.randint(8, 16)
+    embed_size = rs.randint(4, 8)
+    embeddings = _rand_tensor((vocab_size, embed_size))
+    x_len = rs.randint(10, 20)
+    x = torch.randint(0, vocab_size, (x_len,))
+    return [x, embeddings]
 
 
 def softmax(tensor: torch.FloatTensor):
@@ -319,13 +344,11 @@ def softmax(tensor: torch.FloatTensor):
     return exps / exps.sum(dim=1, keepdim=True)
 
 
-def test_cases17():
-    out = []
-    for i in range(10):
-        n_inputs = np.random.randint(50, 100)
-        n_classes = np.random.randint(3, 20)
-        out += [torch.randn((n_inputs, n_classes))]
-    return out
+def testcase17(seed=0):
+    rs = _set_seeds(seed)
+    n_inputs = rs.randint(10, 20)
+    n_classes = rs.randint(3, 8)
+    return [_rand_tensor((n_inputs, n_classes))]
 
 
 def logsoftmax(tensor: torch.FloatTensor):
@@ -333,43 +356,36 @@ def logsoftmax(tensor: torch.FloatTensor):
     return tensor - C - (tensor - C).exp().sum(dim=1, keepdim=True).log()
 
 
-test_cases18 = test_cases17
+testcase18 = testcase17
 
 
 def cross_entropy_loss(logits: torch.FloatTensor, y: torch.LongTensor):
     logprobs = logsoftmax(logits)
-    return -torch.gather(logprobs, 1, y[:, None]).sum()
+    return -torch.gather(logprobs, 1, y[:, None]).mean()
 
 
-def test_cases19():
-    out = []
-    for logits in test_cases17():
-        probs = softmax(logits)
-        y = torch.randint(0, probs.shape[1], (probs.shape[0],))
-        out += [[probs, y]]
-    return out
-
-
-def test_cases20():
-    weight = torch.rand(5)
-    data = torch.rand(22)
-    return [[weight, data]]
+def testcase19(seed=0):
+    rs = _set_seeds(seed)
+    logits = testcase17(seed)[0]
+    y = torch.randint(0, logits.shape[1], (logits.shape[0],))
+    return [logits, y]
 
 
 def ex20(x, weight):
-    kernel_size = weight.shape
-    S = x.shape
+    kernel_size = len(weight)
+    S = len(x)
     x = x.contiguous()
-    strided_input = torch.as_strided(x, (S - kernel_size + 1, kernel_size), (S, 1), 0)
+    strided_input = torch.as_strided(x, (S - kernel_size + 1, kernel_size), (1, 1), 0)
     added = strided_input * weight
     summed = reduce(added, "s k -> s", "sum")
     return summed
 
 
-def test_cases21():
-    weight = torch.rand(6, 5, 4)
-    data = torch.rand(2, 22, 5)
-    return [[weight, data]]
+def testcase20(seed=0):
+    rs = _set_seeds(seed)
+    weight = _rand_tensor(5)
+    data = _rand_tensor(22)
+    return [data, weight]
 
 
 def ex21(x, weight):
@@ -385,6 +401,18 @@ def ex21(x, weight):
     return summed
 
 
+def testcase21(seed=0):
+    rs = _set_seeds(seed)
+    n_kernels = rs.randint(4, 8)
+    n_channels = 5
+    kernel_len = 4
+    weight = _rand_tensor((n_kernels, n_channels, kernel_len))
+    batch_size = rs.randint(8, 16)
+    data_len = 22
+    data = _rand_tensor((batch_size, n_channels, data_len))
+    return [data, weight]
+
+
 ex12 = relu
 ex13 = dropout
 ex14 = linear
@@ -393,3 +421,4 @@ ex16 = embed
 ex17 = softmax
 ex18 = logsoftmax
 ex19 = cross_entropy_loss
+
