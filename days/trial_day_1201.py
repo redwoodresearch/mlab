@@ -359,8 +359,8 @@ def test_cases20():
 def ex20(x, weight):
     kernel_size = weight.shape
     S = x.shape
-    x = x.contiguous()
-    strided_input = torch.as_strided(x, (S - kernel_size + 1, kernel_size), (S, 1), 0)
+    output_length = S - kernel_size + 1
+    strided_input = torch.as_strided(x, (output_length, kernel_size), (1, 1), 0)
     added = strided_input * weight
     summed = reduce(added, "s k -> s", "sum")
     return summed
