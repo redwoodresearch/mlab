@@ -25,7 +25,7 @@ def _set_seeds(seed):
 def _rand_shape(rs: np.random.RandomState, n_dims: Collection[int]):
     n_dim = rs.choice(n_dims)
     return list(rs.randint(3, 6, n_dim))
-    
+
 
 def _rand_tensor(shape: list[int], std=10.0):
     return (torch.randn(shape) * std).round()
@@ -34,7 +34,7 @@ def _rand_tensor(shape: list[int], std=10.0):
 def _count(sample, keys):
     counts = dict(zip(*np.unique(sample, return_counts=True)))
     return [counts.get(i, 0) for i in keys]
-    
+
 
 def am_i_done(f, ex_num, n_tests=10):
     g = globals()
@@ -64,10 +64,9 @@ def am_i_done(f, ex_num, n_tests=10):
         for seed in range(n_tests):
             tc = testcase(seed)
             frequencies = _count(f(*tc), range(len(tc[1])))
-            chisq, p = chisquare(frequencies, tc[0]*tc[1], axis=None)
+            chisq, p = chisquare(frequencies, tc[0] * tc[1], axis=None)
             if p < 0.01:
-                print("Your function returned an unexpected sample for "
-                      f"testcase{ex_num}({seed}). (p-value = {p})")
+                print("Your function returned an unexpected sample for " f"testcase{ex_num}({seed}). (p-value = {p})")
                 return
 
     if ex_num == 10:
@@ -77,25 +76,26 @@ def am_i_done(f, ex_num, n_tests=10):
             for i, (Arow, Brow) in enumerate(zip(A, B)):
                 expected = _count(Arow, {a.item() for a in Arow})
                 observed = _count(Brow, {a.item() for a in Arow})
-                chisq, p = chisquare(observed, expected/sum(expected)*sum(observed), axis=None)
+                chisq, p = chisquare(observed, expected / sum(expected) * sum(observed), axis=None)
                 if p < 0.01:
-                    print("Your function returned an unexpected sample for "
-                          f"testcase{ex_num}({seed}), row {i}. (p-value = {p})")
+                    print(
+                        "Your function returned an unexpected sample for "
+                        f"testcase{ex_num}({seed}), row {i}. (p-value = {p})"
+                    )
                     return
 
     if ex_num == 13:
         for seed in range(n_tests):
-            tensor, dropout_p, is_train  = testcase(seed)
+            tensor, dropout_p, is_train = testcase(seed)
             if is_train:
                 out = f(tensor, dropout_p, is_train)
-                is_zero = (out == 0.0)
-                if not torch.allclose(out[~is_zero], tensor[~is_zero]/(1 - dropout_p)):
+                is_zero = out == 0.0
+                if not torch.allclose(out[~is_zero], tensor[~is_zero] / (1 - dropout_p)):
                     print(f"Wrong answer for testcase{ex_num}({seed}).")
                     return
 
                 if abs(is_zero.sum() - dropout_p * len(tensor.flatten())) > 5:
-                    print("Your function zeroed out an unexpected number of elements for "
-                          f"testcase{ex_num}({seed}).")
+                    print("Your function zeroed out an unexpected number of elements for " f"testcase{ex_num}({seed}).")
                     return
             else:
                 if not torch.allclose(tensor, f(tensor, dropout_p, is_train)):
@@ -105,8 +105,9 @@ def am_i_done(f, ex_num, n_tests=10):
     print(f"Your function passed {n_tests} tests. Congrats!")
     return
 
-                
-############################################################################    
+
+############################################################################
+
 
 def ex1():
     return [
@@ -134,7 +135,7 @@ def testcase2(seed=0):
     rs = _set_seeds(seed)
     n_weeks = rs.randint(2, 5)
     return [torch.randint(30, 100, (n_weeks * 7,)).float()]
-    
+
 
 def ex3(tensor1: torch.Tensor, tensor2: torch.Tensor):
     assert tensor1.shape == tensor2.shape, "Input tensors must have the same shape."
@@ -288,8 +289,7 @@ def testcase13(seed=0):
     return [_rand_tensor(shape), drop_fraction, is_train]
 
 
-def linear(tensor: torch.FloatTensor, weight: torch.FloatTensor,
-           bias: Optional[torch.FloatTensor]):
+def linear(tensor: torch.FloatTensor, weight: torch.FloatTensor, bias: Optional[torch.FloatTensor]):
     x = torch.einsum("...j,kj->...k", tensor, weight)
     if bias is not None:
         x += bias
@@ -372,10 +372,10 @@ def testcase19(seed=0):
 
 
 def ex20(x, weight):
-    kernel_size = len(weight)
-    S = len(x)
-    x = x.contiguous()
-    strided_input = torch.as_strided(x, (S - kernel_size + 1, kernel_size), (1, 1), 0)
+    kernel_size = weight.shape
+    S = x.shape
+    output_length = S - kernel_size + 1
+    strided_input = torch.as_strided(x, (output_length, kernel_size), (1, 1), 0)
     added = strided_input * weight
     summed = reduce(added, "s k -> s", "sum")
     return summed
@@ -421,4 +421,3 @@ ex16 = embed
 ex17 = softmax
 ex18 = logsoftmax
 ex19 = cross_entropy_loss
-
