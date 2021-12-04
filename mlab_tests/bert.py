@@ -186,16 +186,18 @@ def test_bert_embedding_fn(your_fn):
         "dropout": 0.1,
     }
     input_ids = t.randint(0, 2900, (2, 3))
+    tt_ids = t.randint(0, 2, (2, 3))
     reference = bert.BertEmbedding(config)
     allclose(
         your_fn(
             input_ids=input_ids,
+            token_type_ids=tt_ids,
             token_embedding=reference.token_embedding,
             token_type_embedding=reference.token_type_embedding,
             position_embedding=reference.position_embedding,
             layer_norm=reference.layer_norm,
         ),
-        reference(input_ids=input_ids),
+        reference(input_ids=input_ids, token_type_ids=tt_ids),
         "bert embedding",
     )
 
@@ -209,17 +211,14 @@ def test_bert_embedding(your_module):
         "dropout": 0.1,
     }
     input_ids = t.randint(0, 2900, (2, 3))
+    tt_ids = t.randint(0, 2, (2, 3))
     t.random.manual_seed(0)
     reference = bert.BertEmbedding(config)
     t.random.manual_seed(0)
     yours = your_module(**config)
     allclose(
-        yours(
-            input_ids=input_ids,
-        ),
-        reference(
-            input_ids=input_ids,
-        ),
+        yours(input_ids=input_ids, token_type_ids=tt_ids),
+        reference(input_ids=input_ids, token_type_ids=tt_ids),
         "bert embedding",
     )
 
