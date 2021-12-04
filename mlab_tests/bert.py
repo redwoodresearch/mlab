@@ -33,6 +33,7 @@ def test_attention_fn(fn):
             num_heads=num_heads,
             attention_pattern=attention_pattern,
             project_value=project_value,
+            # project_out=project_output,
             project_output=project_output,
             # dropout=dropout,
         ),
@@ -114,7 +115,7 @@ def test_bert_mlp(fn):
     dropout.eval()
     allclose(
         fn(token_activations=token_activations, linear_1=mlp_1, linear_2=mlp_2),
-        reference(token_activations=token_activations, linear_1=mlp_1, linear_2=mlp_2),
+        reference(token_activations=token_activations, linear_1=mlp_1, linear_2=mlp_2, dropout=dropout),
         "bert mlp",
     )
 
