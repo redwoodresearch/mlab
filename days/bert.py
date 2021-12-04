@@ -115,10 +115,10 @@ class SelfAttentionLayer(Module):
         if config["hidden_size"] % config["num_heads"] != 0:
             raise AssertionError("head num must divide hidden size")
         hidden_size = config["hidden_size"]
+        self.pattern = AttentionPattern(config)
         self.project_value = Linear(hidden_size, hidden_size, bias=True)
         self.project_out = Linear(hidden_size, hidden_size, bias=True)
         self.dropout = Dropout(config["dropout"])
-        self.pattern = AttentionPattern(config)
 
     def forward(self, token_activations, attention_masks=None):
         return multi_head_self_attention(

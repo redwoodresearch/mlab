@@ -46,7 +46,7 @@ class ReLU(Module):
 
 
 def layer_norm(x, weight, bias):
-    x = (x - x.mean(-1, keepdim=True)) / t.sqrt(x.var(-1, keepdim=True) + 1e-5)
+    x = (x - x.mean(-1, keepdim=True).detach()) / t.sqrt(x.var(-1, keepdim=True).detach() + 1e-5)
     x = x * weight + bias
     return x
 
@@ -64,8 +64,8 @@ class LayerNorm(Module):
         self.idx_list = [-i - 1 for i, _ in enumerate(shape)]
 
     def forward(self, tensor):
-        tensor = (tensor - tensor.mean(*self.idx_list, keepdim=True)) / t.sqrt(
-            tensor.var(*self.idx_list, keepdim=True) + self.eps
+        tensor = (tensor - tensor.mean(*self.idx_list, keepdim=True).detach()) / t.sqrt(
+            tensor.var(*self.idx_list, keepdim=True).detach() + self.eps
         )
         tensor = tensor * self.weight + self.bias
         return tensor
