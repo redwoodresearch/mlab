@@ -178,8 +178,15 @@ def test_bert_block(your_module):
 
 
 def test_bert_embedding_fn(your_fn):
+    config = {
+        "vocab_size": 28996,
+        "hidden_size": 768,
+        "max_position_embeddings": 512,
+        "type_vocab_size": 2,
+        "dropout": 0.1,
+    }
     input_ids = t.randint(0, 2900, (2, 3))
-    reference = bert.BertEmbedding()
+    reference = bert.BertEmbedding(config)
     allclose(
         your_fn(
             input_ids=input_ids,
@@ -199,6 +206,7 @@ def test_bert_embedding(your_module):
         "hidden_size": 768,
         "max_position_embeddings": 512,
         "type_vocab_size": 2,
+        "dropout": 0.1,
     }
     input_ids = t.randint(0, 2900, (2, 3))
     t.random.manual_seed(0)
