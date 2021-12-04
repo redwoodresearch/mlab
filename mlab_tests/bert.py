@@ -72,7 +72,7 @@ def test_attention_pattern_fn(fn):
     )
 
 
-def test_attention_pattern_unbatched(fn):
+def test_attention_pattern_single_head(fn):
     reference = bert.raw_attention_pattern
     hidden_size = 768
     token_activations = t.empty(2, 3, hidden_size).uniform_(-1, 1)
@@ -91,14 +91,13 @@ def test_attention_pattern_unbatched(fn):
             token_activations=token_activations[0],
             project_query=project_query_ub,
             project_key=project_key_ub,
-            my_idx=0,
         ),
         reference(
             token_activations=token_activations,
             num_heads=num_heads,
             project_query=project_query,
             project_key=project_key,
-        )[0, 0, :, 0],
+        )[0, 0, :, :],
         "attention pattern raw",
     )
 
