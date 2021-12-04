@@ -4,26 +4,29 @@ from pygments.lexers import get_lexer_by_name
 from pygments.formatters import TerminalFormatter
 import re
 
+lexer = get_lexer_by_name("pytb" if sys.version_info.major < 3 else "py3tb")
+formatter = TerminalFormatter()
+
+
+def format_traceback(tbtext):
+    # replace long python internal package path
+    tbtext = re.sub(
+        r"/home/[a-zA-Z/.]+/.asdf/installs/python/[0-9.]+/lib/python[0-9.]+/site-packages/", "<PKG>/", tbtext
+    )
+
+    # remove gin stuff
+    tbtext = re.sub(r".*File .*/gin/.+line \d+, in .*\n[^\n]*\n", "", tbtext)
+    tbtext = re.sub(r".*In call to configurable.*\n[^\n]*\n", "", tbtext)
+
+    return highlight(tbtext, lexer, formatter)
+
 
 def setmyexcepthook():
-
-    lexer = get_lexer_by_name("pytb" if sys.version_info.major < 3 else "py3tb")
-    formatter = TerminalFormatter()
-
     def myexcepthook(type, value, tb):
         print("type")
         tbtext = "".join(traceback.format_exception(type, value, tb))
 
-        # replace long python internal package path
-        tbtext = re.sub(
-            r"/home/[a-zA-Z/.]+/.asdf/installs/python/[0-9.]+/lib/python[0-9.]+/site-packages/", "<PKG>/", tbtext
-        )
-
-        # remove gin stuff
-        tbtext = re.sub(r".*File .*/gin/.+line \d+, in .*\n[^\n]*\n", "", tbtext)
-        tbtext = re.sub(r".*In call to configurable.*\n[^\n]*\n", "", tbtext)
-
-        sys.stderr.write(highlight(tbtext, lexer, formatter))
+        sys.stderr.write(format_traceback(tbtext))
 
     sys.excepthook = myexcepthook
 

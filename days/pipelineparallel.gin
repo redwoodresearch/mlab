@@ -1,0 +1,6 @@
+pprun.num_batches = 100
+pprun.x_size = (10,)
+pprun.y_size = (10,)
+
+start_pipeline_cluster.model_paths=["~/mlab/pptest0", "~/mlab/pptest1"]
+
