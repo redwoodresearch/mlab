@@ -36,6 +36,9 @@ class BertEmbedding(Module):
         embeddings = self.dropout(embeddings)
         return embeddings
 
+    def forward(self, **kwargs):
+        return self.embed(**kwargs)
+
     def unembed(self, embeddings: t.Tensor):
         return self.token_embedding.unembed(embeddings)
 
