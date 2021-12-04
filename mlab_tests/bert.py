@@ -177,6 +177,45 @@ def test_bert_block(your_module):
     )
 
 
+def test_bert_embedding_fn(your_fn):
+    input_ids = t.randint(0, 2900, (2, 3))
+    reference = bert.BertEmbedding()
+    allclose(
+        your_fn(
+            input_ids=input_ids,
+            token_embedding=reference.token_embedding,
+            token_type_embedding=reference.token_type_embedding,
+            position_embedding=reference.position_embedding,
+            layer_norm=reference.layer_norm,
+        ),
+        reference(input_ids=input_ids),
+        "bert embedding",
+    )
+
+
+def test_bert_embedding(your_module):
+    config = {
+        "vocab_size": 28996,
+        "hidden_size": 768,
+        "max_position_embeddings": 512,
+        "type_vocab_size": 2,
+    }
+    input_ids = t.randint(0, 2900, (2, 3))
+    t.random.manual_seed(0)
+    reference = bert.BertEmbedding(config)
+    t.random.manual_seed(0)
+    yours = your_module(**config)
+    allclose(
+        yours(
+            input_ids=input_ids,
+        ),
+        reference(
+            input_ids=input_ids,
+        ),
+        "bert embedding",
+    )
+
+
 def test_bert_attention(your_module):
     config = {
         "vocab_size": 28996,
