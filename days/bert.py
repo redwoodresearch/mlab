@@ -175,7 +175,7 @@ class BertOutput:
 
 
 class Bert(Module):
-    def __init__(self, config, tokenizer):
+    def __init__(self, config, tokenizer=None):
         super(Bert, self).__init__()
 
         default_config = {
