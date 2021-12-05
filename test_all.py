@@ -11,7 +11,9 @@ formatter = TerminalFormatter()
 def format_traceback(tbtext):
     # replace long python internal package path
     tbtext = re.sub(
-        r"/home/[a-zA-Z/.]+/.asdf/installs/python/[0-9.]+/lib/python[0-9.]+/site-packages/", "<PKG>/", tbtext
+        r"/home/[a-zA-Z/.]+/.asdf/installs/python/[0-9.]+/lib/python[0-9.]+/site-packages/",
+        "<PKG>/",
+        tbtext,
     )
 
     # remove gin stuff
@@ -57,9 +59,9 @@ def init_both(my_class, their_class, *args, **kwargs):
     return my_class, their_class
 
 
-def allclose(my_out, their_out, name, tol=1e-8):
+def allclose(my_out, their_out, name, tol=1e-5):
 
-    if not t.allclose(my_out, their_out, rtol=tol * 1000, atol=tol):
+    if not t.allclose(my_out, their_out, rtol=1e-4, atol=tol):
         errstring = f'error in {name}\n{tpeek("", my_out, ret=True)} \n!=\n{tpeek("", their_out, ret=True)}'
         raise AssertionError(errstring)
     else:
@@ -239,7 +241,9 @@ def test_gpt2():
     my_gpt2, their_gpt2 = gpt2.my_gpt_from_hf_weights()
 
     inputs = {
-        "input_ids": t.LongTensor(my_gpt2.tokenizer(["I'm Alex Rider, i'm a writer"])["input_ids"]),
+        "input_ids": t.LongTensor(
+            my_gpt2.tokenizer(["I'm Alex Rider, i'm a writer"])["input_ids"]
+        ),
     }
     my_output = my_gpt2(**inputs).logits
     their_output = their_gpt2(**inputs).logits
@@ -284,12 +288,17 @@ def test_gpt2_generation():
     prompt = "I'm Alex Rider,"
     print("generating")
     their_generated_text = my_gpt2.tokenizer.decode(
-        their_gpt2.generate(input_ids=my_gpt2.tokenizer([prompt], return_tensors="pt")["input_ids"], max_length=10)[0]
+        their_gpt2.generate(
+            input_ids=my_gpt2.tokenizer([prompt], return_tensors="pt")["input_ids"],
+            max_length=10,
+        )[0]
         .cpu()
         .tolist()
     )
     print("their generated text", their_generated_text)
-    generated_text = my_gpt2.generate(prompt, max_length=10, freq_penalty=1000, temperature=1)
+    generated_text = my_gpt2.generate(
+        prompt, max_length=10, freq_penalty=1000, temperature=1
+    )
     print("generated text", generated_text)
 
 
@@ -299,13 +308,20 @@ def test_gpt2_generation_beam():
     prompt = "I'm Alex Rider,"
     print("generating")
     their_generated_text = my_gpt2.tokenizer.decode(
-        their_gpt2.generate(input_ids=my_gpt2.tokenizer([prompt], return_tensors="pt")["input_ids"], max_length=10)[0]
+        their_gpt2.generate(
+            input_ids=my_gpt2.tokenizer([prompt], return_tensors="pt")["input_ids"],
+            max_length=10,
+        )[0]
         .cpu()
         .tolist()
     )
     print("their generated text", their_generated_text)
-    generated_text = my_gpt2.generate_beam_search(prompt, beam_width=3, max_length=10, freq_penalty=1000)
-    generated_text_2 = my_gpt2.generate_beam_search(prompt, beam_width=3, max_length=10, freq_penalty=1000)
+    generated_text = my_gpt2.generate_beam_search(
+        prompt, beam_width=3, max_length=10, freq_penalty=1000
+    )
+    generated_text_2 = my_gpt2.generate_beam_search(
+        prompt, beam_width=3, max_length=10, freq_penalty=1000
+    )
     print("generated text", generated_text)
     assert generated_text_2 == generated_text
 
