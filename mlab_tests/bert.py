@@ -142,7 +142,7 @@ def test_bert(your_module):
     input_ids = tokenizer("hello there", return_tensors="pt")["input_ids"]
     allclose(
         theirs(input_ids=input_ids),
-        reference(input_ids=input_ids),
+        reference(input_ids=input_ids).logits,
         "bert",
     )
 
