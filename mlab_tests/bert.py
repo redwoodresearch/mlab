@@ -282,8 +282,3 @@ def test_bert_attention_pattern(your_module):
         reference(input_activations),
         "bert",
     )
-
-
-# TODO write this
-def test_bert(bert_module):
-    raise NotImplementedError()
