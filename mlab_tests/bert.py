@@ -188,6 +188,7 @@ def test_bert_embedding_fn(your_fn):
     input_ids = t.randint(0, 2900, (2, 3))
     tt_ids = t.randint(0, 2, (2, 3))
     reference = bert.BertEmbedding(config)
+    reference.eval()
     allclose(
         your_fn(
             input_ids=input_ids,
@@ -214,8 +215,10 @@ def test_bert_embedding(your_module):
     tt_ids = t.randint(0, 2, (2, 3))
     t.random.manual_seed(0)
     reference = bert.BertEmbedding(config)
+    reference.eval()
     t.random.manual_seed(0)
     yours = your_module(**config)
+    yours.eval()
     allclose(
         yours(input_ids=input_ids, token_type_ids=tt_ids),
         reference(input_ids=input_ids, token_type_ids=tt_ids),
