@@ -1,3 +1,5 @@
+import itertools
+import re
 from einops.einops import rearrange
 import torch as t
 import numpy as np
@@ -81,3 +83,45 @@ def import_object_from_qualified_name(qname: str):
     out = getattr(module, object_name)
     assert out is not None
     return out
+
+
+def einsum(string, *tensors):
+    inputs, output = string.split("->")
+    inputs = [x.split() for x in inputs.split(",")]
+    output = output.split()
+    if len(tensors) != len(inputs):
+        raise AssertionError("einsum string must have same number of inputs as input tensors")
+    dim_sizes = {}
+    for args, tensor in zip(inputs, tensors):
+        if len(args) != len(tensor.shape):
+            raise AssertionError(f"arg string {args} has the wrong length for shape {tensor.shape}.")
+        for arg, dim in zip(args, tensor.shape):
+            if arg in dim_sizes and dim_sizes[arg] != dim:
+                raise AssertionError(f"dim {arg} has incompatible dimensions {dim_sizes[arg]} and {dim}")
+            dim_sizes[arg] = dim
+    for arg in output:
+        if arg not in dim_sizes:
+            raise AssertionError(f"output string has a name that doesn't appear in the input: {arg}")
+    valid_regex = r"^[a-zA-Z0-9_]+$"
+    for arg in itertools.chain(output, *inputs):
+        if not re.match(valid_regex, arg):
+            raise AssertionError(f"invalid identifier {arg}")
+    dim_order = list(output)
+    for dim in dim_sizes.keys():
+        if dim not in dim_order:
+            dim_order.append(dim)
+    wide = t.ones([dim_sizes[x] for x in dim_order])
+    for arg, input in zip(inputs, tensors):
+        input_ordered = rearrange(input, f"{' '.join(arg)} -> {' '.join([x if x in arg else '1' for x in dim_order])}")
+        wide *= input_ordered
+    # print("inputs", inputs, "output", output)
+    return wide.sum(dim=tuple(range(len(output), len(dim_order))))
+
+
+if __name__ == "__main__":
+    i1, i2 = t.rand(10, 20, 40), t.rand(10, 40, 50)
+    print(
+        t.allclose(
+            einsum("batch seq chan, batch chan chan2 -> batch seq chan2", i1, i2), t.einsum("bsc,bct->bst", i1, i2)
+        )
+    )
