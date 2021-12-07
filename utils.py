@@ -89,6 +89,7 @@ def einsum(string, *tensors):
     inputs, output = string.split("->")
     inputs = [x.split() for x in inputs.split(",")]
     output = output.split()
+
     if len(tensors) != len(inputs):
         raise AssertionError("einsum string must have same number of inputs as input tensors")
     dim_sizes = {}
@@ -106,6 +107,7 @@ def einsum(string, *tensors):
     for arg in itertools.chain(output, *inputs):
         if not re.match(valid_regex, arg):
             raise AssertionError(f"invalid identifier {arg}")
+
     dim_order = list(output)
     for dim in dim_sizes.keys():
         if dim not in dim_order:
@@ -114,7 +116,6 @@ def einsum(string, *tensors):
     for arg, input in zip(inputs, tensors):
         input_ordered = rearrange(input, f"{' '.join(arg)} -> {' '.join([x if x in arg else '1' for x in dim_order])}")
         wide *= input_ordered
-    # print("inputs", inputs, "output", output)
     return wide.sum(dim=tuple(range(len(output), len(dim_order))))
 
 

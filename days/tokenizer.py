@@ -1,6 +1,7 @@
 import transformers
 import numpy as np
 import sentencepiece as spm
+from transformers.models.auto.tokenization_auto import AutoTokenizer
 from utils import Timer, getprops
 import json
 import functools
@@ -13,19 +14,12 @@ def normalizer(str):
     return unidecode(str.lower().replace("\t", "    ").replace("\n", ""))
 
 
-# bpe and wordpiece work by splitting to chars then merging by tokens in order! i didn't know this!
-
-# main tokenizers: bpe, wordpiece, sentencepiece, unigram lm
-# how unigram lm works: pick the tokenization such that a unigram lm on them has the best loss
-# https://everdark.github.io/k9/notebooks/ml/natural_language_understanding/subword_units/subword_units.nb.html
-class ViterbiTokenizer:
+class Tokenizer:
     def __init__(self, token_list, pad=0, sep=1, cls=None, bot=2, eot=2, unk=3, mask=4, normalizer=normalizer):
         self.replacements = {"▁": " "}
         for obj in token_list:
             obj["piece"] = self._replace_all(obj["piece"])
         self.token_list = token_list
-        self.text_to_id = None
-        self.id_to_text = None
         self.pad = pad
         if cls:
             self.eot = cls
@@ -37,50 +31,51 @@ class ViterbiTokenizer:
         self.unk = unk
         self.vocab = {x["piece"]: x for x in token_list}
         self.vocab_by_id = {x["id"]: x for x in token_list}
+
         self.normalizer = normalizer
-
-    def create_viterbi_tokenizer_from_corpus(corpus_string, max_token_length=20):
-        corpus_sentences = [x + "." for x in corpus_string.split(".")]
-        substring_frequencies = ViterbiTokenizer.get_substring_frequencies(corpus_sentences, max_token_length)
-
-    def get_substring_frequencies(sentences, max_length):
-        counter = defaultdict(lambda: 0)
-        for sentence in sentences:
-            for i in range(len(sentence)):
-                for ln in range(1, min(len(sentence) - i, max_length + 1)):
-                    counter[sentence[i:ln]] += 1
-        return counter
 
     def _replace_all(self, text):
         return functools.reduce(lambda a, x: a.replace(x[0], x[1]), self.replacements.items(), text)
 
+    def _pad_and_shit(self, ids, ends=False, pad_length=None):
+        if ends:
+            ids = [self.bot] + ids + [self.eot]
+        if pad_length is not None:
+            ids.extend([self.pad] * (pad_length - len(ids)))
+        return ids
+
     def tokenize(self, texts, **kwargs):
         if isinstance(texts, str):
-            return self._tokenize(texts, **kwargs)
+            return self._pad_and_shit(self._tokenize(texts), **kwargs)
         results = []
         for text in texts:
-            results.append(self._tokenize(text))
+            results.append(self._pad_and_shit(self._tokenize(text), **kwargs))
         return results
 
     def __call__(self, texts, **kwargs):
         return self.tokenize(texts, **kwargs)
 
-    def _tokenize(self, text, pad_length=None, ends=False):
-        if self.normalizer is not None:
-            text = self.normalizer(text)
-        print(text)
-        best_subw_slices = self.viterbi_forward(text)
-        print("did forward")
-        ids = self.viterbi_backward(best_subw_slices)
-        if ends:
-            ids = [self.bot] + ids + [self.eot]
-        if pad_length:
-            ids.extend([self.pad] * (pad_length - len(ids)))
-        return ids
-
     def decode(self, ids):
         ids = list(ids)
         return "".join([self.vocab_by_id[id]["piece"] for id in ids])
+
+
+# bpe and wordpiece work by splitting to chars then merging by tokens in order! i didn't know this!
+
+# main tokenizers: bpe, wordpiece, sentencepiece, unigram lm
+# how unigram lm works: pick the tokenization such that a unigram lm on them has the best loss
+# https://everdark.github.io/k9/notebooks/ml/natural_language_understanding/subword_units/subword_units.nb.html
+class UnigramLmTokenizer(Tokenizer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _tokenize(self, text):
+        if self.normalizer is not None:
+            text = self.normalizer(text)
+        best_subw_slices = self.viterbi_forward(text)
+        ids = self.viterbi_backward(best_subw_slices)
+
+        return ids
 
     def viterbi_forward(self, sequence):
         """Forward step of Viterbi."""
@@ -120,6 +115,23 @@ class ViterbiTokenizer:
         return subwords
 
 
+class BPETokenizer(Tokenizer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _tokenize(self, text):
+        tokens = list(text)
+        for token in self.token_list:
+            token = token["piece"]
+            i = 0  # using jank loop to iterate through list while changing its length
+            while i < len(tokens) - 1:
+                if tokens[i] + tokens[i + 1] == token:
+                    tokens[i] = token
+                    tokens.pop(i + 1)
+                i += 1
+        return [self.vocab[x]["id"] for x in tokens]
+
+
 # "protoc -I=. --python_out=./proto ./spiece.proto"
 if __name__ == "__main__":
     model_file = "/home/tao/mlab/days/spiece.model"
@@ -133,7 +145,7 @@ if __name__ == "__main__":
             "./days/sentencepiece.json",
         )
     )
-    my_tokenizer = ViterbiTokenizer(token_list=dct)
+    my_tokenizer = UnigramLmTokenizer(token_list=dct)
     btxt = """Gregory, any update on this? Maybe you can poll python-ideas.
 
 Collin, any download stats and feedback on your package?
@@ -146,5 +158,12 @@ msg111400 - (view)	Author: Raymond Hettinger (rhettinger) * (Python committer)	D
 I agree with Amaury that this should be closed.  It has been previously discussed and rejected in other forums.  One the issues is that the usual mathematical order is unintuitive and not self-documenting  -- i.e. is compose(f,g)  the same as f(g(x)) or g(f(x))?  Also, it is already dirt simple to create your own compose function or to do the composition directly:  h = lambda x: f(g(x))."""
     with Timer():
         my_tokens = my_tokenizer(btxt, ends=True)
-    print(my_tokens)
-    print(my_tokenizer.decode(my_tokens))
+    # print(my_tokens)
+    # print(my_tokenizer.decode(my_tokens))
+    import transformers
+
+    vocab_my_way = json.load(open("bpe_tokens.json"))
+    print(vocab_my_way[600:700])
+    bpe_tokenizer = BPETokenizer(vocab_my_way)
+    tokens = bpe_tokenizer._tokenize("hi, my name is tao")
+    print([bpe_tokenizer.vocab_by_id[i]["piece"] for i in tokens])
