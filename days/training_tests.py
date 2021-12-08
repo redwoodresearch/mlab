@@ -234,6 +234,7 @@ def test_rmsprop(RMSprop):
         dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.0, centered=False),
         dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.5, centered=False),
         dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.5, centered=True),
+        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.0, centered=True),
     ]
     for opt_config in test_cases:
         torch.manual_seed(819)
