@@ -1,9 +1,13 @@
-import math
+import einops
+import matplotlib.pyplot as plt
+from PIL import Image
 from sklearn.datasets import make_moons
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+import torchvision
+from torchvision import transforms
 from typing import Tuple
 
 
@@ -279,4 +283,33 @@ def test_adam(Adam):
         print('\nTesting configuration: ', opt_config)
         _check_equal(w0_correct, w0_submitted)
 
-                    
+
+##################################################################################
+        
+def load_image(fname):
+    img = Image.open(fname)
+    tensorize = transforms.ToTensor()
+    img = tensorize(img)
+    img = einops.rearrange(img, 'c h w -> h w c')
+    height, width = img.shape[:2]
+
+    n_trn = 8192
+    n_tst = 1024
+    X1 = torch.randint(0, height, (n_trn + n_tst,))
+    X2 = torch.randint(0, width, (n_trn + n_tst,))
+    X = torch.stack([X1.float()/height, X2.float()/height]).T
+    Y = img[X1, X2]
+
+    Xtrn, Xtst = X[:n_trn], X[n_trn:]
+    Ytrn, Ytst = Y[:n_trn], Y[n_trn:]
+
+    dl_trn = DataLoader(TensorDataset(Xtrn, Ytrn), batch_size=128, shuffle=True)
+    dl_tst = DataLoader(TensorDataset(Xtst, Ytst), batch_size=128)
+    return dl_trn, dl_tst
+
+
+def plot_image(fname):
+    img = Image.open(fname)
+    fig = plt.imshow(img)
+    fig.axes.get_xaxis().set_visible(False)
+    fig.axes.get_yaxis().set_visible(False)
