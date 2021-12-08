@@ -15,7 +15,7 @@ def _get_moon_data():
 
 
 def _check_equal(tensor1, tensor2):
-    if torch.allclose(tensor1, tensor2):
+    if torch.allclose(tensor1, tensor2, rtol=1e-4, atol=1e-6):
         print("Congrats! You've passed the test.")
     else:
         print("Your module returns different results from the example solution.")
@@ -186,10 +186,10 @@ class _RMSprop:
             for i, p in enumerate(self.params):
                 assert p.grad is not None
                 g = p.grad + self.wd * p
-                v_tilde = self.v[i] = self.alpha * self.v[i] + (1.0 - self.alpha) * g * g
+                v_tilde = self.v[i] = self.alpha * self.v[i] + (1.0 - self.alpha) * g**2
                 if self.centered:
                     self.g_ave[i] = self.g_ave[i] * self.alpha + (1.0 - self.alpha) * g
-                    v_tilde = v_tilde - self.g_ave[i]**2
+                    v_tilde = v_tilde - self.g_ave[i] ** 2
                 if self.mu:
                     self.b[i] = self.mu * self.b[i] + g / (v_tilde.sqrt() + self.eps)
                     p -= self.lr * self.b[i]
@@ -246,14 +246,14 @@ class _Adam:
                 assert p.grad is not None
                 g = p.grad + self.wd * p
                 self.m[i] = self.beta1 * self.m[i] + (1.0 - self.beta1) * g
-                self.v[i] = self.beta2 * self.v[i] + (1.0 - self.beta2) * g * g
+                self.v[i] = self.beta2 * self.v[i] + (1.0 - self.beta2) * g**2
                 mhat = self.m[i] / (1.0 - self.beta1 ** self.t)
                 vhat = self.v[i] / (1.0 - self.beta2 ** self.t)
 
                 if self.amsgrad:
                     torch.maximum(self.vmax[i], self.v[i], out=self.vmax[i])
-                    vhat_sqrt = self.vmax[i].sqrt() / math.sqrt(1 - self.beta2 ** self.t)
-                    p -= self.lr * mhat / (vhat_sqrt + self.eps)
+                    vhat = self.vmax[i] / (1 - self.beta2 ** self.t)
+                    p -= self.lr * mhat / (vhat.sqrt() + self.eps)
                 else:
                     p -= self.lr * mhat / (vhat.sqrt() + self.eps)
                     
