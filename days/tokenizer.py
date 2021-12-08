@@ -8,6 +8,7 @@ import functools
 import torch as t
 from unidecode import unidecode
 from collections import defaultdict
+import itertools
 
 
 def normalizer(str):
@@ -131,9 +132,46 @@ class BPETokenizer(Tokenizer):
                 i += 1
         return [self.vocab[x]["id"] for x in tokens]
 
+    def from_corpus(texts, num_tokens=1000):
+        seqs = [list(x) for x in texts]
+        tokens = list(set(itertools.chain(*seqs)))
+        merge_pair = 12345678990
+        merge_string = None
+        while len(tokens) < num_tokens:
+            pair_counts = defaultdict(lambda: 0)
+            for seq in seqs:
+                i = 0
+                while i < len(seq) - 1:
+                    tottup = (seq[i], seq[i + 1])
+                    if tottup == merge_pair:
+                        seq[i] = merge_string
+                        seq.pop(i + 1)
+                        i -= 1
+                    else:
+                        pair_counts[tottup] += 1
+                    i += 1
+            if len(pair_counts) == 0:
+                break
+            merge_pair = max(pair_counts.items(), key=lambda x: x[1])[0]
+            merge_string = merge_pair[0] + merge_pair[1]
+            tokens.append(merge_string)
+            if merge_pair[0] in tokens and len(merge_pair[0]) > 1:
+                tokens.remove(merge_pair[0])
+            if merge_pair[1] in tokens and len(merge_pair[1]) > 1:
+                tokens.remove(merge_pair[1])
+        print("tokens", tokens)
+        tokenizer = BPETokenizer([{"id": i, "piece": p} for i, p in enumerate(tokens)])
+        return tokenizer
+
 
 # "protoc -I=. --python_out=./proto ./spiece.proto"
 if __name__ == "__main__":
+
+    print("loading shakespeare")
+    corpus = open("shakespeare.txt").readlines()
+    minicorpus = corpus[5000:6000]
+    bpe_shakespeare = BPETokenizer.from_corpus(minicorpus, num_tokens=500)
+    raise AssertionError("hi")
     model_file = "/home/tao/mlab/days/spiece.model"
     s = spm.SentencePieceProcessor(model_file=model_file)
     model_file_bytes = open(model_file, "rb").read()
