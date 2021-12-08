@@ -194,8 +194,8 @@ def test_sgd(SGD):
 
 class _RMSprop:
     def __init__(
-        self, params, lr: float, alpha: float, eps: float, weight_decay: float, momentum: float, centered: bool
-    ):
+        self, params, lr: float, alpha: float, eps: float, weight_decay: float,
+            momentum: float, centered: bool):
         self.params = list(params)
         self.lr = lr
         self.alpha = alpha
@@ -231,6 +231,8 @@ class _RMSprop:
 def test_rmsprop(RMSprop):
     test_cases = [
         dict(lr=0.1, alpha=0.9, eps=0.001, weight_decay=0.0, momentum=0.0, centered=False),
+        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.0, centered=False),
+        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.5, centered=False),
         dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.5, centered=True),
     ]
     for opt_config in test_cases:
