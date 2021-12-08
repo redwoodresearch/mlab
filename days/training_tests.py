@@ -312,14 +312,14 @@ def test_adam(Adam):
 
 ##################################################################################
         
-def load_image(fname):
+def load_image(fname, n_train=8192):
     img = Image.open(fname)
     tensorize = transforms.ToTensor()
     img = tensorize(img)
     img = einops.rearrange(img, 'c h w -> h w c')
     height, width = img.shape[:2]
 
-    n_trn = 8192
+    n_trn = n_train
     n_tst = 1024
     X1 = torch.randint(0, height, (n_trn + n_tst,))
     X2 = torch.randint(0, width, (n_trn + n_tst,))
