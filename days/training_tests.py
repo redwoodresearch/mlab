@@ -100,6 +100,29 @@ def test_accuracy(accuracy):
     _check_equal(torch.Tensor([_acc]), torch.Tensor([acc]))
 
 
+def _evaluate(model: nn.Module, dataloader: DataLoader):
+    sum_abs = 0.0
+    n_elems = 0
+    for X, y in dataloader:
+        sum_abs += (model(X) - y).abs().sum()
+        n_elems += y.shape[0] * y.shape[1]
+    return sum_abs / n_elems
+
+
+def test_evaluate(evaluate):
+    torch.manual_seed(928)
+    X = torch.rand(512, 2)
+    Y = torch.rand(512, 3)
+    dl = DataLoader(TensorDataset(X, Y), batch_size=128)
+
+    model = _MLP(2, 32, 3)
+    model = _train(model, dl, lr=0.1)
+    _loss = _evaluate(model, dl)
+    loss = evaluate(model, dl)
+    _check_equal(torch.Tensor([_loss]), torch.Tensor([loss]))
+
+
+
 ############################################################################
 
 
