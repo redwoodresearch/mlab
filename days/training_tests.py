@@ -19,7 +19,7 @@ def _get_moon_data():
 
 
 def _check_equal(tensor1, tensor2):
-    if torch.allclose(tensor1, tensor2, rtol=1e-4, atol=1e-6):
+    if torch.allclose(tensor1, tensor2, rtol=1e-3, atol=1e-5):
         print("Congrats! You've passed the test.")
     else:
         print("Your module returns different results from the example solution.")
