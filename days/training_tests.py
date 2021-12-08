@@ -57,22 +57,25 @@ def _train(model: nn.Module, dataloader: DataLoader, lr: float):
     for X, y in dataloader:
         opt.zero_grad()
         pred = model(X)
-        loss = F.cross_entropy(pred, y)
+        loss = F.l1_loss(pred, y)
         loss.backward()
         opt.step()
     return model
 
 
 def test_train(train):
-    dl = _get_moon_data()
+    torch.manual_seed(928)
     lr = 0.1
+    X = torch.rand(512, 2)
+    Y = torch.rand(512, 3)
+    dl = DataLoader(TensorDataset(X, Y), batch_size=128)
     
     torch.manual_seed(600)
-    model = _MLP(2, 32, 2)
+    model = _MLP(2, 32, 3)
     _trained_model = _train(model, dl, lr)
     
     torch.manual_seed(600)
-    model = _MLP(2, 32, 2)
+    model = _MLP(2, 32, 3)
     trained_model = train(model, dl, lr)
 
     x = torch.randn(128, 2)
