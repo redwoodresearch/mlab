@@ -4,7 +4,9 @@
 #include "utils.h" // for CUDA_ERROR_CHK, (see file for details)
 
 // This is a reproduction of our orignal pycuda kernel, mostly for
-// demonstrating memory managment.
+// demonstrating memory managment. Most/many usages of cuda use some
+// abstraction around memory managment, but I think it's important to be
+// farmiliar with the low level API.
 //
 // Make sure to read the common errors at the bottom after looking at this
 // code!
@@ -16,7 +18,7 @@ int main() {
   // create a vector for which the values of all entries are 1.5f
   std::vector<float> hostMem(size, 1.5f);
 
-  std::cout << "starting value of hostMem: " << hostMem[0] << "\n";
+  std::cout << "starting value of hostMem: " << hostMem[5] << "\n";
 
   float *gpuMem;
 
@@ -35,11 +37,14 @@ int main() {
   CUDA_ERROR_CHK(cudaMemcpy(gpuMem, hostMem.data(), size * sizeof(float),
                             cudaMemcpyHostToDevice));
 
-  // This launches a kernel. The first argument in <<<_, _>>> is the block size
-  // and the second is the grid dimensions. Passing scalar integer values
+  // This launches a kernel. The first argument in <<<_, _>>> is the grid
+  // dimensions and the second is the block size. Passing scalar integer values
   // results in a 1D kernel. The dim3 struct can be passed instead for higher
   // dimensions.
-  set_zero<<<size, 1>>>(gpuMem);
+  //
+  // Docs at
+  // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#kernels
+  set_zero<<<1, size>>>(gpuMem);
 
   // Check for errors from the kernel launch itself (invalid block/grid
   // arguments for example).
@@ -56,7 +61,7 @@ int main() {
   // we have to free memory by hand when using malloc
   CUDA_ERROR_CHK(cudaFree(gpuMem));
 
-  std::cout << "ending value of hostMem: " << hostMem[0] << "\n";
+  std::cout << "ending value of hostMem: " << hostMem[127] << "\n";
 }
 
 // Common cuda errors:
