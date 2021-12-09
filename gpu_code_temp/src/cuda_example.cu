@@ -16,11 +16,11 @@ __global__ void set_zero(float *dest) { dest[threadIdx.x] = 0.f; }
 int main() {
   int64_t size = 128;
   // create a vector for which the values of all entries are 1.5f
-  std::vector<float> hostMem(size, 1.5f);
+  std::vector<float> host_mem(size, 1.5f);
 
-  std::cout << "starting value of hostMem: " << hostMem[5] << "\n";
+  std::cout << "starting value of host_mem: " << host_mem[5] << "\n";
 
-  float *gpuMem;
+  float *gpu_mem;
 
   // cuda api functions can return errors, so we need to handle them.
   //
@@ -32,9 +32,10 @@ int main() {
   //
   // All of these memory managment functions take sizes in bytes. A common
   // mistake is forgetting to multiply by sizeof(T).
-  CUDA_ERROR_CHK(cudaMalloc(&gpuMem, size * sizeof(float)));
+  CUDA_ERROR_CHK(cudaMalloc(&gpu_mem, size * sizeof(float)));
 
-  CUDA_ERROR_CHK(cudaMemcpy(gpuMem, hostMem.data(), size * sizeof(float),
+  // Note: dest then src (like c memcpy)
+  CUDA_ERROR_CHK(cudaMemcpy(gpu_mem, host_mem.data(), size * sizeof(float),
                             cudaMemcpyHostToDevice));
 
   // This launches a kernel. The first argument in <<<_, _>>> is the grid
@@ -44,7 +45,7 @@ int main() {
   //
   // Docs at
   // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#kernels
-  set_zero<<<1, size>>>(gpuMem);
+  set_zero<<<1, size>>>(gpu_mem);
 
   // Check for errors from the kernel launch itself (invalid block/grid
   // arguments for example).
@@ -55,13 +56,13 @@ int main() {
   // memory access).
   CUDA_ERROR_CHK(cudaDeviceSynchronize());
 
-  CUDA_ERROR_CHK(cudaMemcpy(hostMem.data(), gpuMem, size * sizeof(float),
+  CUDA_ERROR_CHK(cudaMemcpy(host_mem.data(), gpu_mem, size * sizeof(float),
                             cudaMemcpyDeviceToHost));
 
   // we have to free memory by hand when using malloc
-  CUDA_ERROR_CHK(cudaFree(gpuMem));
+  CUDA_ERROR_CHK(cudaFree(gpu_mem));
 
-  std::cout << "ending value of hostMem: " << hostMem[127] << "\n";
+  std::cout << "ending value of host_mem: " << host_mem[127] << "\n";
 }
 
 // Common cuda errors:
@@ -72,8 +73,7 @@ int main() {
 // - Failing to error check.
 // - Not syncronizing after a kernel launch.
 // - Forgetting to free memory (typically people use RAII wrappers of some kind:
-//   https://en.cppreference.com/w/cpp/language/raii, but we won't set that up
-//   here for simplicity)
+//   https://en.cppreference.com/w/cpp/language/raii)
 // - Passing host memory pointers into kernels or trying to dereference device
 //   memory in cpu code.^
 // - Forgetting to copy from device to host or host to device.^
@@ -81,3 +81,5 @@ int main() {
 // ^These errors can be avoided with the use of unified memory, but it has
 //  worse perfomance characteristics and generally isn't used in the most
 //  performant applications.
+//
+// Feel free to write wrappers or other utility code to reduce these errors.
