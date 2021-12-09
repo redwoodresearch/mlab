@@ -9,11 +9,9 @@ cmake_minimum_required(VERSION 3.18)
 
 add_compile_options(-Wall -Wextra -Wmissing-field-initializers)
 
-set(RELEASE_ARGS -Ofast)
 set(RELEASE_DEB_ARGS "${RELEASE_ARGS};-UNDEBUG")
 
 # must be quoted for some reason I don't understand?
-add_compile_options("$<$<CONFIG:RELEASE>:${RELEASE_ARGS}>")
 add_compile_options("$<$<CONFIG:RELWITHDEBINFO>:${RELEASE_DEB_ARGS}>")
 add_compile_options("$<$<CONFIG:DEBUG>:-ftrapv;-fno-omit-frame-pointer>")
 
@@ -32,7 +30,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 find_package(CUDAToolkit REQUIRED)
 
-add_executable(exercise_0 "${PROJECT_SOURCE_DIR}/src/exercise_0.cu")
-target_include_directories(exercise_0 PUBLIC "${PROJECT_SOURCE_DIR}/include")
+add_executable(cuda_example "${PROJECT_SOURCE_DIR}/src/cuda_example.cu")
+target_include_directories(cuda_example PUBLIC "${PROJECT_SOURCE_DIR}/include")
 # https://cmake.org/cmake/help/git-stage/prop_tgt/CUDA_ARCHITECTURES.html
-set_target_properties(exercise_0 PROPERTIES CUDA_ARCHITECTURES "72")
+set_target_properties(cuda_example PROPERTIES CUDA_ARCHITECTURES "72")
