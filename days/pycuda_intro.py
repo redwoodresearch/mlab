@@ -71,7 +71,8 @@ print(dest)
 
 # solution (not in student copy ofc):
 mul_add_mod = SourceModule("""
-__global__ void mul_add(float *dest, float *a, float *b, float *c)
+__global__ void mul_add(float *dest, const float *a, const float *b,
+    const float *c)
 {
   const int i = threadIdx.x;
   dest[i] = a[i] * b[i] + c[i];
@@ -137,7 +138,8 @@ def ceil_divide(a, b):
 import numpy as np
 
 mul_add_mod = SourceModule("""
-__global__ void mul_add(float *dest, float *a, float *b, float *c, int64_t size)
+__global__ void mul_add(float *dest, const float *a, const float *b,
+    const float *c, int64_t size)
 {
   const int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
   if (i >= size) return;
@@ -179,7 +181,8 @@ print(mul_add(a, b, c))
 
 # solution (not in student copy ofc):
 mul_add_no_size_check_mod = SourceModule("""
-__global__ void mul_add(float *dest, float *a, float *b, float *c, int64_t size)
+__global__ void mul_add(float *dest, const float *a, const float *b,
+    const float *c, int64_t size)
 {
   const int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
   // if (i >= size) return;
@@ -235,8 +238,8 @@ c = torch.randn(size).cuda()
 import numpy as np
 
 index_mod = SourceModule("""
-__global__ void index(float *dest, float *a, int64_t *b, int64_t size,
-    int64_t a_size)
+__global__ void index(float *dest, const float *a, const int64_t *b,
+    int64_t size, int64_t a_size)
 {
   const int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
   if (i >= size) return;
@@ -303,7 +306,8 @@ print(index(a, b))
 
 # solution (not in student copy ofc):
 reduce_mod = SourceModule("""
-__global__ void reduce(float *dest, float *inp, int64_t dim0, int64_t dim1)
+__global__ void reduce(float *dest, const float *inp,
+    int64_t dim0, int64_t dim1)
 {
   const int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
   if (i >= dim0) return;
