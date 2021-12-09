@@ -277,7 +277,6 @@ a = torch.arange(10).to(torch.float32).cuda()
 b = torch.tensor(-1).to(torch.long).cuda()
 index(a, b)
 
-
 size = 50000
 a = torch.arange(size).to(torch.float32).cuda()
 b = torch.arange(size).flip(0).cuda()
