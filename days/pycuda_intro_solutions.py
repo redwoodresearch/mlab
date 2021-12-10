@@ -1,6 +1,3 @@
-# TODO: turn into jupyter notebook (I vastly prefer developing outside of a
-# notebook)
-
 # First, let's look at a simple example of using pycuda to operate on
 # gpu tensors.
 import pycuda.autoinit as _
