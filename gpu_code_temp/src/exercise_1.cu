@@ -129,6 +129,10 @@ pointer + size for the 'first' and 'last' params (respectively).
 You should find that our implementation gets absolutely smoked on timing,
 Yikes.
 
+You might want to benchmark thrust on considerably larger inputs than the
+atomic implementation can conveniently manage to see how performance changes
+over a larger set of input sizes.
+
 In turns out that having all threads write to the same atomic results
 in a ton of collisions making the code very slow.
 
@@ -136,7 +140,14 @@ Let's see if we can write a faster reduce.
 */
 
 /*
-4. Another approach to reduction is to reduce all the threads within a block
+4. Next, benchmark a single threaded cpu summation implementation (you can use
+std::accumulate if you'd like) and plot the results.
+
+How does the scaling of floats/sec differ between the cpu and gpu?
+*/
+
+/*
+5. Another approach to reduction is to reduce all the threads within a block
 (segmented reduction) and output this reduced value to a new array for each of
 these blocks. Then we launch another kernel which reduces this new array (which
 has size = number of blocks in previous launch). This is repeated until the
@@ -198,7 +209,7 @@ TODO: are these instructions clear?
 */
 
 /*
-5. Now let's setup the code to invoke this kernel multiple times and fully
+6. Now let's setup the code to invoke this kernel multiple times and fully
 reduce the array. You will need two arrays.
 
 Let's also benchmark this and plot it alongside the atomic and Thrust times
@@ -219,7 +230,7 @@ you've tried to optimize yourself:) )
 */
 
 /*
-6. Next we'll be looking at the 'shfl' family of instrinics which
+7. Next we'll be looking at the 'shfl' family of instrinics which
 can be used to quickly communicate between threads within a warp.
 
 First, note that in addition to writing __global__ functions (kernels), it's
@@ -264,10 +275,8 @@ invocation. The overall perfomance is similar.
 
 // the rest of this file is the solution for all parts:
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <iostream>
-#include <random>
 #include <vector>
 
 #include <thrust/reduce.h>
@@ -610,6 +619,9 @@ int main() {
         shfl_reduce_preallocated(gpu_inp, size, dest);
       },
       30);
+
+
+  // TODO: add cpu benchmark
 
   CUDA_ERROR_CHK(cudaFree(dest));
 }
