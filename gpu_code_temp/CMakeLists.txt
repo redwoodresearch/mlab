@@ -2,7 +2,7 @@ cmake_policy(SET CMP0048 NEW)
 project(
   cuda_exercises
   VERSION 0.1
-  LANGUAGES CUDA CXX)
+  LANGUAGES CUDA)
 
 # needed for cuda features
 cmake_minimum_required(VERSION 3.18)
@@ -15,20 +15,11 @@ set(RELEASE_DEB_ARGS "${RELEASE_ARGS};-UNDEBUG")
 add_compile_options("$<$<CONFIG:RELWITHDEBINFO>:${RELEASE_DEB_ARGS}>")
 add_compile_options("$<$<CONFIG:DEBUG>:-ftrapv;-fno-omit-frame-pointer;-G>")
 
-option(FORCE_COLORED_OUTPUT
-       "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
-if(${FORCE_COLORED_OUTPUT})
-  # gnu/clang only
-  add_compile_options(-fdiagnostics-color=always)
-endif()
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-
-find_package(CUDAToolkit REQUIRED)
 
 add_executable(cuda_example "${PROJECT_SOURCE_DIR}/src/cuda_example.cu")
 target_include_directories(cuda_example PUBLIC "${PROJECT_SOURCE_DIR}/include")
