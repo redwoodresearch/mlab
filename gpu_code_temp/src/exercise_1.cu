@@ -1,5 +1,8 @@
 #include "utils.h"
 
+// TODO: build system? Need to at least give some advice on how to work with
+// it.
+
 /*
 For this exercise we'll implement a series of approaches for summing up an
 array. The ideas here generalize to (many) types of reductions.
@@ -32,7 +35,7 @@ approach for 'deeply' parallel programming. Additionally, non-determistic
 failure can happen (typically due to missing synchronization or failing to
 initialize memory). Because synchronization errors are sensitive to timing,
 it's suprising typical for print statements to cause the code to start working
-again. 
+again.
 
 Here's a ordered checklist to go through when debugging cuda (crashes and
 incorrect output):
@@ -59,7 +62,7 @@ incorrect output):
   helpful when failures are determistic.
 - Down all the way to here? You might be in for a hard time. There
   are many ways to proceed from here, but I often find the print/dump based
-  workflow useful (described below). 
+  workflow useful (described below).
 
 I find a workflow of dumping inputs, outputs, and expected outputs as python
 lists useful for GPU debugging in particular. This allows for dumping to a
@@ -95,7 +98,8 @@ just benchmark by hand. Graph the floats/sec vs the length of the array (a
 simple way to do this is to print values as a csv and then parse with python).
 Run with lengths up to around 10 million.
 
-To ensure minimal noise, average the timing over several runs.
+To ensure minimal noise, average the timing over several runs. Also, make sure
+the gpu isn't running anything else of significance.
 
 Also, often letting the code 'warm up' for an iteration (or a few) will
 improve performance. For ML applications we typically care about about
@@ -197,9 +201,9 @@ TODO: are these instructions clear?
 5. Now let's setup the code to invoke this kernel multiple times and fully
 reduce the array. You will need two arrays.
 
-Let's also benchmark this and plot it alongside the atomic and thrust times
+Let's also benchmark this and plot it alongside the atomic and Thrust times
 (you should find that it's much faster than the atomic implementation, but
-still slower than thrust).
+still slower than Thrust).
 
 If you'd like, you can spend some time trying to optimize this implementation.
 We'll be implementing a different approach next which uses a new type of
@@ -218,8 +222,14 @@ you've tried to optimize yourself:) )
 6. Next we'll be looking at the 'shfl' family of instrinics which
 can be used to quickly communicate between threads within a warp.
 
-Read this article through the 'Shuffle Warp Reduce' section, but
-stop at and don't read the 'Block Reduce' section':
+First, note that in addition to writing __global__ functions (kernels), it's
+possible to write functions which can be called on the gpu using __device__. To
+make a function callable on the cpu and the gpu you can use '__host__
+__device__'. See here in the docs for details:
+https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#function-declaration-specifiers
+
+Now read this article through the 'Shuffle Warp Reduce' section, but stop at
+and don't read the 'Block Reduce' section':
 https://developer.nvidia.com/blog/faster-parallel-reductions-kepler/
 
 Can you think of a way to combine the 'warpReduceSum' approach here with
@@ -239,11 +249,12 @@ of iterating by the total size covered by the grid (blockDim.x * gridDim.x).
 This is an efficient approach to use only 2 kernel launches without having to
 tune any parameters.
 
-Using what you've learned here, implement and optimize a fast reduction
+Using what you've learned here, spend some time optimizing your reduction
 function. Can you match the perfomance of Thrust? This will certainly require
-some tuning and might be quite difficult. Note that thrust is allocating memory
+some tuning and might be quite difficult. Note that Thrust is allocating memory
 on each call, so it's slightly handicapped on smaller inputs. It's possible to
-avoid allocating memory each time, but I won't go into how to do so here.
+avoid allocating memory each time with Thrust, but I won't go into how to do so
+here.
 
 Consider also reading reading some of the discussion of atomics in that article
 and implementing that approach. Combining atomics with block wide reduction
@@ -301,33 +312,33 @@ std::vector<float> random_floats(float min, float max, int size) {
   return out;
 }
 
-template <typename F> void check_reducer(const F &f) {
-  std::vector<float> host_mem_single{1.7f};
-  float *gpu_mem = copy_to_gpu(host_mem_single.data(), host_mem_single.size());
-  std::cout << "single sum: " << f(gpu_mem, host_mem_single.size()) << "\n";
+template <typename F>
+float reduce_vec(const std::vector<float> &vec, const F &f) {
+  float *gpu_mem = copy_to_gpu(vec.data(), vec.size());
+  float out = f(gpu_mem, vec.size());
   CUDA_ERROR_CHK(cudaFree(gpu_mem));
 
+  return out;
+}
+
+template <typename F> void check_reducer(const F &f) {
+  std::vector<float> host_mem_single{1.7f};
+  std::cout << "single sum: " << reduce_vec(host_mem_single, f) << "\n";
+
   std::vector<float> host_mem_few{1.2f, 0.f, 123.f};
-  gpu_mem = copy_to_gpu(host_mem_few.data(), host_mem_few.size());
-  std::cout << "few sum: " << f(gpu_mem, host_mem_few.size()) << "\n";
-  CUDA_ERROR_CHK(cudaFree(gpu_mem));
+  std::cout << "few sum: " << reduce_vec(host_mem_few, f) << "\n";
 
   auto host_mem_more_than_block = random_floats(-8.0f, 8.0f, 513);
   float cpu_total = std::accumulate(host_mem_more_than_block.begin(),
                                     host_mem_more_than_block.end(), 0.f);
-  gpu_mem = copy_to_gpu(host_mem_more_than_block.data(),
-                        host_mem_more_than_block.size());
   std::cout << "more_than_block sum: "
-            << f(gpu_mem, host_mem_more_than_block.size()) << "\n";
+            << reduce_vec(host_mem_more_than_block, f) << "\n";
   std::cout << "cpu more_than_block sum: " << cpu_total << "\n";
-  CUDA_ERROR_CHK(cudaFree(gpu_mem));
 
   auto host_mem_many = random_floats(-8.0f, 8.0f, 262145);
   cpu_total = std::accumulate(host_mem_many.begin(), host_mem_many.end(), 0.f);
-  gpu_mem = copy_to_gpu(host_mem_many.data(), host_mem_many.size());
-  std::cout << "many sum: " << f(gpu_mem, host_mem_many.size()) << "\n";
+  std::cout << "many sum: " << reduce_vec(host_mem_many, f) << "\n";
   std::cout << "cpu many sum: " << cpu_total << "\n";
-  CUDA_ERROR_CHK(cudaFree(gpu_mem));
 }
 
 template <typename F>
