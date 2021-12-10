@@ -432,17 +432,17 @@ run_simple_sum_block_for_test(const std::vector<float> &to_reduce) {
 }
 
 template <typename T> void print_vec(const std::vector<T> &v) {
-  std::cerr << "[";
+  std::cout << "[";
   for (float x : v) {
-    std::cerr << x << ",";
+    std::cout << x << ",";
   }
-  std::cerr << "]\n";
+  std::cout << "]\n";
 }
 
 void print_vecs(const std::array<std::vector<float>, 2> &vecs) {
-  std::cerr << "gpu = ";
+  std::cout << "gpu = ";
   print_vec(vecs[0]);
-  std::cerr << "cpu = ";
+  std::cout << "cpu = ";
   print_vec(vecs[1]);
 }
 
