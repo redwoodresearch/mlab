@@ -19,7 +19,7 @@ def _get_moon_data():
 
 
 def _check_equal(tensor1, tensor2):
-    if torch.allclose(tensor1, tensor2, rtol=1e-4, atol=1e-6):
+    if torch.allclose(tensor1, tensor2, rtol=1e-3, atol=1e-5):
         print("Congrats! You've passed the test.")
     else:
         print("Your module returns different results from the example solution.")
@@ -172,6 +172,9 @@ class _SGD:
 
 def test_sgd(SGD):
     test_cases = [
+        dict(lr=0.1, momentum=0.0, dampening=0.0, weight_decay=0.0),
+        dict(lr=0.1, momentum=0.7, dampening=0.0, weight_decay=0.0),
+        dict(lr=0.1, momentum=0.5, dampening=0.5, weight_decay=0.0),
         dict(lr=0.1, momentum=0.5, dampening=0.5, weight_decay=0.05),
         dict(lr=0.2, momentum=0.8, dampening=0.0, weight_decay=0.05),
     ]
@@ -292,6 +295,7 @@ class _Adam:
 
 def test_adam(Adam):
     test_cases = [
+        dict(lr=0.1, betas=(0.8, 0.95), eps=0.001, weight_decay=0.0, amsgrad=False),
         dict(lr=0.1, betas=(0.8, 0.9), eps=0.001, weight_decay=0.05, amsgrad=False),
         dict(lr=0.2, betas=(0.9, 0.95), eps=0.01, weight_decay=0.08, amsgrad=True),
     ]
