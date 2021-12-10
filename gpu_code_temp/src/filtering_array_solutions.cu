@@ -23,6 +23,8 @@ __global__ void filter_atomic_kernel(const T *inp, T *dest, int *atomic_v,
 template <typename T, typename Pred>
 int filter_atomic_preallocated(const T *inp, T *dest, int *atomic_v, int size,
                                const Pred &pred) {
+  int zero = 0;
+  cudaMemcpy(atomic_v, &zero, sizeof(int), cudaMemcpyHostToDevice);
   int block_size = 512;
   filter_atomic_kernel<<<ceil_divide(size, block_size), block_size>>>(
       inp, dest, atomic_v, size, pred);
@@ -95,7 +97,6 @@ void check_filterer(const F &f, const Pred &pred) {
     cpu_vec.reserve(host_mem_large.size());
     std::copy_if(host_mem_large.begin(), host_mem_large.end(),
                  std::back_inserter(cpu_vec), pred);
-    std::cout << cpu_vec.size() << std::endl;
     auto gpu_vec = filter_vec(host_mem_large, f);
 
     std::cout << "is equal (large): " << std::boolalpha
@@ -103,13 +104,100 @@ void check_filterer(const F &f, const Pred &pred) {
   }
 }
 
+template <typename F>
+float benchmark_filter(const F &f, int size, int iters = 10,
+                       bool is_cpu = false) {
+  auto host_mem = random_floats(-1.0f, 1.0f, size);
+  float *mem;
+  float *out_mem;
+  std::vector<float> out_mem_cpu;
+  if (is_cpu) {
+    mem = host_mem.data();
+    out_mem_cpu.resize(size);
+    out_mem = out_mem_cpu.data();
+  } else {
+    mem = copy_to_gpu(host_mem.data(), host_mem.size());
+    CUDA_ERROR_CHK(cudaMalloc(&out_mem, size * sizeof(float)));
+  }
+
+  // warmup
+  for (int i = 0; i < 3; ++i) {
+    f(mem, out_mem, size);
+  }
+
+  Timer timer;
+  for (int i = 0; i < iters; ++i) {
+    f(mem, out_mem, size);
+  }
+
+  float time = timer.elapsed() / iters;
+
+  if (!is_cpu) {
+    CUDA_ERROR_CHK(cudaFree(mem));
+    CUDA_ERROR_CHK(cudaFree(out_mem));
+  }
+
+  return time;
+}
+
+template <typename F>
+void run_all_benchmark_filter(const F &f, int max_size_power,
+                              bool is_cpu = false) {
+  std::cout << "size,time\n";
+  for (int size_power = 6; size_power < max_size_power; ++size_power) {
+    int size = 1 << size_power;
+    int iters = size_power < 17 ? 100 : 10;
+    std::cout << size << "," << benchmark_filter(f, size, iters, is_cpu)
+              << "\n";
+  }
+}
+
 int main() {
-  auto pred = [] __host__ __device__(const float x) {
-    return std::abs(std::fmod(x, 1.f)) < 0.5f;
+  auto get_pred = [](float thresh) {
+    return [thresh] __host__ __device__(const float x) {
+      return std::abs(std::fmod(x, 1.f)) < thresh;
+    };
   };
 
-  auto filter_atomic_f = [pred](const float *inp, float *dest, int size) {
-    return filter_atomic(inp, dest, size, pred);
+  int *atomic_v;
+  CUDA_ERROR_CHK(cudaMalloc(&atomic_v, sizeof(int)));
+  auto get_filter_atomic_f = [atomic_v](auto pred) {
+    return [pred, atomic_v](const float *inp, float *dest, int size) {
+      return filter_atomic_preallocated(inp, dest, atomic_v, size, pred);
+    };
   };
-  check_filterer(filter_atomic_f, pred);
+
+  auto get_filter_thrust = [](auto pred) {
+    return [pred](const float *inp, float *dest, int size) {
+      return thrust::copy_if(thrust::device, inp, inp + size, dest, pred);
+    };
+  };
+
+  auto get_filter_cpu = [](auto pred) {
+    return [pred](const float *inp, float *dest, int size) {
+      return std::copy_if(inp, inp + size, dest, pred);
+    };
+  };
+
+  auto base_pred = get_pred(0.5f);
+  check_filterer(get_filter_atomic_f(base_pred), base_pred);
+
+  std::cout << "[\n";
+  for (float thresh : {0.01f, 0.05f, 0.2f, 0.5f, 0.9f}) {
+    auto pred = get_pred(thresh);
+    std::cout << "(" << thresh << ",\n{\n";
+    std::cout << "'atomic' : \"\"\"\n";
+    run_all_benchmark_filter(get_filter_atomic_f(pred), 26);
+    std::cout << "\"\"\",\n";
+    std::cout << "'thrust' : \"\"\"\n";
+    run_all_benchmark_filter(get_filter_thrust(pred), 26);
+    std::cout << "\"\"\",\n";
+    std::cout << "'cpu' : \"\"\"\n";
+    run_all_benchmark_filter(get_filter_cpu(pred), 20, true);
+    std::cout << "\"\"\",\n";
+    std::cout << "}),\n";
+  }
+  std::cout << "]\n";
+
+  CUDA_ERROR_CHK(cudaFree(atomic_v));
 }
