@@ -13,7 +13,7 @@ set(RELEASE_DEB_ARGS "${RELEASE_ARGS};-UNDEBUG")
 
 # must be quoted for some reason I don't understand?
 add_compile_options("$<$<CONFIG:RELWITHDEBINFO>:${RELEASE_DEB_ARGS}>")
-add_compile_options("$<$<CONFIG:DEBUG>:-ftrapv;-fno-omit-frame-pointer>")
+add_compile_options("$<$<CONFIG:DEBUG>:-ftrapv;-fno-omit-frame-pointer;-G>")
 
 option(FORCE_COLORED_OUTPUT
        "Always produce ANSI-colored output (GNU/Clang only)." TRUE)

@@ -5,7 +5,7 @@ For this exercise we'll implement a series of approaches for summing up an
 array. The ideas here generalize to (many) types of reductions.
 
 Feel free to use int instead of int64_t, but don't run on inputs larger than
-2147483647.
+2147483647 (32 bit int max).
 
 1. For starters we'll use the most simple approach: device wide atomics.
 Docs:
@@ -19,7 +19,70 @@ the gpu and cpu. Why are the values slightly different? (If they're very
 different, that's probably a bug.)
 
 TODO: any more instruction? Or is this clear?
-TODO: do we want tests? (should be easy to test).
+TODO: do we want to provide tests? (should be easy to test).
+*/
+
+/*
+An interlude on debugging cuda by Ryan. You can skip this until actually
+needing to debug stuff if you'd like.
+
+Debugging cuda can be really painful. There is cuda-gdb, but it's a bit finicky
+and (I've found) somewhat buggy. This sort of tool also just isn't a great
+approach for 'deeply' parallel programming. Additionally, non-determistic
+failure can happen (typically due to missing synchronization or failing to
+initialize memory). Because synchronization errors are sensitive to timing,
+it's suprising typical for print statements to cause the code to start working
+again. 
+
+Here's a ordered checklist to go through when debugging cuda (crashes and
+incorrect output):
+- Reduce to the minimal input. Does this make it obvious what the issue is?
+  Does it fail only when the size isn't a multiple of the block size (or
+  similar)?
+- Illegal memory error (or similar)? Make sure to check your mallocs, that
+  pointers are for the correct device, and the bounds on your indexes (consider
+  adding asserts -- I typically use pointer wrappers which automatically bounds
+  check in debug mode, but I won't discuss setting that up here).
+- Are things off by a seemingly random amount? Perhaps you failed to initialize
+  to 0 and are using garbage memory.
+- Is the failure/error non-determistic? The issue could be related to
+  synchronization or reading something while anther thread is writing. So look
+  through and try to see if there are any obvious places where syncronization
+  is missing.
+- Just generally look over your code and think about the algorithm. Can you
+  spot anything which could be wrong?
+- Consider using cuda-gdb. We won't go through how to use it here, but if
+  you're already familiar with GDB it should be pretty straight forward to
+  pick up after reading a guide online. This is particularly useful
+  in situations like an assertion error and you just want to look at the values
+  of a bunch of the surronding variables. It also tends to be more
+  helpful when failures are determistic.
+- Down all the way to here? You might be in for a hard time. There
+  are many ways to proceed from here, but I often find the print/dump based
+  workflow useful (described below). 
+
+I find a workflow of dumping inputs, outputs, and expected outputs as python
+lists useful for GPU debugging in particular. This allows for dumping to a
+python file which can then be imported to access and manipulate the data (often
+after converting to numpy arrays). Then with this input data and some python
+hacking, strategic print statements can be inserted into the kernel and used to
+'binary search' for where the failure occurs (checking what values should be
+with hacky python code). You should try to print only what you really need to
+avoid clutter. In fact, if you print too much the kernel will crash as printf
+has a fixed sized buffer! Make sure to first reduce to the minimally sized
+input which can cause the issue. Using a bunch of these print statments/dumping
+makes it easier to debug non-determistic fails. Just keep rerunning until it
+fails at some location and then investigate the print statements which
+correspond to that location.
+
+If print statments upset the timing and cause the issue to no longer occur, try
+saving values to array and then printing at the end of the kernel. Saving to an
+array is much faster, so it shouldn't upset timing much.
+
+While this print statement work flow is good for thorough debugging, it can
+take a while to get rolling, so it's always a good idea to first go through
+something like the common errors checklist above and to do a detailed read
+through of the code.
 */
 
 /*
@@ -39,8 +102,7 @@ improve performance. For ML applications we typically care about about
 amortized time over a large number of iterations, so to reduce noise we
 should run warm up iteration(s) before actually running the benchmark.
 
-Remember to run your final benchmarks in release mode! (It might not make a
-difference in this case, but it does matter in general.)
+Remember to run your final benchmarks in release mode!
 
 How does performance (in floats/sec) change with the size of the input?
 Consider zooming in/higher levels of sampling at various points to get a better
