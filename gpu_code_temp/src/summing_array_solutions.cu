@@ -64,23 +64,31 @@ template <typename F> void check_reducer(const F &f) {
 }
 
 template <typename F>
-float benchmark_reduce(const F &f, int size, int iters = 10) {
+float benchmark_reduce(const F &f, int size, int iters = 10,
+                       bool is_cpu = false) {
   auto host_mem = random_floats(-8.0f, 8.0f, size);
-  float *gpu_mem = copy_to_gpu(host_mem.data(), host_mem.size());
+  float *mem = host_mem.data();
+  if (!is_cpu) {
+    mem = copy_to_gpu(host_mem.data(), host_mem.size());
+  }
 
   // warmup
   for (int i = 0; i < 3; ++i) {
-    f(gpu_mem, size);
+    f(mem, size);
   }
 
   Timer timer;
   for (int i = 0; i < iters; ++i) {
-    f(gpu_mem, size);
+    f(mem, size);
   }
 
-  CUDA_ERROR_CHK(cudaFree(gpu_mem));
+  float time = timer.elapsed() / iters;
 
-  return timer.elapsed() / iters;
+  if (!is_cpu) {
+    CUDA_ERROR_CHK(cudaFree(mem));
+  }
+
+  return time;
 }
 
 __device__ void syncthreads() {
@@ -117,12 +125,14 @@ __global__ void simple_sum_block_kernel(const float *inp, float *dest,
 }
 
 template <typename F>
-void run_all_benchmark_reduce(const F &f, int max_size_power) {
+void run_all_benchmark_reduce(const F &f, int max_size_power,
+                              bool is_cpu = false) {
   std::cout << "size,time\n";
   for (int size_power = 6; size_power < max_size_power; ++size_power) {
     int size = 1 << size_power;
     int iters = size_power < 17 ? 100 : 10;
-    std::cout << size << "," << benchmark_reduce(f, size, iters) << "\n";
+    std::cout << size << "," << benchmark_reduce(f, size, iters, is_cpu)
+              << "\n";
   }
 }
 
@@ -343,7 +353,14 @@ int main() {
       },
       30);
 
-  // TODO: add cpu benchmark
-
   CUDA_ERROR_CHK(cudaFree(dest));
+
+  std::cout << "cpu results\n";
+  run_all_benchmark_reduce(
+      [&](const float *mem, int size) {
+        float out = 0.;
+        volatile float *no_optimization = &out;
+        *no_optimization = std::accumulate(mem, mem + size, 0);
+      },
+      23);
 }
