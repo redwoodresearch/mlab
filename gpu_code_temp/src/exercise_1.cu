@@ -219,7 +219,8 @@ you've tried to optimize yourself:) )
 can be used to quickly communicate between threads within a warp.
 
 Read this article through the 'Shuffle Warp Reduce' section, but
-stop at and don't read the 'Block Reduce' section'.
+stop at and don't read the 'Block Reduce' section':
+https://developer.nvidia.com/blog/faster-parallel-reductions-kepler/
 
 Can you think of a way to combine the 'warpReduceSum' approach here with
 __syncthreads() and shared memory to construct an efficient (and hopefully
