@@ -100,7 +100,7 @@ __device__ void syncthreads() {
 template <int block_size>
 __global__ void simple_sum_block_kernel(const float *inp, float *dest,
                                         int size) {
-  __shared__ float data[block_size];
+  static __shared__ float data[block_size];
   assert(blockDim.x == block_size);
 
   int tidx = threadIdx.x;
@@ -300,7 +300,7 @@ int main() {
   check_reducer(shfl_reduce);
 
   // outputs found in scripts/solution_plot_ops_sum.py
-  std::cout << "atomic results:\n";
+  std::cout << "atomic = \"\"\"\n";
 
   float *dest;
   CUDA_ERROR_CHK(cudaMalloc(&dest, sizeof(float)));
@@ -310,18 +310,20 @@ int main() {
         sum_atomic_preallocated(gpu_inp, size, dest);
       },
       22);
+  std::cout << "\"\"\"\n";
 
   CUDA_ERROR_CHK(cudaFree(dest));
 
-  std::cout << "thrust results:\n";
+  std::cout << "thrust = \"\"\"\n";
 
   run_all_benchmark_reduce(
       [&](const float *gpu_inp, int size) {
         thrust::reduce(thrust::device, gpu_inp, gpu_inp + size, 0.f);
       },
       30);
+  std::cout << "\"\"\"\n";
 
-  std::cout << "simple sum block results:\n";
+  std::cout << "simple_sum_block = \"\"\"\n";
 
   constexpr int block_size = 512;
   float *dest_l;
@@ -340,11 +342,12 @@ int main() {
                                                          dest_r);
       },
       max_size_power_simple_segment);
+  std::cout << "\"\"\"\n";
 
   CUDA_ERROR_CHK(cudaFree(dest_l));
   CUDA_ERROR_CHK(cudaFree(dest_r));
 
-  std::cout << "shfl results:\n";
+  std::cout << "shfl = \"\"\"\n";
 
   CUDA_ERROR_CHK(cudaMalloc(&dest, 1024 * sizeof(float)));
   run_all_benchmark_reduce(
@@ -352,10 +355,11 @@ int main() {
         shfl_reduce_preallocated(gpu_inp, size, dest);
       },
       30);
+  std::cout << "\"\"\"\n";
 
   CUDA_ERROR_CHK(cudaFree(dest));
 
-  std::cout << "cpu results\n";
+  std::cout << "cpu = \"\"\"\n";
   run_all_benchmark_reduce(
       [&](const float *mem, int size) {
         float out = 0.;
@@ -363,4 +367,5 @@ int main() {
         *no_optimization = std::accumulate(mem, mem + size, 0);
       },
       23);
+  std::cout << "\"\"\"\n";
 }
