@@ -7,7 +7,7 @@ project(
 # needed for cuda features
 cmake_minimum_required(VERSION 3.18)
 
-add_compile_options(-Wall -Wextra -Wmissing-field-initializers 
+add_compile_options(-Wall -Wextra -Wmissing-field-initializers
     --expt-relaxed-constexpr --extended-lambda)
 
 set(RELEASE_DEB_ARGS "${RELEASE_ARGS};-UNDEBUG")
@@ -27,10 +27,18 @@ target_include_directories(cuda_example PUBLIC "${PROJECT_SOURCE_DIR}/include")
 # https://cmake.org/cmake/help/git-stage/prop_tgt/CUDA_ARCHITECTURES.html
 set_target_properties(cuda_example PROPERTIES CUDA_ARCHITECTURES "72")
 
-add_executable(exercise_1 "${PROJECT_SOURCE_DIR}/src/exercise_1.cu")
-target_include_directories(exercise_1 PUBLIC "${PROJECT_SOURCE_DIR}/include")
-set_target_properties(exercise_1 PROPERTIES CUDA_ARCHITECTURES "72")
+add_executable(summing_array "${PROJECT_SOURCE_DIR}/src/summing_array.cu")
+target_include_directories(summing_array PUBLIC "${PROJECT_SOURCE_DIR}/include")
+set_target_properties(summing_array PROPERTIES CUDA_ARCHITECTURES "72")
 
-add_executable(exercise_2 "${PROJECT_SOURCE_DIR}/src/exercise_2.cu")
-target_include_directories(exercise_2 PUBLIC "${PROJECT_SOURCE_DIR}/include")
-set_target_properties(exercise_2 PROPERTIES CUDA_ARCHITECTURES "72")
+add_executable(summing_array_solutions "${PROJECT_SOURCE_DIR}/src/summing_array_solutions.cu")
+target_include_directories(summing_array_solutions PUBLIC "${PROJECT_SOURCE_DIR}/include")
+set_target_properties(summing_array_solutions PROPERTIES CUDA_ARCHITECTURES "72")
+
+add_executable(filtering_array "${PROJECT_SOURCE_DIR}/src/filtering_array.cu")
+target_include_directories(filtering_array PUBLIC "${PROJECT_SOURCE_DIR}/include")
+set_target_properties(filtering_array PROPERTIES CUDA_ARCHITECTURES "72")
+
+add_executable(filtering_array_solutions "${PROJECT_SOURCE_DIR}/src/filtering_array_solutions.cu")
+target_include_directories(filtering_array_solutions PUBLIC "${PROJECT_SOURCE_DIR}/include")
+set_target_properties(filtering_array_solutions PROPERTIES CUDA_ARCHITECTURES "72")
