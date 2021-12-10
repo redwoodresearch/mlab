@@ -301,17 +301,6 @@ float sum_atomic(const float *gpu_inp, int size) {
   return out;
 }
 
-std::vector<float> random_floats(float min, float max, int size) {
-  std::vector<float> out(size);
-  std::uniform_real_distribution<float> dist(min, max);
-  // std::random_device rd;
-  // std::default_random_engine engine(rd());
-  std::default_random_engine engine;
-  std::generate(out.begin(), out.end(), [&] { return dist(engine); });
-
-  return out;
-}
-
 template <typename F>
 float reduce_vec(const std::vector<float> &vec, const F &f) {
   float *gpu_mem = copy_to_gpu(vec.data(), vec.size());
@@ -431,19 +420,9 @@ run_simple_sum_block_for_test(const std::vector<float> &to_reduce) {
   return {out_from_gpu, out_cpu};
 }
 
-template <typename T> void print_vec(const std::vector<T> &v) {
-  std::cout << "[";
-  for (float x : v) {
-    std::cout << x << ",";
-  }
-  std::cout << "]\n";
-}
-
 void print_vecs(const std::array<std::vector<float>, 2> &vecs) {
-  std::cout << "gpu = ";
-  print_vec(vecs[0]);
-  std::cout << "cpu = ";
-  print_vec(vecs[1]);
+  std::cout << "gpu = " << vecs[0] << "\n";
+  std::cout << "cpu = " << vecs[1] << "\n";
 }
 
 void check_simple_sum_block() {

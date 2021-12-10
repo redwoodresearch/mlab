@@ -7,7 +7,8 @@ project(
 # needed for cuda features
 cmake_minimum_required(VERSION 3.18)
 
-add_compile_options(-Wall -Wextra -Wmissing-field-initializers)
+add_compile_options(-Wall -Wextra -Wmissing-field-initializers 
+    --expt-relaxed-constexpr --extended-lambda)
 
 set(RELEASE_DEB_ARGS "${RELEASE_ARGS};-UNDEBUG")
 
@@ -28,5 +29,8 @@ set_target_properties(cuda_example PROPERTIES CUDA_ARCHITECTURES "72")
 
 add_executable(exercise_1 "${PROJECT_SOURCE_DIR}/src/exercise_1.cu")
 target_include_directories(exercise_1 PUBLIC "${PROJECT_SOURCE_DIR}/include")
-# https://cmake.org/cmake/help/git-stage/prop_tgt/CUDA_ARCHITECTURES.html
 set_target_properties(exercise_1 PROPERTIES CUDA_ARCHITECTURES "72")
+
+add_executable(exercise_2 "${PROJECT_SOURCE_DIR}/src/exercise_2.cu")
+target_include_directories(exercise_2 PUBLIC "${PROJECT_SOURCE_DIR}/include")
+set_target_properties(exercise_2 PROPERTIES CUDA_ARCHITECTURES "72")
