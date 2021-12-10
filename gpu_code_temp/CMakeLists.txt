@@ -34,3 +34,8 @@ add_executable(cuda_example "${PROJECT_SOURCE_DIR}/src/cuda_example.cu")
 target_include_directories(cuda_example PUBLIC "${PROJECT_SOURCE_DIR}/include")
 # https://cmake.org/cmake/help/git-stage/prop_tgt/CUDA_ARCHITECTURES.html
 set_target_properties(cuda_example PROPERTIES CUDA_ARCHITECTURES "72")
+
+add_executable(exercise_1 "${PROJECT_SOURCE_DIR}/src/exercise_1.cu")
+target_include_directories(exercise_1 PUBLIC "${PROJECT_SOURCE_DIR}/include")
+# https://cmake.org/cmake/help/git-stage/prop_tgt/CUDA_ARCHITECTURES.html
+set_target_properties(exercise_1 PROPERTIES CUDA_ARCHITECTURES "72")
