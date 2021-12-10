@@ -102,14 +102,13 @@ __global__ void simple_sum_block_kernel(const float *inp, float *dest,
   if (idx < size) {
     data[tidx] = inp[idx];
   }
-  syncthreads();
 
 #pragma unroll
   for (int chunk_size = block_size / 2; chunk_size > 0; chunk_size /= 2) {
+    syncthreads();
     if (tidx < chunk_size) {
       data[tidx] += data[tidx + chunk_size];
     }
-    syncthreads();
   }
 
   if (tidx == 0) {
