@@ -3,6 +3,35 @@ import torch.nn.functional as F
 from days.modules import AdaptiveAvgPool2d, BatchNorm2d, Linear, ReLU, Conv2d, MaxPool2d, Flatten
 
 
+class BasicResidualBlock(nn.Module):
+    def __init__(self, in_feats, out_feats):
+        super().__init__()
+        self.conv1 = Conv2d(in_feats, out_feats, 3, padding=1, bias=False)
+        self.batch_norm = BatchNorm2d(out_feats)
+        self.conv2 = Conv2d(out_feats, out_feats, 3, padding=1, bias=False)
+        self.batch_norm = BatchNorm2d(out_feats)
+
+    def forward(self, input):
+        conv1 = self.batch_norm(F.relu(self.conv1(input)))
+        conv2 = self.batch_norm(self.conv2(conv1))
+        return F.relu(conv2 + input)
+
+
+basic_res_net = nn.Sequential(
+    Conv2d(3, 16, 7, stride=2, padding=3),
+    BasicResidualBlock(16, 16),
+    BasicResidualBlock(16, 32),
+    MaxPool2d(2),
+    BasicResidualBlock(32, 32),
+    BasicResidualBlock(32, 64),
+    MaxPool2d(2),
+    BasicResidualBlock(64, 64),
+    BasicResidualBlock(64, 128),
+    nn.AvgPool2d(2),
+    Linear(128, 10),
+)
+
+
 class ResidualBlock(nn.Module):
     def __init__(self, in_feats, out_feats, stride=1):
         super().__init__()

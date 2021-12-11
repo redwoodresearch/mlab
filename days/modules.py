@@ -7,19 +7,27 @@ from torch.nn import Module, Parameter
 from utils import tpeek
 
 
+def log_softmax(tensor: t.Tensor, dim: int = 0):
+    exps = np.e ** tensor
+    exp_sums = exps.sum(dim=dim, keepdim=True)
+    result = tensor - t.log(exp_sums)
+    return result
+
+
 def softmax(tensor: t.Tensor, dim: int = 0):
     exps = np.e ** tensor
     exp_sums = exps.sum(dim=dim, keepdim=True)
-    result = exps / exp_sums
+    result = exps / (exp_sums)
     return result
 
 
 def relu(tensor: t.Tensor) -> t.Tensor:
+    tensor = tensor.clone()
     tensor[tensor < 0] = 0
     return tensor
 
 
-# gelu from openai github, not the same as torch's
+# gelu approximation used by gpt and bert
 def gelu(x):
     return 0.5 * x * (1 + t.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * t.pow(x, 3))))
 
@@ -37,6 +45,12 @@ class ReLU(Module):
         return relu(x)
 
 
+def layer_norm(x, weight, bias):
+    x = (x - x.mean(-1, keepdim=True).detach()) / t.sqrt(x.var(-1, keepdim=True).detach() + 1e-5)
+    x = x * weight + bias
+    return x
+
+
 class LayerNorm(Module):
     def __init__(self, shape, eps=1e-6):
         if isinstance(shape, int):
@@ -50,8 +64,8 @@ class LayerNorm(Module):
         self.idx_list = [-i - 1 for i, _ in enumerate(shape)]
 
     def forward(self, tensor):
-        tensor = (tensor - tensor.mean(*self.idx_list, keepdim=True)) / t.sqrt(
-            tensor.var(*self.idx_list, keepdim=True) + self.eps
+        tensor = (tensor - tensor.mean(*self.idx_list, keepdim=True).detach()) / t.sqrt(
+            tensor.var(*self.idx_list, keepdim=True).detach() + self.eps
         )
         tensor = tensor * self.weight + self.bias
         return tensor
@@ -65,7 +79,7 @@ class Dropout(Module):
     def forward(self, input):
         if self.training:
             mask = t.empty_like(input).uniform_(0, 1) > self.fraction
-            return mask * input
+            return mask * input / (1 - self.fraction)
         return input
 
 
@@ -122,6 +136,7 @@ def cross_entropy(input, target, ignore_index=None, max=1e12):
 def _ntuple(n):
     import collections
     from itertools import repeat
+
     def parse(x):
         if isinstance(x, collections.abc.Iterable):
             return tuple(x)
@@ -129,7 +144,9 @@ def _ntuple(n):
 
     return parse
 
+
 _pair = _ntuple(2)
+
 
 class Conv2d(Module):
     def __init__(
@@ -157,17 +174,17 @@ class Conv2d(Module):
         else:
             self.bias = t.zeros(out_channels)
 
-
     def forward(self, x):
         sH, sW = self.stride
         pH, pW = self.padding
         B, iC, iH, iW = x.shape
         oC, _, kH, kW = self.weight.shape
-        oH = (iH + 2*pH - kH) // sH + 1
-        oW = (iW + 2*pW - kW) // sW + 1
+        oH = (iH + 2 * pH - kH) // sH + 1
+        oW = (iW + 2 * pW - kW) // sW + 1
 
         from torch.nn.functional import pad
         padded_x = pad(x, [pW, pW, pH, pH])
+
 
         conv_size = (B, iC, oH, oW, kH, kW)
         bs, cs, hs, ws = padded_x.stride()
@@ -199,8 +216,8 @@ class MaxPool2d(Module):
         pH, pW = self.padding
         B, iC, iH, iW = x.shape
         kH, kW = self.kernel_size
-        oH = (iH + 2*pH - kH) // sH + 1
-        oW = (iW + 2*pW - kW) // sW + 1
+        oH = (iH + 2 * pH - kH) // sH + 1
+        oW = (iW + 2 * pW - kW) // sW + 1
 
         from torch.nn.functional import pad
         padded_x = pad(x, [pW, pW, pH, pH], value=-float('inf'))
@@ -235,9 +252,9 @@ class BatchNorm2d(Module):
         self.momentum = momentum
         self.weight = Parameter(t.ones(num_features))
         self.bias = Parameter(t.zeros(num_features))
-        self.register_buffer('running_mean', t.zeros(num_features))
-        self.register_buffer('running_var', t.ones(num_features))
-        self.register_buffer('num_batches_tracked', t.tensor(0))
+        self.register_buffer("running_mean", t.zeros(num_features))
+        self.register_buffer("running_var", t.ones(num_features))
+        self.register_buffer("num_batches_tracked", t.tensor(0))
 
     def forward(self, x):
         ids = (0, 2, 3)
@@ -252,7 +269,7 @@ class BatchNorm2d(Module):
             mean = self.running_mean
             var = self.running_var
 
-        rs = lambda u : u.reshape(1, -1, 1, 1)
+        rs = lambda u: u.reshape(1, -1, 1, 1)
         return rs(self.weight) * (x - rs(mean)) / t.sqrt(rs(var) + self.eps) + rs(self.bias)
 
 
@@ -263,9 +280,10 @@ class AdaptiveAvgPool2d(Module):
 
     def forward(self, x):
         def kernels(in_dim, out_dim):
-            return [slice(math.floor((i * in_dim) / out_dim),
-                          math.ceil(((i + 1) * in_dim) / out_dim))
-                    for i in range(out_dim)]
+            return [
+                slice(math.floor((i * in_dim) / out_dim), math.ceil(((i + 1) * in_dim) / out_dim))
+                for i in range(out_dim)
+            ]
 
         B, C, iH, iW = x.shape
         oH, oW = self.output_size
@@ -278,3 +296,11 @@ class AdaptiveAvgPool2d(Module):
             for j, ker_W in enumerate(kWs):
                 out[:, :, i, j] = t.mean(x[:, :, ker_H, ker_W], (-2, -1))
         return out
+
+
+# TODO finish this
+def sample_from_distribution(dist):
+    rands = t.rand(*dist.shape[:-1], 1)
+    cumsum = t.cumsum(dist, dim=-1)
+    mask = cumsum <= rands
+    anti_mask = cumsum > rands
