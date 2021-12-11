@@ -46,3 +46,7 @@ set_target_properties(filtering_array_solutions PROPERTIES CUDA_ARCHITECTURES "7
 add_executable(reduce_by_key "${PROJECT_SOURCE_DIR}/src/reduce_by_key.cu")
 target_include_directories(reduce_by_key PUBLIC "${PROJECT_SOURCE_DIR}/include")
 set_target_properties(reduce_by_key PROPERTIES CUDA_ARCHITECTURES "72")
+
+add_executable(reduce_by_key_solutions "${PROJECT_SOURCE_DIR}/src/reduce_by_key_solutions.cu")
+target_include_directories(reduce_by_key_solutions PUBLIC "${PROJECT_SOURCE_DIR}/include")
+set_target_properties(reduce_by_key_solutions PROPERTIES CUDA_ARCHITECTURES "72")

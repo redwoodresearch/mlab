@@ -77,8 +77,8 @@ void check_filterer(const F &f, const Pred &pred) {
                           f)
             << "\n";
 
-  {
-    auto host_mem_more_than_block = random_floats(-8.0f, 8.0f, 513);
+  for (int size : {513, 100000}) {
+    auto host_mem_more_than_block = random_floats(-8.0f, 8.0f, size);
     std::vector<float> cpu_vec;
     cpu_vec.reserve(host_mem_more_than_block.size());
     std::copy_if(host_mem_more_than_block.begin(),
@@ -86,19 +86,7 @@ void check_filterer(const F &f, const Pred &pred) {
                  pred);
     auto gpu_vec = filter_vec(host_mem_more_than_block, f);
 
-    std::cout << "is equal (more than block): " << std::boolalpha
-              << vecs_same_elems(cpu_vec, gpu_vec) << std::endl;
-  }
-
-  {
-    auto host_mem_large = random_floats(-8.0f, 8.0f, 100000);
-    std::vector<float> cpu_vec;
-    cpu_vec.reserve(host_mem_large.size());
-    std::copy_if(host_mem_large.begin(), host_mem_large.end(),
-                 std::back_inserter(cpu_vec), pred);
-    auto gpu_vec = filter_vec(host_mem_large, f);
-
-    std::cout << "is equal (large): " << std::boolalpha
+    std::cout << "is equal (size: " << size << "): " << std::boolalpha
               << vecs_same_elems(cpu_vec, gpu_vec) << std::endl;
   }
 }
