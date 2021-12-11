@@ -30,12 +30,12 @@ public:
   using TimePoint = Clock::time_point;
 
   Timer() { start(); }
-  Timer(std::optional<TimePoint> start) : start_(start) {}
+  Timer(TimePoint start) : start_(start), started_(true) {}
 
   double elapsed() {
-    if (start_.has_value()) {
+    if (started_) {
       return total_ + std::chrono::duration_cast<std::chrono::duration<double>>(
-                          now() - *start_)
+                          now() - start_)
                           .count();
     } else {
       return total_;
@@ -44,10 +44,13 @@ public:
 
   void stop() {
     total_ = elapsed();
-    start_ = std::nullopt;
+    started_ = false;
   }
 
-  void start() { start_ = now(); }
+  void start() {
+    start_ = now();
+    started_ = true;
+  }
 
   void report(const std::string &name) {
     std::cout << name << ": " << elapsed() << std::endl;
@@ -56,6 +59,7 @@ public:
 private:
   static TimePoint now() { return Clock::now(); }
 
-  std::optional<TimePoint> start_ = std::nullopt;
+  TimePoint start_;
+  bool started_ = false;
   double total_ = 0.;
 };

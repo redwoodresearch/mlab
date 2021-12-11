@@ -16,10 +16,10 @@ set(RELEASE_DEB_ARGS "${RELEASE_ARGS};-UNDEBUG")
 add_compile_options("$<$<CONFIG:RELWITHDEBINFO>:${RELEASE_DEB_ARGS}>")
 add_compile_options("$<$<CONFIG:DEBUG>:-ftrapv;-fno-omit-frame-pointer;-G>")
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 add_executable(cuda_example "${PROJECT_SOURCE_DIR}/src/cuda_example.cu")
