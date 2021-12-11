@@ -23,8 +23,7 @@ __global__ void filter_atomic_kernel(const T *inp, T *dest, int *atomic_v,
 template <typename T, typename Pred>
 int filter_atomic_preallocated(const T *inp, T *dest, int *atomic_v, int size,
                                const Pred &pred) {
-  int zero = 0;
-  cudaMemcpy(atomic_v, &zero, sizeof(int), cudaMemcpyHostToDevice);
+  CUDA_ERROR_CHK(cudaMemset(atomic_v, 0, sizeof(int)));
   int block_size = 512;
   filter_atomic_kernel<<<ceil_divide(size, block_size), block_size>>>(
       inp, dest, atomic_v, size, pred);
