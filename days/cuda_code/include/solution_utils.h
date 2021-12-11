@@ -40,9 +40,9 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
 inline std::vector<float> random_floats(float min, float max, int size) {
   std::vector<float> out(size);
   std::uniform_real_distribution<float> dist(min, max);
-  // std::random_device rd;
-  // std::default_random_engine engine(rd());
-  std::default_random_engine engine;
+  std::random_device rd;
+  std::default_random_engine engine(rd());
+  // std::default_random_engine engine;
   std::generate(out.begin(), out.end(), [&] { return dist(engine); });
 
   return out;
