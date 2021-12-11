@@ -165,14 +165,11 @@ class Conv2d(Module):
         self.padding = _pair(padding)
 
         super().__init__()
-        # uniform(-1/sqrt(k), 1/sqrt(k)), where k = weight.size(1) * prod(*kernel_size)
         weight_size = (out_channels, in_channels // groups, *kernel_size)
-        bound = 1 / math.sqrt(weight_size[1] * math.prod(kernel_size))
+        bound = 1 / math.sqrt(weight_size[1] * kernel_size[0] * kernel_size[1])
         self.weight = Parameter(t.FloatTensor(*weight_size).uniform_(-bound, bound))
 
         if bias:
-            fan_in = math.prod(self.weight.shape[1:])
-            bound = 1 / math.sqrt(fan_in)
             self.bias = Parameter(t.FloatTensor(out_channels).uniform_(-bound, bound))
         else:
             self.bias = t.zeros(out_channels)
@@ -186,16 +183,15 @@ class Conv2d(Module):
         oW = (iW + 2 * pW - kW) // sW + 1
 
         from torch.nn.functional import pad
+        padded_x = pad(x, [pW, pW, pH, pH])
 
-        padded_x = pad(x, [pH, pH, pW, pW])
 
-        sx_stride = t.tensor(padded_x.stride())
-        sx_stride[-2] *= sH
-        sx_stride[-1] *= sW
-        sx_stride = tuple(sx_stride)
+        conv_size = (B, iC, oH, oW, kH, kW)
+        bs, cs, hs, ws = padded_x.stride()
+        conv_stride = (bs, cs, hs*sH, ws*sW, hs, ws)
+        strided_x = t.as_strided(padded_x, size=conv_size, stride=conv_stride)
 
-        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2 * pW, 1))
-        return t.einsum("bcxyij,ocij->boxy", strided_x, self.weight) + self.bias.reshape(1, -1, 1, 1)
+        return t.einsum('bcxyij,ocij->boxy', strided_x, self.weight) + self.bias.reshape(1, -1, 1, 1)
 
 
 class MaxPool2d(Module):
@@ -224,15 +220,13 @@ class MaxPool2d(Module):
         oW = (iW + 2 * pW - kW) // sW + 1
 
         from torch.nn.functional import pad
+        padded_x = pad(x, [pW, pW, pH, pH], value=-float('inf'))
 
-        padded_x = pad(x, [pH, pH, pW, pW])
+        conv_size = (B, iC, oH, oW, kH, kW)
+        bs, cs, hs, ws = padded_x.stride()
+        conv_stride = (bs, cs, hs*sH, ws*sW, hs, ws)
+        strided_x = t.as_strided(padded_x, size=conv_size, stride=conv_stride)
 
-        sx_stride = t.tensor(padded_x.stride())
-        sx_stride[-2] *= sH
-        sx_stride[-1] *= sW
-        sx_stride = tuple(sx_stride)
-
-        strided_x = t.as_strided(padded_x, size=(B, iC, oH, oW, kH, kW), stride=sx_stride + (iW + 2 * pW, 1))
         return strided_x.amax((-2, -1))
 
 

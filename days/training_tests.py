@@ -143,8 +143,7 @@ class _SGD:
         self.wd = weight_decay
         self.mu = momentum
         self.tau = dampening
-        self.b = [None for p in self.params]
-        # self.g = [torch.zeros_like(p) for p in self.params]
+        self.b = [torch.zeros_like(p) for p in self.params]
 
     def zero_grad(self):
         for p in self.params:
@@ -160,14 +159,8 @@ class _SGD:
                         self.b[i] = self.mu * self.b[i] + (1.0 - self.tau) * g
                     else:
                         self.b[i] = g
-                    # if self.nesterov:
-                    #     g = self.g[i] + self.mu * self.b[i]  # according to Pytorch docs
-                    #     g = g + self.mu * self.b[i]          # according to PyTorch code
-                    #     # I think both are wrong. Nesterov requires an extra grad calculation
-                    #     self.g[i] = g
-                    # else:
-                    #     g = self.b[i]
-                p -= self.lr * self.b[i]
+                    g = self.b[i]
+                p -= self.lr * g
 
 
 def test_sgd(SGD):
@@ -198,14 +191,13 @@ def test_sgd(SGD):
 class _RMSprop:
     def __init__(
         self, params, lr: float, alpha: float, eps: float, weight_decay: float,
-            momentum: float, centered: bool):
+            momentum: float):
         self.params = list(params)
         self.lr = lr
         self.alpha = alpha
         self.eps = eps
         self.wd = weight_decay
         self.mu = momentum
-        self.centered = centered
 
         self.v = [torch.zeros_like(p) for p in self.params]
         self.b = [torch.zeros_like(p) for p in self.params]
@@ -220,24 +212,20 @@ class _RMSprop:
             for i, p in enumerate(self.params):
                 assert p.grad is not None
                 g = p.grad + self.wd * p
-                v_tilde = self.v[i] = self.alpha * self.v[i] + (1.0 - self.alpha) * g ** 2
-                if self.centered:
-                    self.g_ave[i] = self.g_ave[i] * self.alpha + (1.0 - self.alpha) * g
-                    v_tilde = v_tilde - self.g_ave[i] ** 2
+                self.v[i] = self.alpha * self.v[i] + (1.0 - self.alpha) * g ** 2
                 if self.mu:
-                    self.b[i] = self.mu * self.b[i] + g / (v_tilde.sqrt() + self.eps)
+                    self.b[i] = self.mu * self.b[i] + g / (self.v[i].sqrt() + self.eps)
                     p -= self.lr * self.b[i]
                 else:
-                    p -= self.lr * g / (v_tilde.sqrt() + self.eps)
+                    p -= self.lr * g / (self.v[i].sqrt() + self.eps)
 
 
 def test_rmsprop(RMSprop):
     test_cases = [
-        dict(lr=0.1, alpha=0.9, eps=0.001, weight_decay=0.0, momentum=0.0, centered=False),
-        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.0, centered=False),
-        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.5, centered=False),
-        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.5, centered=True),
-        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.0, centered=True),
+        dict(lr=0.1, alpha=0.9, eps=0.001, weight_decay=0.0, momentum=0.0),
+        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.0),
+        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.5),
+        dict(lr=0.1, alpha=0.95, eps=0.0001, weight_decay=0.05, momentum=0.0),
     ]
     for opt_config in test_cases:
         torch.manual_seed(819)
@@ -257,17 +245,15 @@ def test_rmsprop(RMSprop):
 
 
 class _Adam:
-    def __init__(self, params, lr: float, betas: Tuple[float, float], eps: float, weight_decay: float, amsgrad: bool):
+    def __init__(self, params, lr: float, betas: Tuple[float, float], eps: float, weight_decay: float):
         self.params = list(params)
         self.lr = lr
         self.beta1, self.beta2 = betas
         self.eps = eps
         self.wd = weight_decay
-        self.amsgrad = amsgrad
 
         self.m = [torch.zeros_like(p) for p in self.params]
         self.v = [torch.zeros_like(p) for p in self.params]
-        self.vmax = [torch.zeros_like(p) for p in self.params]
         self.t = 0
 
     def zero_grad(self):
@@ -284,20 +270,14 @@ class _Adam:
                 self.v[i] = self.beta2 * self.v[i] + (1.0 - self.beta2) * g ** 2
                 mhat = self.m[i] / (1.0 - self.beta1 ** self.t)
                 vhat = self.v[i] / (1.0 - self.beta2 ** self.t)
-
-                if self.amsgrad:
-                    torch.maximum(self.vmax[i], self.v[i], out=self.vmax[i])
-                    vhat = self.vmax[i] / (1 - self.beta2 ** self.t)
-                    p -= self.lr * mhat / (vhat.sqrt() + self.eps)
-                else:
-                    p -= self.lr * mhat / (vhat.sqrt() + self.eps)
+                p -= self.lr * mhat / (vhat.sqrt() + self.eps)
 
 
 def test_adam(Adam):
     test_cases = [
-        dict(lr=0.1, betas=(0.8, 0.95), eps=0.001, weight_decay=0.0, amsgrad=False),
-        dict(lr=0.1, betas=(0.8, 0.9), eps=0.001, weight_decay=0.05, amsgrad=False),
-        dict(lr=0.2, betas=(0.9, 0.95), eps=0.01, weight_decay=0.08, amsgrad=True),
+        dict(lr=0.1, betas=(0.8, 0.95), eps=0.001, weight_decay=0.0),
+        dict(lr=0.1, betas=(0.8, 0.9), eps=0.001, weight_decay=0.05),
+        dict(lr=0.2, betas=(0.9, 0.95), eps=0.01, weight_decay=0.08),
     ]
     for opt_config in test_cases:
         torch.manual_seed(819)
