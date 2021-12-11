@@ -9,6 +9,7 @@ import torch as t
 from unidecode import unidecode
 from collections import defaultdict
 import itertools
+import re
 
 
 def normalizer(str):
@@ -16,7 +17,18 @@ def normalizer(str):
 
 
 class Tokenizer:
-    def __init__(self, token_list, pad=0, sep=1, cls=None, bot=2, eot=2, unk=3, mask=4, normalizer=normalizer):
+    def __init__(
+        self,
+        token_list,
+        pad=0,
+        sep=1,
+        cls=None,
+        bot=2,
+        eot=2,
+        unk=3,
+        mask=4,
+        normalizer=normalizer,
+    ):
         self.replacements = {"▁": " "}
         for obj in token_list:
             obj["piece"] = self._replace_all(obj["piece"])
@@ -36,7 +48,9 @@ class Tokenizer:
         self.normalizer = normalizer
 
     def _replace_all(self, text):
-        return functools.reduce(lambda a, x: a.replace(x[0], x[1]), self.replacements.items(), text)
+        return functools.reduce(
+            lambda a, x: a.replace(x[0], x[1]), self.replacements.items(), text
+        )
 
     def _pad_and_shit(self, ids, ends=False, pad_length=None):
         if ends:
@@ -52,6 +66,13 @@ class Tokenizer:
         for text in texts:
             results.append(self._pad_and_shit(self._tokenize(text), **kwargs))
         return results
+
+    def from_corpus(texts):
+        pass
+
+    def _tokenize(self, text):
+        splitted = re.split(r"\b", text)[1:-1]
+        print(splitted)
 
     def __call__(self, texts, **kwargs):
         return self.tokenize(texts, **kwargs)
@@ -166,12 +187,14 @@ class BPETokenizer(Tokenizer):
 
 # "protoc -I=. --python_out=./proto ./spiece.proto"
 if __name__ == "__main__":
-
+    # Syntax-1
+    tokenizer = Tokenizer([])
+    tokenizer("hello, my name is tom")
+    raise AssertionError("hi")
     print("loading shakespeare")
     corpus = open("shakespeare.txt").readlines()
     minicorpus = corpus[5000:6000]
     bpe_shakespeare = BPETokenizer.from_corpus(minicorpus, num_tokens=500)
-    raise AssertionError("hi")
     model_file = "/home/tao/mlab/days/spiece.model"
     s = spm.SentencePieceProcessor(model_file=model_file)
     model_file_bytes = open(model_file, "rb").read()

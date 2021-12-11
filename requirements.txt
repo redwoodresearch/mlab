@@ -6,3 +6,4 @@ torchtext
 numpy
 transformers
 sentencepiece
+unidecode
