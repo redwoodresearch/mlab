@@ -1,3 +1,4 @@
+build/
 crash-*
 **/__pycache__/
 mlab.egg-info/
