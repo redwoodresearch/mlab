@@ -10,10 +10,8 @@ cmake_minimum_required(VERSION 3.18)
 add_compile_options(-Wall -Wextra -Wmissing-field-initializers
     --expt-relaxed-constexpr --extended-lambda)
 
-set(RELEASE_DEB_ARGS "${RELEASE_ARGS};-UNDEBUG")
-
 # must be quoted for some reason I don't understand?
-add_compile_options("$<$<CONFIG:RELWITHDEBINFO>:${RELEASE_DEB_ARGS}>")
+add_compile_options("$<$<CONFIG:RELWITHDEBINFO>:-UNDEBUG>")
 add_compile_options("$<$<CONFIG:DEBUG>:-ftrapv;-fno-omit-frame-pointer;-G>")
 
 set(CMAKE_CXX_STANDARD 17)
