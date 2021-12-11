@@ -80,6 +80,12 @@ def resnet34_with_pretrained_weights():
     simple_resnet34.load_state_dict(new_state_dict)
     import torch
 
-    x = torch.randn((5, 3, 224, 224))
-    assert torch.allclose(simple_resnet34(x), torch_resnet34(x), atol=1e-4, rtol=1e-4)
+    x = torch.randn((5, 3, 64, 64))
+    assert torch.allclose(simple_resnet34(x), torch_resnet34(x), atol=1e-3, rtol=1e-3)
+    simple_resnet34.eval()
+    torch_resnet34.eval()
+    assert torch.allclose(simple_resnet34(x), torch_resnet34(x), atol=1e-3, rtol=1e-3)
     return simple_resnet34
+
+if __name__ == '__main__':
+    resnet34 = resnet34_with_pretrained_weights()
