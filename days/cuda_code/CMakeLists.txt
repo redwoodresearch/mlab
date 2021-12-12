@@ -1,3 +1,4 @@
+set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
 cmake_policy(SET CMP0048 NEW)
 project(
   cuda_exercises
