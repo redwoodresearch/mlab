@@ -124,6 +124,41 @@ def test_evaluate(evaluate):
     _check_equal(torch.Tensor([_loss]), torch.Tensor([loss]))
 
 
+def _rosenbrock(x, y, a=1, b=100):
+    return (a-x)**2 + b*(y-x**2)**2 + 1
+    
+
+def _opt_rosenbrock(xy, lr, momentum, n_iter):
+    w_history = torch.zeros([n_iter+1, 2])
+    w_history[0] = xy.detach()
+    opt = torch.optim.SGD([xy], lr=lr, momentum=momentum)
+
+    for i in range(n_iter):
+        opt.zero_grad()
+        _rosenbrock(xy[0], xy[1]).backward()
+        opt.step()
+        w_history[i+1] = xy.detach()
+    return w_history
+
+
+def test_rosenbrock(opt_rosenbrock):
+    test_cases = [
+        dict(lr=0.001, momentum=0.0, n_iter=10),
+        dict(lr=0.001, momentum=0.8, n_iter=20),
+    ]
+    for opt_config in test_cases:
+        w = torch.Tensor([-1.5, 2.5])
+        w.requires_grad = True
+        w_history = opt_rosenbrock(w, **opt_config)
+
+        w = torch.Tensor([-1.5, 2.5])
+        w.requires_grad = True
+        _w_history = _opt_rosenbrock(w, **opt_config)
+
+        print("\nTesting configuration: ", opt_config)
+        _check_equal(w_history, _w_history)
+
+    
 ############################################################################
 
 
