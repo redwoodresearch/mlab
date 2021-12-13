@@ -54,8 +54,8 @@ def test_mlp(MLP):
     _check_equal(mlp(x), _mlp(x))
 
 
-def _train(model: nn.Module, dataloader: DataLoader, lr: float):
-    opt = torch.optim.SGD(model.parameters(), lr)
+def _train(model: nn.Module, dataloader: DataLoader, lr, momentum):
+    opt = torch.optim.SGD(model.parameters(), lr, momentum)
     for X, y in dataloader:
         opt.zero_grad()
         pred = model(X)
@@ -68,17 +68,18 @@ def _train(model: nn.Module, dataloader: DataLoader, lr: float):
 def test_train(train):
     torch.manual_seed(928)
     lr = 0.1
+    momentum = 0.5
     X = torch.rand(512, 2)
     Y = torch.rand(512, 3)
     dl = DataLoader(TensorDataset(X, Y), batch_size=128)
 
     torch.manual_seed(600)
     model = _MLP(2, 32, 3)
-    _trained_model = _train(model, dl, lr)
+    _trained_model = _train(model, dl, lr=lr, momentum=momentum)
 
     torch.manual_seed(600)
     model = _MLP(2, 32, 3)
-    trained_model = train(model, dl, lr)
+    trained_model = train(model, dl, lr=lr, momentum=momentum)
 
     x = torch.randn(128, 2)
     _check_equal(trained_model(x), _trained_model(x))
