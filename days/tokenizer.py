@@ -1,3 +1,4 @@
+from typing import Counter
 import transformers
 import numpy as np
 import sentencepiece as spm
@@ -10,6 +11,9 @@ from unidecode import unidecode
 from collections import defaultdict
 import itertools
 import re
+
+corpus = open("shakespeare.txt").readlines()
+minicorpus = corpus[5000:6000]
 
 
 def normalizer(str):
@@ -67,12 +71,26 @@ class Tokenizer:
             results.append(self._pad_and_shit(self._tokenize(text), **kwargs))
         return results
 
-    def from_corpus(texts):
-        pass
+    def from_corpus(texts, n=30000):
+        splitted = itertools.chain(
+            *[
+                [x.strip() for x in re.split(r"\b", text) if x.strip() != ""]
+                for text in texts
+            ]
+        )
+        counts = Counter(splitted)
+        tokens = [
+            {"piece": x, "id": i}
+            for i, (x, _) in zip(range(5, 10000000), counts.most_common(n))
+        ]
+        print(tokens)
+        return Tokenizer(tokens)
 
     def _tokenize(self, text):
-        splitted = re.split(r"\b", text)[1:-1]
+        splitted = [x.strip() for x in re.split(r"\b", text) if x.strip() != ""]
         print(splitted)
+        ids = [self.vocab.get(x, {"id": self.unk})["id"] for x in splitted]
+        return ids
 
     def __call__(self, texts, **kwargs):
         return self.tokenize(texts, **kwargs)
@@ -155,6 +173,7 @@ class BPETokenizer(Tokenizer):
 
     def from_corpus(texts, num_tokens=1000):
         seqs = [list(x) for x in texts]
+
         tokens = list(set(itertools.chain(*seqs)))
         merge_pair = 12345678990
         merge_string = None
@@ -176,24 +195,87 @@ class BPETokenizer(Tokenizer):
             merge_pair = max(pair_counts.items(), key=lambda x: x[1])[0]
             merge_string = merge_pair[0] + merge_pair[1]
             tokens.append(merge_string)
-            if merge_pair[0] in tokens and len(merge_pair[0]) > 1:
-                tokens.remove(merge_pair[0])
-            if merge_pair[1] in tokens and len(merge_pair[1]) > 1:
-                tokens.remove(merge_pair[1])
         print("tokens", tokens)
-        tokenizer = BPETokenizer([{"id": i, "piece": p} for i, p in enumerate(tokens)])
+        tokenizer = BPETokenizer(
+            [{"id": i, "piece": p} for i, p in zip(range(5, 1000000), tokens)]
+        )
         return tokenizer
 
 
-# "protoc -I=. --python_out=./proto ./spiece.proto"
+def test_tokenizer_from_corpus(tokenizer):
+    reference = Tokenizer.from_corpus(minicorpus)
+    yours = tokenizer.from_corpus(minicorpus)
+    assert tuple(reference.vocab.items()) == tuple(yours.vocab.items())
+
+
+def test_tokenizer(tokenizer):
+    reference = Tokenizer.from_corpus(minicorpus)
+    yours = tokenizer(reference.token_list)
+    assert tuple(reference.tokenize("hello, my name is tom trundlewich")) == tuple(
+        yours.tokenize("hello, my name is tom trundlewich")
+    )
+
+
+def test_tokenizer_convenience(tokenizer):
+    reference = Tokenizer.from_corpus(minicorpus)
+    yours = tokenizer(reference.token_list)
+    assert tuple(
+        reference(
+            [
+                "hello, my name is tom trundlewich",
+                "farewell, my dearest tom trundlewich",
+            ]
+        )
+    ) == tuple(
+        yours(
+            [
+                "hello, my name is tom trundlewich",
+                "farewell, my dearest tom trundlewich",
+            ]
+        )
+    )
+    assert tuple(
+        reference(
+            [
+                "hello, my name is tom trundlewich",
+                "farewell, my dearest tom trundlewich",
+            ],
+            pad_longest=True,
+        )
+    ) == tuple(
+        yours(
+            [
+                "hello, my name is tom trundlewich",
+                "farewell, my dearest tom trundlewich",
+            ],
+            pad_longest=True,
+        )
+    )
+    assert tuple(reference("farewell, my dearest tom trundlewich")) == tuple(
+        yours("farewell, my dearest tom trundlewich")
+    )
+
+
+def test_bpe_tokenizer_from_corpus(tokenizer):
+    reference = BPETokenizer.from_corpus(minicorpus)
+    yours = tokenizer.from_corpus(minicorpus)
+    assert tuple(reference.vocab.items()) == tuple(yours.vocab.items())
+
+
+def test_bpe_tokenizer(tokenizer):
+    reference = BPETokenizer.from_corpus(minicorpus)
+    yours = tokenizer(reference.token_list)
+    assert tuple(reference.tokenize("hello, my name is tom trundlewich")) == tuple(
+        yours.tokenize("hello, my name is tom trundlewich")
+    )
+
+
 if __name__ == "__main__":
     # Syntax-1
-    tokenizer = Tokenizer([])
-    tokenizer("hello, my name is tom")
-    raise AssertionError("hi")
     print("loading shakespeare")
-    corpus = open("shakespeare.txt").readlines()
-    minicorpus = corpus[5000:6000]
+    tokenizer = Tokenizer.from_corpus(minicorpus)
+    print(tokenizer("i eat bread for breakfast every day of the week."))
+    raise AssertionError("hi")
     bpe_shakespeare = BPETokenizer.from_corpus(minicorpus, num_tokens=500)
     model_file = "/home/tao/mlab/days/spiece.model"
     s = spm.SentencePieceProcessor(model_file=model_file)
