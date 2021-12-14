@@ -208,6 +208,12 @@ def test_tokenizer_from_corpus(tokenizer):
     assert tuple(reference.vocab.items()) == tuple(yours.vocab.items())
 
 
+def test_tokenizer_from_corpus_fn(fn):
+    reference = Tokenizer.from_corpus(minicorpus).vocab.keys()
+    yours = fn(minicorpus)
+    assert set(reference) == set(yours)
+
+
 def test_tokenizer(tokenizer):
     reference = Tokenizer.from_corpus(minicorpus)
     yours = tokenizer(reference.token_list)
