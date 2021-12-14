@@ -109,8 +109,6 @@ def train_dqn(experiment_name, env_id, gamma, episodes, start_eps, end_eps,
                                            gamma=(end_lr /
                                                   start_lr)**(1 / episodes))
 
-    durations = []
-
     for eps_idx in tqdm(range(episodes), disable=False):
         eps = (end_eps - start_eps) * eps_idx / episodes + start_eps
         starting_q, states, rewards, choices = run_episode(
@@ -154,8 +152,6 @@ def train_dqn(experiment_name, env_id, gamma, episodes, start_eps, end_eps,
         experiment.log_metric("mean loss", unreduced_loss.mean())
         experiment.log_metric("starting Q", starting_q)
         experiment.log_metric("discounted start reward", discounted_start_reward)
-
-        durations.append(episode_len)
 
     run_episode(env, net, eps=0, device=device, render=True)
 
