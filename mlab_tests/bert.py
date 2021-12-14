@@ -197,6 +197,7 @@ def test_bert_embedding_fn(your_fn):
             token_type_embedding=reference.token_type_embedding,
             position_embedding=reference.position_embedding,
             layer_norm=reference.layer_norm,
+            dropout=reference.dropout,
         ),
         reference(input_ids=input_ids, token_type_ids=tt_ids),
         "bert embedding",
