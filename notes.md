@@ -27,6 +27,7 @@ Also try decaying eps value and decaying learning rate?
 Actually get people to spend a while messing with params on cartpole. I think this
 is pretty worthwhile.
 
-Then after
+Then afterword, mess with params on beamrider on fast runs and then just let it
+run for a while (beamrider is very easy to see some progress in).
 
 

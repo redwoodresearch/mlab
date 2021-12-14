@@ -1,0 +1,9 @@
+train_dqn.experiment_name = "pong_increased_lr"
+train_dqn.env_id = "Pong-v0"
+train_dqn.gamma = 0.95
+train_dqn.episodes = 10000
+train_dqn.start_eps = 0.2
+train_dqn.end_eps = 0.01
+train_dqn.start_lr = 3e-2
+train_dqn.end_lr = 5e-3
+train_dqn.train_frac_per_episode = 0.05
