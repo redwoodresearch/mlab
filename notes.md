@@ -7,12 +7,10 @@ Need: explanation of greedy selection for Q function to achieve policy which con
 
 Now guide to gym
 
-Then I think dirt simple DQN first trains on every state? (This seems right).
+Then I think dirt simple DQN first trains on every state? (This seems right). (Nope actually go straight
+to normal buffer implementation)
 
-One big batch, don't worry at all about efficiency.
-Don't worry about performance even for vectorization of operations!
-(I'm a bit worried about how this plays with rapid feedback, maybe just don't train to
-covergences?)
+Don't worry about performance, don't even worry too much about vectorization of operations!
 
 Make sure people see tradeoff between different eps values/do tuning on them.
 Subset selection considerations (actually sample without replacement!).
@@ -20,9 +18,9 @@ Make sure rendering occurs to see progress (just last episode).
 
 Get people to try running multiple time (with final param values? initial param values?)
 
-Make sure people understand how eps can cause failure on cartpole.
+Make sure people understand how eps can cause failure on cartpole so you need decay.
 
-Also try decaying eps value and decaying learning rate?
+Fixed LR.
 
 Actually get people to spend a while messing with params on cartpole. I think this
 is pretty worthwhile.

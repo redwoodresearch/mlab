@@ -91,5 +91,13 @@ class ScaledFloatFrame(gym.ObservationWrapper):
         return np.array(observation).astype(np.float32) / self.scale
 
 
+class ClipRewardEnv(gym.RewardWrapper):
+    def __init__(self, env):
+        gym.RewardWrapper.__init__(self, env)
+
+    def reward(self, reward):
+        """Bin reward to {+1, 0, -1} by its sign."""
+        return np.sign(reward)
+
 def wrap_atari_env(env):
-    return FrameStack(ScaledFloatFrame(WarpFrame(env)), 4)
+    return ClipRewardEnv(FrameStack(ScaledFloatFrame(WarpFrame(env)), 4))

@@ -1,11 +1,16 @@
-train_dqn.experiment_name = "cart_pole"
+train_dqn.experiment_name = "double_dqn_cart_pole"
 train_dqn.env_id = "CartPole-v0"
 train_dqn.gamma = 0.98
-train_dqn.episodes = 10000
-train_dqn.start_eps = 0.1
-train_dqn.end_eps = 0.001
-train_dqn.start_lr = 3e-3
-train_dqn.end_lr = 5e-4
-train_dqn.train_frac_per_episode = 0.25
+train_dqn.steps = 100000
+train_dqn.start_eps = 0.2
+train_dqn.end_eps = 0.02
+train_dqn.start_lr = 1e-3
+train_dqn.end_lr = 5e-5
+train_dqn.train_freq = 16
+train_dqn.batch_size = 128
+train_dqn.buffer_size = 10000
+train_dqn.eval_freq = 10000
+train_dqn.use_double_dqn = True
+train_dqn.multi_step_n = 1
 
 mlp_model.hidden_size = 64
