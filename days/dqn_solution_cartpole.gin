@@ -10,7 +10,7 @@ train_dqn.train_freq = 16
 train_dqn.batch_size = 128
 train_dqn.buffer_size = 10000
 train_dqn.eval_freq = 10000
-train_dqn.use_double_dqn = True
-train_dqn.multi_step_n = 1
+train_dqn.use_double_dqn = False
+# train_dqn.multi_step_n = 1
 
 mlp_model.hidden_size = 64

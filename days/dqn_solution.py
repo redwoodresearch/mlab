@@ -114,6 +114,7 @@ def train_dqn(experiment_name,
               buffer_size,
               eval_freq,
               use_double_dqn,
+              multi_step_n,
               eval_count=1):
     # # Create an experiment with your api key
     experiment = Experiment(
@@ -207,7 +208,7 @@ def train_dqn(experiment_name,
             total_reward = 0
 
         if (step + 1) % train_freq == 0:
-            idxs = torch.randperm(len(buffer) - 1)[:batch_size]
+            idxs = torch.randperm(len(buffer) - multi_step_n)[:batch_size]
 
             obs_batch = []
             rewards = []
@@ -216,12 +217,20 @@ def train_dqn(experiment_name,
             next_obs = []
 
             for idx in idxs:
-                obs_b, choice_b, reward_b, done_b = buffer[idx]
+                obs_b, choice_b, _, _ = buffer[idx]
                 obs_batch.append(obs_b)
                 choices.append(choice_b)
-                rewards.append(reward_b)
-                dones.append(done_b)
-                next_obs.append(buffer[idx + 1][0])
+                total_reward_update = 0
+                done_any = False
+                for i in range(multi_step_n):
+                    _, _, reward_b, done_b = buffer[idx + i]
+                    total_reward_update += gamma**i * reward_b
+                    if done_b:
+                        done_any = True
+                        break
+                rewards.append(total_reward_update)
+                dones.append(done_any)
+                next_obs.append(buffer[idx + multi_step_n][0])
 
             obs_batch = torch.tensor(np.array(obs_batch), device=device)
             choices = torch.tensor(np.array(choices), device=device)
