@@ -231,8 +231,10 @@ def train_dqn(experiment_name,
             dones = torch.tensor(np.array(dones), device=device)
             next_obs = torch.tensor(np.array(next_obs), device=device)
 
-            targets = rewards + dones.logical_not() * (
-                gamma * split_nets(next_obs, flip=True).max(dim=-1).values)
+            with torch.no_grad():
+                targets = rewards + dones.logical_not() * (
+                    gamma**multi_step_n *
+                    split_nets(next_obs, flip=True).max(dim=-1).values)
 
             loss = loss_fn(
                 targets,
