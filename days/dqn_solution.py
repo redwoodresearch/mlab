@@ -222,7 +222,6 @@ def train_dqn(experiment_name,
                 rewards.append(reward_b)
                 dones.append(done_b)
                 next_obs.append(buffer[idx + 1][0])
-                next_obs.append(buffer[idx + multi_step_n][0])
 
             obs_batch = torch.tensor(np.array(obs_batch), device=device)
             choices = torch.tensor(np.array(choices), device=device)
@@ -257,7 +256,7 @@ def train_dqn(experiment_name,
                              device=device,
                              experiment=experiment,
                              step=step,
-                             render=True)
+                             render=False)
 
     run_eval_episode(eval_count,
                      eval_env,
