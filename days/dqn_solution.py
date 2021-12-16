@@ -178,9 +178,9 @@ def train_dqn(experiment_name,
     )
     experiment.set_name(experiment_name)
 
-    torch.cuda.init()
-    device = torch.device('cuda:0')
-    # device = torch.device('cpu')
+    # torch.cuda.init()
+    # device = torch.device('cuda:0')
+    device = torch.device('cpu')
 
     env = gym.make(env_id)
     eval_env = gym.make(env_id)
