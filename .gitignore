@@ -4,3 +4,4 @@ crash-*
 mlab.egg-info/
 scratch/
 .ipynb_checkpoints/
+image*

@@ -11,8 +11,9 @@ from unidecode import unidecode
 from collections import defaultdict
 import itertools
 import re
+from pathlib import Path
 
-corpus = open("shakespeare.txt").readlines()
+corpus = open(Path.home() / "mlab/shakespeare.txt").readlines()
 minicorpus = corpus[5000:6000]
 
 
@@ -46,6 +47,7 @@ class Tokenizer:
             self.bot = bot
         self.mask = mask
         self.unk = unk
+        self.sep = sep
         self.vocab = {x["piece"]: x for x in token_list}
         self.vocab_by_id = {x["id"]: x for x in token_list}
 
@@ -73,22 +75,17 @@ class Tokenizer:
 
     def from_corpus(texts, n=30000):
         splitted = itertools.chain(
-            *[
-                [x.strip() for x in re.split(r"\b", text) if x.strip() != ""]
-                for text in texts
-            ]
+            *[re.findall(r"\w+|[^\w\s]", text) for text in texts]
         )
         counts = Counter(splitted)
         tokens = [
             {"piece": x, "id": i}
             for i, (x, _) in zip(range(5, 10000000), counts.most_common(n))
         ]
-        print(tokens)
         return Tokenizer(tokens)
 
     def _tokenize(self, text):
-        splitted = [x.strip() for x in re.split(r"\b", text) if x.strip() != ""]
-        print(splitted)
+        splitted = re.findall(r"\w+|[^\w\s]", text)
         ids = [self.vocab.get(x, {"id": self.unk})["id"] for x in splitted]
         return ids
 
@@ -195,7 +192,6 @@ class BPETokenizer(Tokenizer):
             merge_pair = max(pair_counts.items(), key=lambda x: x[1])[0]
             merge_string = merge_pair[0] + merge_pair[1]
             tokens.append(merge_string)
-        print("tokens", tokens)
         tokenizer = BPETokenizer(
             [{"id": i, "piece": p} for i, p in zip(range(5, 1000000), tokens)]
         )
@@ -205,7 +201,9 @@ class BPETokenizer(Tokenizer):
 def test_tokenizer_from_corpus(tokenizer):
     reference = Tokenizer.from_corpus(minicorpus)
     yours = tokenizer.from_corpus(minicorpus)
-    assert tuple(reference.vocab.items()) == tuple(yours.vocab.items())
+    assert tuple([x["piece"] for x in reference.token_list]) == tuple(
+        [x["piece"] for x in yours.token_list]
+    )
 
 
 def test_tokenizer_from_corpus_fn(fn):
