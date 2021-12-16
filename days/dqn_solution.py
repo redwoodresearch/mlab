@@ -168,7 +168,6 @@ def train_dqn(experiment_name,
               use_double_dqn,
               multi_step_n,
               eval_count=1,
-              max_grad_norm=10,
               start_training_step=0):
     # Create an experiment with your api key
     experiment = Experiment(
@@ -220,7 +219,7 @@ def train_dqn(experiment_name,
             return net(inp)
 
     optim = Adam(get_params(), lr=lr)
-    loss_fn = nn.SmoothL1Loss()
+    loss_fn = nn.MSELoss()
 
     eps_sched = get_linear_fn(start_eps, end_eps, exploration_frac)
 
@@ -297,16 +296,13 @@ def train_dqn(experiment_name,
                     gamma**multi_step_n *
                     split_nets(next_obs, flip=True).max(dim=-1).values)
 
-            loss = loss_fn(
-                targets,
-                split_nets(obs_batch, flip=False)[torch.arange(idxs.size(0)),
-                                                  choices])
+            actual = split_nets(obs_batch,
+                                flip=False)[torch.arange(idxs.size(0)),
+                                            choices]
+            loss = loss_fn(targets, actual)
             experiment.log_metric("loss", loss.cpu().item(), step=step)
             optim.zero_grad()
             loss.backward()
-
-            # probably not really needed
-            nn.utils.clip_grad_norm_(get_params(), max_grad_norm)
 
             optim.step()
 
