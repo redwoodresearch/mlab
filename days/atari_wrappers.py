@@ -3,13 +3,9 @@ from collections import deque
 import gym
 import numpy as np
 from gym import spaces
+import cv2
 
-try:
-    import cv2  # pytype:disable=import-error
-
-    cv2.ocl.setUseOpenCL(False)
-except ImportError:
-    cv2 = None
+cv2.ocl.setUseOpenCL(False)
 
 from stable_baselines3.common.type_aliases import GymObs, GymStepReturn
 

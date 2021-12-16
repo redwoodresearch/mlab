@@ -2,6 +2,7 @@ from comet_ml import Experiment
 
 import sys
 from math import prod
+import copy
 
 from torch.optim import Adam
 import numpy as np
@@ -22,7 +23,11 @@ class CastToFloat(nn.Module):
 
 @gin.configurable
 class MLP(nn.Module):
-    def __init__(self, obs_size, action_size, hidden_size, use_value_function=False):
+    def __init__(self,
+                 obs_size,
+                 action_size,
+                 hidden_size,
+                 use_value_function=False):
         super().__init__()
 
         self._base = nn.Sequential(CastToFloat(),
@@ -41,12 +46,15 @@ class MLP(nn.Module):
         policy = torch.distributions.Categorical(logits=self._to_policy(base))
 
         if self._use_value_function:
-            return self._to_value(base), policy
+            return self._to_value(base).squeeze(), policy
+        else:
+            return policy
 
 
 @gin.configurable
 def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
-                        rewards_to_go, advantage_estimation):
+                        rewards_to_go, advantage_estimation, gamma,
+                        advantage_estim_lambda, value_loss_alpha):
     # Create an experiment with your api key
     experiment = Experiment(
         api_key="gDeuTHDCxQ6xdsXnvzkWsvDEb",
@@ -63,15 +71,22 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
     env = gym.make(env_id)
 
     net = MLP(prod(env.observation_space.shape),
-              env.action_space.n, use_value_function=advantage_estimation).to(device=device)
+              env.action_space.n,
+              use_value_function=advantage_estimation).to(device=device)
     optim = Adam(net.parameters(), lr=lr)
+
+    value_loss_fn = nn.MSELoss()
 
     bar = tqdm(total=steps, disable=False)
     step = 0
     while step < steps:
         all_obs = []
-        all_actions = []
-        all_weights = []
+        actions = []
+
+        rewards = []
+        dones = []
+
+        weights = []
 
         eps_rewards = []
 
@@ -81,16 +96,20 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
 
         obs = env.reset()
         while True:
+            all_obs.append(obs)
+
             with torch.no_grad():
-                all_obs.append(obs)
                 output = net(torch.tensor(obs, device=device))
-                if advantage_estimation:
-                    policy = output[1]
-                else:
-                    policy = output
-                action = policy.sample()
-                all_actions.append(action)
-                obs, reward, done, _ = env.step(action.cpu().item())
+
+            if advantage_estimation:
+                policy = output[1]
+            else:
+                policy = output
+            action = policy.sample()
+            actions.append(action)
+            obs, reward, done, _ = env.step(action.cpu().item())
+            dones.append(done)
+
             eps_rewards.append(reward)
             step += 1
             bar.update(1)
@@ -98,14 +117,16 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
             if done:
                 obs = env.reset()
                 total_reward = sum(eps_rewards)
-                if rewards_to_go:
-                    for i in reversed(range(len(eps_rewards))):
-                        eps_rewards[i] = eps_rewards[i] + (
-                            eps_rewards[i + 1] if i + 1 < len(eps_rewards) else 0)
-                    all_weights += eps_rewards
+                if advantage_estimation:
+                    rewards += eps_rewards
                 else:
-                    total_reward = sum(eps_rewards)
-                    all_weights += [total_reward] * len(eps_rewards)
+                    if rewards_to_go:
+                        for i in reversed(range(len(eps_rewards))):
+                            eps_rewards[i] = eps_rewards[i] + (eps_rewards[
+                                i + 1] if i + 1 < len(eps_rewards) else 0)
+                        weights += eps_rewards
+                    else:
+                        weights += [total_reward] * len(eps_rewards)
 
                 avg_reward += total_reward
                 avg_eps_len += len(eps_rewards)
@@ -115,17 +136,60 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
                 if len(all_obs) >= batch_size:
                     break
 
+        outputs = net(torch.tensor(np.array(all_obs), device=device))
+        value_loss = None
+        if advantage_estimation:
+            values, dist = outputs
+
+            assert dones[-1]
+            rewards = torch.tensor(rewards, dtype=torch.float)
+            dones = torch.tensor(dones)
+            rewards_total = rewards.clone()
+
+            for i in reversed(range(len(rewards_total))):
+                if not dones[i]:
+                    rewards_total[i] += gamma * rewards_total[i + 1]
+
+            # print(values)
+            # print(rewards_total)
+            # print(dones)
+            value_loss = value_loss_fn(rewards_total.to(device=device), values)
+
+            experiment.log_metric("value_loss",
+                                  value_loss.cpu().item(),
+                                  step=step)
+
+            values = values.detach().cpu()
+
+            shifted_rewards = np.concatenate((values[1:], torch.tensor([0.])))
+            advantage_estimates = (
+                dones.logical_not() * gamma * shifted_rewards + rewards -
+                values)
+
+            for i in reversed(range(len(advantage_estimates))):
+                if not dones[i]:
+                    advantage_estimates[i] += (gamma * advantage_estim_lambda *
+                                               advantage_estimates[i + 1])
+
+            weights = advantage_estimates.to(device=device)
+        else:
+            dist = outputs
+            weights = torch.tensor(weights, device=device)
+
         avg_reward = avg_reward / n_eps
         avg_eps_len = avg_eps_len / n_eps
 
-        weights = torch.tensor(all_weights, device=device)
-        actions = torch.tensor(all_actions, device=device)
-        dist = net(torch.tensor(np.array(all_obs), device=device))
-        loss = -(weights * dist.log_prob(actions)).mean()
+        actions = torch.tensor(actions, device=device)
+        policy_loss = -(weights * dist.log_prob(actions)).mean()
 
-        experiment.log_metric("loss", loss.cpu().item(), step=step)
-        experiment.log_metric("avg reward", total_reward, step=step)
+        experiment.log_metric("policy loss", policy_loss.cpu().item(), step=step)
+        experiment.log_metric("avg reward", avg_reward, step=step)
         experiment.log_metric("avg episode length", avg_eps_len, step=step)
+
+        if advantage_estimation:
+            loss = policy_loss + value_loss * value_loss_alpha
+        else:
+            loss = policy_loss
 
         optim.zero_grad()
         loss.backward()
@@ -134,7 +198,12 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
     obs = env.reset()
     while True:
         with torch.no_grad():
-            action = net(torch.tensor(obs, device=device)).sample()
+            output = net(torch.tensor(obs, device=device))
+            if advantage_estimation:
+                policy = output[1]
+            else:
+                policy = output
+            action = policy.sample()
             obs, reward, done, _ = env.step(action.cpu().item())
             env.render()
 

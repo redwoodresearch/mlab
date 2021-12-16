@@ -1,6 +1,7 @@
 from comet_ml import Experiment
 
 import sys
+from collections import deque
 from math import prod
 import itertools
 
@@ -167,7 +168,8 @@ def train_dqn(experiment_name,
               use_double_dqn,
               multi_step_n,
               eval_count=1,
-              max_grad_norm=10):
+              max_grad_norm=10,
+              start_training_step=0):
     # Create an experiment with your api key
     experiment = Experiment(
         api_key="gDeuTHDCxQ6xdsXnvzkWsvDEb",
@@ -194,10 +196,11 @@ def train_dqn(experiment_name,
 
     if use_double_dqn:
         nets = [get_net().to(device) for _ in range(2)]
-        get_params = lambda : itertools.chain(*[net.parameters() for net in nets])
+        get_params = lambda: itertools.chain(
+            *[net.parameters() for net in nets])
     else:
         net = get_net().to(device)
-        get_params = lambda : net.parameters()
+        get_params = lambda: net.parameters()
 
     def both_nets(inp):
         if use_double_dqn:
@@ -227,7 +230,7 @@ def train_dqn(experiment_name,
         starting_q = both_nets(torch.tensor(obs,
                                             device=device).unsqueeze(0)).max()
 
-    buffer = []
+    buffer = deque([], maxlen=buffer_size)
     episode_len = 0
     total_reward = 0
 
@@ -256,7 +259,7 @@ def train_dqn(experiment_name,
             episode_len = 0
             total_reward = 0
 
-        if (step + 1) % train_freq == 0:
+        if step >= start_training_step and (step + 1) % train_freq == 0:
             idxs = torch.randperm(len(buffer) - multi_step_n)[:batch_size]
 
             obs_batch = []
@@ -301,12 +304,11 @@ def train_dqn(experiment_name,
             experiment.log_metric("loss", loss.cpu().item(), step=step)
             optim.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(get_params(), max_grad_norm)
-            optim.step()
 
-            target_size = buffer_size - train_freq
-            to_cut = len(buffer) - target_size
-            del buffer[:to_cut]
+            # probably not really needed
+            nn.utils.clip_grad_norm_(get_params(), max_grad_norm)
+
+            optim.step()
 
         if (step + 1) % eval_freq == 0:
             run_eval_episode(eval_count,
