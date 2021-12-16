@@ -178,9 +178,9 @@ def train_dqn(experiment_name,
     )
     experiment.set_name(experiment_name)
 
-    # torch.cuda.init()
-    # device = torch.device('cuda:0')
-    device = torch.device('cpu')
+    torch.cuda.init()
+    device = torch.device('cuda:0')
+    # device = torch.device('cpu')
 
     env = gym.make(env_id)
     eval_env = gym.make(env_id)
@@ -292,9 +292,11 @@ def train_dqn(experiment_name,
             next_obs = torch.tensor(np.array(next_obs), device=device)
 
             with torch.no_grad():
+                next_obs_actions = split_nets(next_obs,
+                                              flip=False).argmax(dim=-1)
                 targets = rewards + dones.logical_not() * (
-                    gamma**multi_step_n *
-                    split_nets(next_obs, flip=True).max(dim=-1).values)
+                    gamma**multi_step_n * split_nets(next_obs, flip=True)[
+                        torch.arange(idxs.size(0)), next_obs_actions])
 
             actual = split_nets(obs_batch,
                                 flip=False)[torch.arange(idxs.size(0)),
