@@ -8,11 +8,12 @@ import numpy as np
 import gin
 import torch
 from torch import nn
-from torch.optim import Adam, lr_scheduler
+from torch.optim import Adam
 import gym
 from tqdm import tqdm
+from einops.layers.torch import Rearrange
 
-from days.atari_utils import wrap_atari_env
+from days.atari_wrappers import AtariWrapper
 
 
 def make_choice(env, eps, net, obs, device):
@@ -40,10 +41,11 @@ def run_eval_episode(count,
     for _ in range(count):
         obs = env.reset()
 
-        total_starting_q += net(torch.tensor(
-            obs, device=device).unsqueeze(0)).max().cpu().item()
-
         with torch.no_grad():
+            total_starting_q += net(
+                torch.tensor(obs,
+                             device=device).unsqueeze(0)).max().cpu().item()
+
             while True:
                 if render:
                     env.render()
@@ -67,17 +69,48 @@ def run_eval_episode(count,
                               step=step)
 
 
+class PixelByteToFloat(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, inp):
+        return inp.to(torch.float) / 255.0
+
+
+class DuelingHead(nn.Module):
+    def __init__(self, input_hidden_size, action_size, dueling_hidden_size):
+        super().__init__()
+
+        self._advantage_side = nn.Sequential(
+            nn.Linear(input_hidden_size, dueling_hidden_size), nn.ReLU(),
+            nn.Linear(dueling_hidden_size, action_size))
+        self._value_side = nn.Sequential(
+            nn.Linear(input_hidden_size, dueling_hidden_size), nn.ReLU(),
+            nn.Linear(dueling_hidden_size, 1))
+
+    def forward(self, x):
+        adv_v = self._advantage_side(x)
+        adv_v = adv_v - adv_v.mean()
+
+        value_v = self._value_side(x)
+
+        return adv_v + value_v
+
+
+@gin.configurable
+def dqn_head(hidden_size, action_size, use_dueling, dueling_hidden_size=256):
+    if use_dueling:
+        return DuelingHead(hidden_size, action_size, dueling_hidden_size)
+    else:
+        return nn.Linear(hidden_size, action_size)
+
+
 def atari_model(obs_n_channels, action_size):
-    return nn.Sequential(
-        nn.Conv2d(obs_n_channels, 32, 8, stride=4),
-        nn.ReLU(),
-        nn.Conv2d(32, 64, 4, stride=2),
-        nn.ReLU(),
-        nn.Conv2d(64, 64, 3, stride=1),
-        nn.ReLU(),
-        nn.Flatten(),
-        nn.Linear(3136, action_size),
-    )
+    return nn.Sequential(Rearrange("n h w c -> n c h w"), PixelByteToFloat(),
+                         nn.Conv2d(obs_n_channels, 32, 8, stride=4), nn.ReLU(),
+                         nn.Conv2d(32, 64, 4, stride=2), nn.ReLU(),
+                         nn.Conv2d(64, 64, 3, stride=1), nn.ReLU(),
+                         nn.Flatten(), dqn_head(3136, action_size))
 
 
 class CastToFloat(nn.Module):
@@ -90,14 +123,32 @@ class CastToFloat(nn.Module):
 
 @gin.configurable
 def mlp_model(obs_size, action_size, hidden_size):
-    return nn.Sequential(
-        CastToFloat(),
-        nn.Linear(obs_size, hidden_size),
-        nn.ReLU(),
-        nn.Linear(hidden_size, hidden_size),
-        nn.ReLU(),
-        nn.Linear(hidden_size, action_size),
-    )
+    return nn.Sequential(CastToFloat(), nn.Linear(obs_size, hidden_size),
+                         nn.ReLU(), nn.Linear(hidden_size, hidden_size),
+                         nn.ReLU(), dqn_head(hidden_size, action_size))
+
+
+def get_linear_fn(start: float, end: float, end_fraction: float):
+    """
+    Create a function that interpolates linearly between start and end
+    between ``progress_remaining`` = 1 and ``progress_remaining`` = ``end_fraction``.
+    This is used in DQN for linearly annealing the exploration fraction
+    (epsilon for the epsilon-greedy strategy).
+
+    :params start: value to start with if ``progress_remaining`` = 1
+    :params end: value to end with if ``progress_remaining`` = 0
+    :params end_fraction: fraction of ``progress_remaining``
+        where end is reached e.g 0.1 then end is reached after 10%
+        of the complete training process.
+    :return:
+    """
+    def func(progress: float) -> float:
+        if progress > end_fraction:
+            return end
+        else:
+            return start + progress * (end - start) / end_fraction
+
+    return func
 
 
 @gin.configurable
@@ -107,19 +158,20 @@ def train_dqn(experiment_name,
               steps,
               start_eps,
               end_eps,
-              start_lr,
-              end_lr,
+              exploration_frac,
+              lr,
               train_freq,
               batch_size,
               buffer_size,
               eval_freq,
               use_double_dqn,
               multi_step_n,
-              eval_count=1):
-    # # Create an experiment with your api key
+              eval_count=1,
+              max_grad_norm=10):
+    # Create an experiment with your api key
     experiment = Experiment(
         api_key="gDeuTHDCxQ6xdsXnvzkWsvDEb",
-        project_name=f"train_dqn",
+        project_name="train_dqn",
         workspace="rgreenblatt",
         disabled=False,
     )
@@ -132,9 +184,9 @@ def train_dqn(experiment_name,
     env = gym.make(env_id)
     eval_env = gym.make(env_id)
     if len(env.observation_space.shape) > 1:
-        env = wrap_atari_env(env)
-        eval_env = wrap_atari_env(eval_env)
-        get_net = lambda: atari_model(env.observation_space.shape[0], env.
+        env = AtariWrapper(env)
+        eval_env = AtariWrapper(eval_env, clip_reward=False)
+        get_net = lambda: atari_model(env.observation_space.shape[-1], env.
                                       action_space.n)
     else:
         get_net = lambda: mlp_model(prod(env.observation_space.shape), env.
@@ -142,10 +194,10 @@ def train_dqn(experiment_name,
 
     if use_double_dqn:
         nets = [get_net().to(device) for _ in range(2)]
-        params = itertools.chain(*[net.parameters() for net in nets])
+        get_params = lambda : itertools.chain(*[net.parameters() for net in nets])
     else:
         net = get_net().to(device)
-        params = net.parameters()
+        get_params = lambda : net.parameters()
 
     def both_nets(inp):
         if use_double_dqn:
@@ -164,12 +216,10 @@ def train_dqn(experiment_name,
         else:
             return net(inp)
 
-    optim = Adam(params, lr=start_lr)
-    loss_fn = nn.MSELoss(reduction='mean')
+    optim = Adam(get_params(), lr=lr)
+    loss_fn = nn.SmoothL1Loss()
 
-    scheduler = lr_scheduler.ExponentialLR(optim,
-                                           gamma=(end_lr / start_lr)**(1 /
-                                                                       steps))
+    eps_sched = get_linear_fn(start_eps, end_eps, exploration_frac)
 
     obs = env.reset()
 
@@ -182,7 +232,7 @@ def train_dqn(experiment_name,
     total_reward = 0
 
     for step in tqdm(range(steps), disable=False):
-        eps = (end_eps - start_eps) * step / steps + start_eps
+        eps = eps_sched(step / steps)
 
         choice = make_choice(env, eps, both_nets, obs, device)
         new_obs, reward, done, _ = env.step(choice)
@@ -201,7 +251,6 @@ def train_dqn(experiment_name,
             experiment.log_metric("episode len", episode_len, step=step)
             experiment.log_metric("total reward", total_reward, step=step)
             experiment.log_metric("eps", eps, step=step)
-            experiment.log_metric("lr", scheduler.get_last_lr()[0], step=step)
             experiment.log_metric("starting Q", starting_q, step=step)
 
             episode_len = 0
@@ -252,8 +301,8 @@ def train_dqn(experiment_name,
             experiment.log_metric("loss", loss.cpu().item(), step=step)
             optim.zero_grad()
             loss.backward()
+            nn.utils.clip_grad_norm_(get_params(), max_grad_norm)
             optim.step()
-            scheduler.step()
 
             target_size = buffer_size - train_freq
             to_cut = len(buffer) - target_size

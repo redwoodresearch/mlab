@@ -1,0 +1,8 @@
+train_simple_policy.experiment_name = "spg_cart_pole"
+train_simple_policy.env_id = "CartPole-v0"
+train_simple_policy.steps = 200000
+train_simple_policy.lr = 1e-2
+train_simple_policy.batch_size = 5000
+train_simple_policy.rewards_to_go = True
+
+MLP.hidden_size = 64
