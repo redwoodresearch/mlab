@@ -10,6 +10,6 @@ cd mlab
 pip install -r requirements.txt
 pip install -e .
 mkdir ~/working
-sudo snap install code
+sudo snap install code --classic
 code --install-extension ms-python.python
 code --install-extension ms-toolsai.jupyter
