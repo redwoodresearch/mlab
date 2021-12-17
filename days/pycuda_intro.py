@@ -50,6 +50,11 @@ torch.cuda.synchronize()
 
 print(dest)
 
+# We can also load our module from a file and specify include directories.
+
+import pathlib
+script_dir = pathlib.Path(__file__).parent.resolve()
+
 # Note that pycuda *isn't* a great way to write maintainable pytorch cuda code
 # in practice. Typically you'd write cuda c++ code and use pybind11 with the
 # pytorch c++ api, but pycuda's convenient for experimenting here. This is much
