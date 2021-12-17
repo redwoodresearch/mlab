@@ -3,6 +3,7 @@ from comet_ml import Experiment
 import sys
 from math import prod
 
+from einops.layers.torch import Rearrange
 from torch.optim import Adam
 import numpy as np
 import gym
@@ -10,6 +11,8 @@ import torch
 from torch import nn
 import gin
 from tqdm import tqdm
+
+from days.atari_wrappers import AtariWrapper
 
 
 class CastToFloat(nn.Module):
@@ -21,7 +24,7 @@ class CastToFloat(nn.Module):
 
 
 @gin.configurable
-class MLP(nn.Module):
+class MLPPolicy(nn.Module):
     def __init__(self,
                  obs_size,
                  action_size,
@@ -50,6 +53,54 @@ class MLP(nn.Module):
             return policy
 
 
+class PixelByteToFloat(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, inp):
+        return inp.to(torch.float) / 255.0
+
+
+@gin.configurable
+class CNNPolicy(nn.Module):
+    def __init__(self, obs_n_channels, action_size, use_value_function=False):
+        super().__init__()
+
+        self._base = nn.Sequential(Rearrange("n h w c -> n c h w"),
+                                   PixelByteToFloat(),
+                                   nn.Conv2d(obs_n_channels, 32, 8, stride=4),
+                                   nn.ReLU(), nn.Conv2d(32, 64, 4, stride=2),
+                                   nn.ReLU(), nn.Conv2d(64, 64, 3, stride=1),
+                                   nn.ReLU(), nn.Flatten(),
+                                   nn.Linear(3136, 512))
+
+        self._use_value_function = use_value_function
+        if use_value_function:
+            self._to_value = nn.Linear(512, 1)
+        self._to_policy = nn.Sequential(nn.Linear(512, action_size),
+                                        nn.LogSoftmax(dim=-1))
+
+    def forward(self, x):
+        squeeze = False
+        if len(x.size()) == 3:
+            x = x.unsqueeze(0)
+            squeeze = True
+
+        base = self._base(x)
+
+        if squeeze:
+            base = base.squeeze(dim=0)
+
+
+
+        policy = torch.distributions.Categorical(logits=self._to_policy(base))
+
+        if self._use_value_function:
+            return self._to_value(base).squeeze(), policy
+        else:
+            return policy
+
+
 @gin.configurable
 def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
                         rewards_to_go, advantage_estimation, gamma,
@@ -64,14 +115,20 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
     experiment.set_name(experiment_name)
 
     # torch.cuda.init()
-    # device = torch.device('cuda:0')
-    device = torch.device('cpu')
+    # DEVICE = torch.device('cuda:0')
+    DEVICE = torch.device('cpu')
 
     env = gym.make(env_id)
 
-    net = MLP(prod(env.observation_space.shape),
-              env.action_space.n,
-              use_value_function=advantage_estimation).to(device=device)
+    if len(env.observation_space.shape) > 1:
+        env = AtariWrapper(env)
+        net = CNNPolicy(env.observation_space.shape[-1],
+                        env.action_space.n,
+                        use_value_function=advantage_estimation).to(DEVICE)
+    else:
+        net = MLPPolicy(prod(env.observation_space.shape),
+                        env.action_space.n,
+                        use_value_function=advantage_estimation).to(DEVICE)
     optim = Adam(net.parameters(), lr=lr)
 
     value_loss_fn = nn.MSELoss()
@@ -98,7 +155,7 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
             all_obs.append(obs)
 
             with torch.no_grad():
-                output = net(torch.tensor(obs, device=device))
+                output = net(torch.tensor(obs, device=DEVICE))
 
             if advantage_estimation:
                 policy = output[1]
@@ -135,7 +192,7 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
                 if len(all_obs) >= batch_size:
                     break
 
-        outputs = net(torch.tensor(np.array(all_obs), device=device))
+        outputs = net(torch.tensor(np.array(all_obs), device=DEVICE))
         value_loss = None
         if advantage_estimation:
             values, dist = outputs
@@ -149,10 +206,12 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
                 if not dones[i]:
                     rewards_total[i] += gamma * rewards_total[i + 1]
 
+            # print()
             # print(values)
             # print(rewards_total)
             # print(dones)
-            value_loss = value_loss_fn(rewards_total.to(device=device), values)
+            # print()
+            value_loss = value_loss_fn(rewards_total.to(DEVICE), values)
 
             experiment.log_metric("value_loss",
                                   value_loss.cpu().item(),
@@ -170,23 +229,26 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
                     advantage_estimates[i] += (gamma * advantage_estim_lambda *
                                                advantage_estimates[i + 1])
 
-            weights = advantage_estimates.to(device=device)
+            weights = advantage_estimates.to(DEVICE)
         else:
             dist = outputs
-            weights = torch.tensor(weights, device=device)
+            weights = torch.tensor(weights, device=DEVICE)
 
         avg_reward = avg_reward / n_eps
         avg_eps_len = avg_eps_len / n_eps
 
-        actions = torch.tensor(actions, device=device)
+        actions = torch.tensor(actions, device=DEVICE)
         policy_loss = -(weights * dist.log_prob(actions)).mean()
 
-        experiment.log_metric("policy loss", policy_loss.cpu().item(), step=step)
+        experiment.log_metric("policy loss",
+                              policy_loss.cpu().item(),
+                              step=step)
+
         experiment.log_metric("avg reward", avg_reward, step=step)
         experiment.log_metric("avg episode length", avg_eps_len, step=step)
 
         if advantage_estimation:
-            loss = policy_loss + value_loss * value_loss_alpha
+            loss = value_loss * value_loss_alpha + policy_loss
         else:
             loss = policy_loss
 
@@ -196,13 +258,14 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
 
     for _ in range(5):
         obs = env.reset()
-        video_recorder = gym.wrappers.monitoring.video_recorder.VideoRecorder(env)
+        video_recorder = gym.wrappers.monitoring.video_recorder.VideoRecorder(
+            env)
         print()
         print(f"recording to path: {video_recorder.path}")
         while True:
             video_recorder.capture_frame()
             with torch.no_grad():
-                output = net(torch.tensor(obs, device=device))
+                output = net(torch.tensor(obs, device=DEVICE))
                 if advantage_estimation:
                     policy = output[1]
                 else:
