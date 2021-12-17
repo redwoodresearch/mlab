@@ -5,6 +5,9 @@ import torch as t
 import numpy as np
 import time
 import importlib
+from torchtyping import patch_typeguard, TensorType
+
+patch_typeguard()
 
 
 def tstat(name, tensor):
@@ -16,7 +19,7 @@ def tstat(name, tensor):
 def itpeek(tensor: t.Tensor):
     contains_nan = t.any(t.isnan(tensor)).item()
     contains_inf = t.any(t.isinf(tensor)).item()
-    string = f"SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor.float()).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor.float()).cpu().item())} {'CONTAINS_NAN! ' if contains_nan else ''}{'CONTAINS_INF! ' if contains_inf else ''}VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}...]"
+    string = f"SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor.float()).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor.float()).cpu().item())} {'CONTAINS_NAN! ' if contains_nan else ''}{'CONTAINS_INF! ' if contains_inf else ''}VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}{'...' if tensor.numel()>10 else ''}]"
     return string
 
 

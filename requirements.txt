@@ -9,3 +9,4 @@ sentencepiece
 unidecode
 jupyter_kernel_gateway
 ipykernel
+gin-config
