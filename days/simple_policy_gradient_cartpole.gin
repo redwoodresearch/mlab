@@ -1,6 +1,6 @@
 train_simple_policy.experiment_name = "spg_cart_pole_from_the_start"
 train_simple_policy.env_id = "CartPole-v1"
-train_simple_policy.steps = 1_000_000
+train_simple_policy.steps = 200_000
 train_simple_policy.lr = 1e-3
 train_simple_policy.batch_size = 256
 train_simple_policy.rewards_to_go = True
