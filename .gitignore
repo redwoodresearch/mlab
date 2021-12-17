@@ -5,3 +5,4 @@ mlab.egg-info/
 scratch/
 .ipynb_checkpoints/
 image*
+infrastructure/.lambda_account.json
