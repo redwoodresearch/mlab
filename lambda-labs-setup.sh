@@ -11,7 +11,7 @@ pip install -r requirements.txt
 pip install -e .
 pip install torch==1.10.1+cu113 torchvision==0.11.2+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
 mkdir ~/working
-sudo snap install code
+sudo snap install code --classic
 code --install-extension ms-python.python
 code --install-extension ms-toolsai.jupyter
 python -c "import torch; import torchvision.models;import torchtext; import transformers; transformers.AutoModelForCausalLM.from_pretrained('gpt2');transformers.AutoModelForCausalLM.from_pretrained('bert-base-cased');torchvision.models.resnet34(pretrained=True);torchvision.models.resnet50(pretrained=True);torchtext.datasets.WikiText2(split='train');torchtext.datasets.WikiText103(split='train');torchtext.datasets.IMDB(split='train');"
