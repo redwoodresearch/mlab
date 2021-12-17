@@ -4,8 +4,12 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githu
 sudo apt update
 sudo apt install gh
 conda deactivate
+cd ~;
 git clone https://github.com/taoroalin/mlab
 cd mlab
 pip install -r requirements.txt
 pip install -e .
 mkdir ~/working
+sudo snap install code
+code --install-extension ms-python.python
+code --install-extension ms-toolsai.jupyter
