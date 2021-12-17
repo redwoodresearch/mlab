@@ -2,7 +2,6 @@ from comet_ml import Experiment
 
 import sys
 from math import prod
-import copy
 
 from torch.optim import Adam
 import numpy as np
@@ -161,9 +160,9 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
 
             values = values.detach().cpu()
 
-            shifted_rewards = np.concatenate((values[1:], torch.tensor([0.])))
+            shifted_values = np.concatenate((values[1:], torch.tensor([0.])))
             advantage_estimates = (
-                dones.logical_not() * gamma * shifted_rewards + rewards -
+                dones.logical_not() * gamma * shifted_values + rewards -
                 values)
 
             for i in reversed(range(len(advantage_estimates))):
@@ -195,20 +194,25 @@ def train_simple_policy(experiment_name, env_id, steps, lr, batch_size,
         loss.backward()
         optim.step()
 
-    obs = env.reset()
-    while True:
-        with torch.no_grad():
-            output = net(torch.tensor(obs, device=device))
-            if advantage_estimation:
-                policy = output[1]
-            else:
-                policy = output
-            action = policy.sample()
-            obs, reward, done, _ = env.step(action.cpu().item())
-            env.render()
+    for _ in range(5):
+        obs = env.reset()
+        video_recorder = gym.wrappers.monitoring.video_recorder.VideoRecorder(env)
+        print()
+        print(f"recording to path: {video_recorder.path}")
+        while True:
+            video_recorder.capture_frame()
+            with torch.no_grad():
+                output = net(torch.tensor(obs, device=device))
+                if advantage_estimation:
+                    policy = output[1]
+                else:
+                    policy = output
+                action = policy.sample()
+                obs, reward, done, _ = env.step(action.cpu().item())
 
-        if done:
-            break
+            if done:
+                break
+        video_recorder.close()
 
 
 def main():

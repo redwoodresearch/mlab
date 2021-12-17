@@ -34,7 +34,7 @@ def run_eval_episode(count,
                      device,
                      experiment=None,
                      step=None,
-                     render=False):
+                     save=False):
     assert count > 0
     total_starting_q = 0
     total_reward = 0
@@ -42,20 +42,29 @@ def run_eval_episode(count,
     for _ in range(count):
         obs = env.reset()
 
+        video_recorder = None
+        if save:
+            video_recorder = gym.wrappers.monitoring.video_recorder.VideoRecorder(
+                env)
+
+            print()
+            print(f"recording to path: {video_recorder.path}")
         with torch.no_grad():
             total_starting_q += net(
                 torch.tensor(obs,
                              device=device).unsqueeze(0)).max().cpu().item()
 
             while True:
-                if render:
-                    env.render()
+                if video_recorder is not None:
+                    video_recorder.capture_frame()
                 obs, reward, done, _ = env.step(
                     make_choice(env, eps, net, obs, device))
                 total_reward += reward
                 total_episode_len += 1
                 if done:
                     break
+        if video_recorder is not None:
+            video_recorder.close()
 
     prefix = "" if count == 1 else "avg "
     if experiment is not None:
@@ -316,14 +325,9 @@ def train_dqn(experiment_name,
                              device=device,
                              experiment=experiment,
                              step=step,
-                             render=False)
+                             save=False)
 
-    run_eval_episode(eval_count,
-                     eval_env,
-                     both_nets,
-                     eps=0,
-                     device=device,
-                     render=True)
+    run_eval_episode(1, eval_env, both_nets, eps=0, device=device, save=True)
 
 
 def main():
