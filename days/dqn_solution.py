@@ -17,13 +17,13 @@ from einops.layers.torch import Rearrange
 from days.atari_wrappers import AtariWrapper
 
 
-def make_choice(env, eps, net, obs, device):
+def make_choice(env, eps, net, obs, DEVICE):
     if torch.rand(()) < eps:
         return env.action_space.sample()
     else:
         with torch.no_grad():
             expected_reward = net(
-                torch.tensor(obs, device=device).unsqueeze(0))
+                torch.tensor(obs, device=DEVICE).unsqueeze(0))
             return torch.argmax(expected_reward).cpu().numpy()
 
 
@@ -31,7 +31,7 @@ def run_eval_episode(count,
                      env,
                      net,
                      eps,
-                     device,
+                     DEVICE,
                      experiment=None,
                      step=None,
                      save=False):
@@ -52,13 +52,13 @@ def run_eval_episode(count,
         with torch.no_grad():
             total_starting_q += net(
                 torch.tensor(obs,
-                             device=device).unsqueeze(0)).max().cpu().item()
+                             device=DEVICE).unsqueeze(0)).max().cpu().item()
 
             while True:
                 if video_recorder is not None:
                     video_recorder.capture_frame()
                 obs, reward, done, _ = env.step(
-                    make_choice(env, eps, net, obs, device))
+                    make_choice(env, eps, net, obs, DEVICE))
                 total_reward += reward
                 total_episode_len += 1
                 if done:
@@ -188,8 +188,8 @@ def train_dqn(experiment_name,
     experiment.set_name(experiment_name)
 
     torch.cuda.init()
-    device = torch.device('cuda:0')
-    # device = torch.device('cpu')
+    DEVICE = torch.device('cuda:0')
+    # DEVICE = torch.device('cpu')
 
     env = gym.make(env_id)
     eval_env = gym.make(env_id)
@@ -203,11 +203,11 @@ def train_dqn(experiment_name,
                                     action_space.n)
 
     if use_double_dqn:
-        nets = [get_net().to(device) for _ in range(2)]
+        nets = [get_net().to(DEVICE) for _ in range(2)]
         get_params = lambda: itertools.chain(
             *[net.parameters() for net in nets])
     else:
-        net = get_net().to(device)
+        net = get_net().to(DEVICE)
         get_params = lambda: net.parameters()
 
     def both_nets(inp):
@@ -236,7 +236,7 @@ def train_dqn(experiment_name,
 
     with torch.no_grad():
         starting_q = both_nets(torch.tensor(obs,
-                                            device=device).unsqueeze(0)).max()
+                                            device=DEVICE).unsqueeze(0)).max()
 
     buffer = deque([], maxlen=buffer_size)
     episode_len = 0
@@ -245,7 +245,7 @@ def train_dqn(experiment_name,
     for step in tqdm(range(steps), disable=False):
         eps = eps_sched(step / steps)
 
-        choice = make_choice(env, eps, both_nets, obs, device)
+        choice = make_choice(env, eps, both_nets, obs, DEVICE)
         new_obs, reward, done, _ = env.step(choice)
         buffer.append((obs, choice, reward, done))
         obs = new_obs
@@ -257,7 +257,7 @@ def train_dqn(experiment_name,
             obs = env.reset()
             with torch.no_grad():
                 starting_q = both_nets(
-                    torch.tensor(obs, device=device).unsqueeze(0)).max()
+                    torch.tensor(obs, device=DEVICE).unsqueeze(0)).max()
 
             experiment.log_metric("episode len", episode_len, step=step)
             experiment.log_metric("total reward", total_reward, step=step)
@@ -292,13 +292,13 @@ def train_dqn(experiment_name,
                 dones.append(done_any)
                 next_obs.append(buffer[idx + multi_step_n][0])
 
-            obs_batch = torch.tensor(np.array(obs_batch), device=device)
-            choices = torch.tensor(np.array(choices), device=device)
+            obs_batch = torch.tensor(np.array(obs_batch), device=DEVICE)
+            choices = torch.tensor(np.array(choices), device=DEVICE)
             rewards = torch.tensor(np.array(rewards),
-                                   device=device,
+                                   device=DEVICE,
                                    dtype=torch.float)
-            dones = torch.tensor(np.array(dones), device=device)
-            next_obs = torch.tensor(np.array(next_obs), device=device)
+            dones = torch.tensor(np.array(dones), device=DEVICE)
+            next_obs = torch.tensor(np.array(next_obs), device=DEVICE)
 
             with torch.no_grad():
                 next_obs_actions = split_nets(next_obs,
@@ -322,12 +322,12 @@ def train_dqn(experiment_name,
                              eval_env,
                              both_nets,
                              eps=0.05,
-                             device=device,
+                             device=DEVICE,
                              experiment=experiment,
                              step=step,
                              save=False)
 
-    run_eval_episode(1, eval_env, both_nets, eps=0, device=device, save=True)
+    run_eval_episode(1, eval_env, both_nets, eps=0, device=DEVICE, save=True)
 
 
 def main():
