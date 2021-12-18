@@ -36,7 +36,7 @@ def _count(sample, keys):
     return [counts.get(i, 0) for i in keys]
 
 
-def am_i_done(f, ex_num, n_tests=10):
+def test(f, ex_num, n_tests=10):
     g = globals()
     ex = g.get(f"ex{ex_num}")
     testcase = g.get(f"testcase{ex_num}")
