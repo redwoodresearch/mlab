@@ -1,4 +1,5 @@
 from collections import namedtuple
+from utils import is_equal_test
 
 test_input_a = torch.tensor([[ 0,  1,  2,  3,  4],
                              [ 5,  6,  7,  8,  9],
@@ -49,15 +50,6 @@ test_cases = [
     stride=(1,),
   ),
 ]
-
-def is_equal_test(*, output, expected, test_name='Test'):
-  successful = torch.allclose(expected.to(float), output.to(float))
-  if successful:
-    print(f'{test_name} passed!')
-  else:
-    print(f'{test_name} failed')
-    print(f'Output:\n{output}')
-    print(f'Expected:\n{expected}')
 
 if __name__ == '__main__':
     for i, (expected, size, stride) in enumerate(test_cases):
