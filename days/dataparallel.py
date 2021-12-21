@@ -1,39 +1,55 @@
-import test_all
 import os
 import random
 import torch.distributed as dist
 import torch.multiprocessing as mp
-import argparse
 import gin
 import sys
 from utils import import_object_from_qualified_name
 import torch as t
 import numpy as np
+from sklearn.datasets import make_moons
+from utils import *
+
+DEVICE = "cpu"
 
 
 def load_data():
-    randns = t.rand(1000, 2, 10)
-    return [randns[i] for i in range(1000)]
+    X, y = make_moons(n_samples=100000, noise=0.1, random_state=354)
+    X = t.Tensor(X).float()
+    y = t.Tensor(y).float()
+    return X, y
 
 
 def init_model():
     t.random.manual_seed(0)
-    model = t.nn.Linear(10, 10)
+    model = t.nn.Sequential(t.nn.Linear(2, 20), t.nn.Linear(20, 1))
+    # model = t.nn.Linear(10, 10)
     return model
 
 
 @gin.configurable
 class DistributedDataLoader:
-    def __init__(self, rank, size, data_fn="days.dataparallel.load_data", mini_batch_size=8, random_seed=0):
+    def __init__(
+        self,
+        rank,
+        size,
+        data_fn="days.dataparallel.load_data",
+        mini_batch_size=4,
+        random_seed=0,
+    ):
         self.rank = rank
         self.size = size
         if rank == 0:
-            self.data_list = list(import_object_from_qualified_name(data_fn)())
-            random.seed(random_seed)
-            random.shuffle(self.data_list)
-            self.data_list = self.data_list[: -(len(self.data_list) % (mini_batch_size * size))]
-            print("overflow", len(self.data_list) % (mini_batch_size * size))
-            self.batches = [np.array_split(x, size) for x in np.array_split(self.data_list, mini_batch_size * size)]
+            self.data_tensors = list(import_object_from_qualified_name(data_fn)())
+            t.manual_seed(random_seed)
+            perm = t.randperm(self.data_tensors[0].shape[0])
+            for i, ten in enumerate(self.data_tensors):
+                self.data_tensors[i] = ten[perm]
+
+            self.batches = [
+                to_batches(batch, mini_batch_size, trim=True)
+                for batch in to_batches(self.data_tensors, mini_batch_size * size)
+            ]
             self.len = len(self.batches)
         else:
             self.len = -1
@@ -61,7 +77,11 @@ class DistributedDataLoader:
 
 
 def alladd_grad(model):
-    reduce_ops = [dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, async_op=True) for param in model.parameters()]
+
+    reduce_ops = [
+        dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, async_op=True)
+        for param in model.parameters()
+    ]
     for op in reduce_ops:
         op.wait()
 
@@ -74,29 +94,30 @@ def run(
 ):
     print("i'm rank", rank)
     # device = "cuda:" + str(rank)
-    device = "cpu"
     model = import_object_from_qualified_name(model_init_fn_name)()
     model.train()
-    model.to(device)
+    model.to(DEVICE)
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
     dataloader = DistributedDataLoader(rank=rank, size=size)
     for batch in dataloader:
         # print("batch", batch)
-        out = model(batch[0])
-        loss = t.sum(out - batch[1])
+        out = model(batch[0].to(DEVICE))
+        loss = t.sum((out - batch[1].to(DEVICE)) ** 2)
         loss.backward()
         alladd_grad(model)
         optimizer.step()
         optimizer.zero_grad()
-        print("loss", loss.cpu().detach().numpy())
-        raise AssertionError("I want to error!")
+        print(rank, "loss", loss.cpu().detach().numpy())
 
 
 @gin.configurable
-def init_process(rank, size, run, backend="gloo"):
+def init_process(rank, size, run, device, backend="gloo"):
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = "29500"
+    if device == "cuda":
+        global DEVICE
+        DEVICE = "cuda:" + str(rank)
     dist.init_process_group(backend, rank=rank, world_size=size)
     print("inited process group", rank)
     import test_all
@@ -107,12 +128,13 @@ def init_process(rank, size, run, backend="gloo"):
 @gin.configurable
 def create_processes(
     local_parallelism=2,
+    device="cpu",
 ):
     # raise AssertionError(":)")
     processes = []
     mp.set_start_method("spawn")
     for rank in range(local_parallelism):
-        p = mp.Process(target=init_process, args=(rank, local_parallelism, run))
+        p = mp.Process(target=init_process, args=(rank, local_parallelism, run, device))
         p.start()
         processes.append(p)
 
@@ -121,9 +143,11 @@ def create_processes(
 
 
 if __name__ == "__main__":
+    local_parallelism = 2 if len(sys.argv) < 3 else int(sys.argv[2])
+    device = "cpu" if sys.argv[3] == "cpu" else "cuda"
     if sys.argv[1] == "master":
         # gin.parse_config_file(sys.argv[2])
-        create_processes()
+        create_processes(local_parallelism, device)
     else:
         tmpfilename = ".ginny_weasly"
         with open(tmpfilename, "w") as f:

@@ -13,7 +13,6 @@ import random
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
 standard_transforms = [
     transforms.Pad(12),
     transforms.ColorJitter(0.2, 0.2, 0.2, 0.2),
@@ -162,12 +161,14 @@ def layer_channel_feature_visualization(
 
 def get_layer_activations_fn(model, layer):
     activations = None
+
     def hook_fn(model, input, output):
         nonlocal activations
         activations = output
+
     layer.register_forward_hook(hook_fn)
 
-    def activations_fn(input): 
+    def activations_fn(input):
         model(input)
         return activations
 
@@ -181,22 +182,21 @@ def activation_match(model, layer, target, n_iterations=50, learning_rate=5e-2):
     activations_fn = get_layer_activations_fn(model, layer)
 
     target_activations = activations_fn(target).detach()
-
     input_size = target.size()[-2:]
     params, image_fn = get_params_and_image(*input_size, fft=True, decorrelate=True)
-    transforms_fn = transforms.Compose(standard_transforms)
+    transforms_fn = transforms.Compose(
+        [*standard_transforms, transforms.Resize(target.shape[-2:])]
+    )
 
     optimizer = torch.optim.Adam(params, lr=learning_rate)
     for i in tqdm(range(n_iterations)):
         out_activations = activations_fn(transforms_fn(image_fn()))
-        loss = torch.mean((target_activations - out_activations)**2)
+        loss = torch.mean((target_activations - out_activations) ** 2)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
     return image_fn()
-
-
 
 
 def feature_visualization_example1(args):
@@ -231,12 +231,13 @@ def feature_visualization_example1(args):
         view(feat_vis, "image_madry" + str(channel) + ".png")
         time.sleep(2)
 
+
 def feature_visualization_layers_grid(args):
     import matplotlib.pyplot as plt
     from torchvision.models.resnet import BasicBlock, Bottleneck
 
     resnet = models.resnet34(pretrained=True)
-    is_residual_block = lambda m : isinstance(m, BasicBlock) or isinstance(m, Bottleneck)
+    is_residual_block = lambda m: isinstance(m, BasicBlock) or isinstance(m, Bottleneck)
     residual_blocks = [m for m in resnet.modules() if is_residual_block(m)]
     layers = residual_blocks + [resnet]
     n_channels = 10
@@ -249,14 +250,17 @@ def feature_visualization_layers_grid(args):
     fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
 
     for i, layer in enumerate(layers):
-      for channel in range(n_channels):
-        feat_vis = layer_channel_feature_visualization(resnet, layer, channel, n_iterations=args.iterations)
-        feat_vis_img = tensor_to_img_array(feat_vis)[0]
-        axes[i, channel].imshow(feat_vis_img)
-        axes[i, channel].set_axis_off()
+        for channel in range(n_channels):
+            feat_vis = layer_channel_feature_visualization(
+                resnet, layer, channel, n_iterations=args.iterations
+            )
+            feat_vis_img = tensor_to_img_array(feat_vis)[0]
+            axes[i, channel].imshow(feat_vis_img)
+            axes[i, channel].set_axis_off()
 
-    plt.savefig('out.png')
+    plt.savefig("out.png")
     plt.show()
+
 
 def match_activations_example(args):
     import matplotlib.pyplot as plt
@@ -265,13 +269,11 @@ def match_activations_example(args):
     from io import BytesIO
 
     def load_image(url):
-      response = requests.get(url)
-      return Image.open(BytesIO(response.content))
+        response = requests.get(url)
+        return Image.open(BytesIO(response.content))
 
-    url = 'https://i.redd.it/1qyooc1sekb61.jpg'
+    url = "https://i.redd.it/1qyooc1sekb61.jpg"
     img = load_image(url)
-    img.thumbnail((224, 224 * img.height // img.width))
-
 
     fig, axes = plt.subplots(1, 6, figsize=(15, 5))
     axes = axes.flatten()
@@ -279,22 +281,37 @@ def match_activations_example(args):
     axes[0].imshow(img)
     axes[0].set_axis_off()
 
-    input = transforms.ToTensor()(img).unsqueeze(0)
+    input = transforms.Resize((224, 224))(
+        transforms.ToTensor()(img).unsqueeze(0).to(DEVICE)
+    )
+    print(input.shape)
     resnet = models.resnet34(pretrained=True)
-
-    arg_layers = [resnet.layer1, resnet.layer2, resnet.layer3, resnet.layer4, resnet]
+    # print(resnet)
+    arg_layers = [
+        resnet.bn1,
+        # resnet.conv2,
+        resnet.layer1[0],
+        resnet.layer1,
+        resnet.layer2,
+        resnet.layer3,
+        resnet.layer4,
+        resnet,
+    ]
     for i, layer in enumerate(arg_layers, 1):
-      vis = activation_match(model=resnet, layer=resnet, target=input, n_iterations=args.iterations)
-      feat_vis_img = tensor_to_img_array(vis)[0]
-      axes[i].imshow(feat_vis_img)
-      axes[i].set_axis_off()
+        vis = activation_match(
+            model=resnet, layer=layer, target=input, n_iterations=args.iterations
+        )
+        view(vis, "image_match" + str(i) + ".png")
+        feat_vis_img = tensor_to_img_array(vis)[0]
+        axes[i].imshow(feat_vis_img)
+        axes[i].set_axis_off()
     plt.show()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-it", "--iterations", type=int, default=70)
-    parser.add_argument('-e', '--example', type=int, default=0)
+    parser.add_argument("-e", "--example", type=int, default=0)
     args = parser.parse_args()
 
     example_fns = [
