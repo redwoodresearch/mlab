@@ -12,8 +12,22 @@ patch_typeguard()
 
 def tstat(name, tensor):
     print(
-        name, "mean", "{0:.4g}".format(t.mean(tensor).cpu().item()), "var", "{0:.4g}".format(t.var(tensor).cpu().item())
+        name,
+        "mean",
+        "{0:.4g}".format(t.mean(tensor).cpu().item()),
+        "var",
+        "{0:.4g}".format(t.var(tensor).cpu().item()),
     )
+
+
+def to_batches(list_of_tensors, batch_size, trim=False):
+    len = list_of_tensors[0].shape[0]
+    batches = []
+    for i in range(0, len, batch_size):
+        if i + batch_size > len and trim:
+            break
+        batches.append([x[i : i + batch_size] for x in list_of_tensors])
+    return batches
 
 
 def itpeek(tensor: t.Tensor):
@@ -59,7 +73,9 @@ def copy_state_identical(from_module, to_module):
     from_only = from_state_keys - to_state_keys
     to_only = to_state_keys - from_state_keys
     if len(to_only) > 0 or len(from_only) > 0:
-        raise AssertionError(f"{from_only} only in from module, {to_only} only in to module")
+        raise AssertionError(
+            f"{from_only} only in from module, {to_only} only in to module"
+        )
     to_module.load_state_dict(from_state_keys)
 
 
@@ -94,18 +110,26 @@ def einsum(string, *tensors):
     output = output.split()
 
     if len(tensors) != len(inputs):
-        raise AssertionError("einsum string must have same number of inputs as input tensors")
+        raise AssertionError(
+            "einsum string must have same number of inputs as input tensors"
+        )
     dim_sizes = {}
     for args, tensor in zip(inputs, tensors):
         if len(args) != len(tensor.shape):
-            raise AssertionError(f"arg string {args} has the wrong length for shape {tensor.shape}.")
+            raise AssertionError(
+                f"arg string {args} has the wrong length for shape {tensor.shape}."
+            )
         for arg, dim in zip(args, tensor.shape):
             if arg in dim_sizes and dim_sizes[arg] != dim:
-                raise AssertionError(f"dim {arg} has incompatible dimensions {dim_sizes[arg]} and {dim}")
+                raise AssertionError(
+                    f"dim {arg} has incompatible dimensions {dim_sizes[arg]} and {dim}"
+                )
             dim_sizes[arg] = dim
     for arg in output:
         if arg not in dim_sizes:
-            raise AssertionError(f"output string has a name that doesn't appear in the input: {arg}")
+            raise AssertionError(
+                f"output string has a name that doesn't appear in the input: {arg}"
+            )
     valid_regex = r"^[a-zA-Z0-9_]+$"
     for arg in itertools.chain(output, *inputs):
         if not re.match(valid_regex, arg):
@@ -117,7 +141,10 @@ def einsum(string, *tensors):
             dim_order.append(dim)
     wide = t.ones([dim_sizes[x] for x in dim_order])
     for arg, input in zip(inputs, tensors):
-        input_ordered = rearrange(input, f"{' '.join(arg)} -> {' '.join([x if x in arg else '1' for x in dim_order])}")
+        input_ordered = rearrange(
+            input,
+            f"{' '.join(arg)} -> {' '.join([x if x in arg else '1' for x in dim_order])}",
+        )
         wide *= input_ordered
     return wide.sum(dim=tuple(range(len(output), len(dim_order))))
 
@@ -126,6 +153,7 @@ if __name__ == "__main__":
     i1, i2 = t.rand(10, 20, 40), t.rand(10, 40, 50)
     print(
         t.allclose(
-            einsum("batch seq chan, batch chan chan2 -> batch seq chan2", i1, i2), t.einsum("bsc,bct->bst", i1, i2)
+            einsum("batch seq chan, batch chan chan2 -> batch seq chan2", i1, i2),
+            t.einsum("bsc,bct->bst", i1, i2),
         )
     )
