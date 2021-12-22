@@ -118,7 +118,8 @@ if __name__ == "__main__":
             "remote",
         )
     elif sys.argv[1] == "work":
+        params = json.loads(os.environ["PARAMS"])
         with open(tmp_gin_fname, "w") as f:
-            f.write(os.environ["gin_config"])
+            f.write(params["gin_config"])
         gin.parse_config_file(tmp_gin_fname)
         train()
