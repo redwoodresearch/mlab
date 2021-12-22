@@ -1,3 +1,7 @@
+import os
+
+os.system("pip install -r requirements.txt")
+
 import comet_ml
 from comet_ml import Experiment
 import sys
@@ -14,6 +18,8 @@ import itertools as pr
 from days.rrjobs import rrjobs_submit
 import torch.nn.functional as F
 
+tmp_gin_fname = ".hpsearch_temp_gin"
+
 
 def make_grid(axes):
     value_sets = list(pr.product(*axes.values()))
@@ -22,7 +28,9 @@ def make_grid(axes):
         point_config = {}
         for i, key in enumerate(axes.keys()):
             point_config[key] = item[i]
-        points.append(point_config)
+        points.append(
+            "\n".join([f"{key} = {repr(value)}" for key, value in point_config.items()])
+        )
     return points
 
 
@@ -53,16 +61,16 @@ def search(name, axes, location="local"):
             name,
             ["python", "days/hpsearch.py", "work"],
             [
-                {"priority": 1, "parameters": {"--grid_point": json.dumps(point)}}
+                {"priority": 1, "parameters": {"--grid_point": point}}
                 for point in grid_points
             ],
         )
     else:
         for point in grid_points:
             with gin.unlock_config():
-                gin.parse_config_files_and_bindings(
-                    [], [f"{key} = {repr(value)}" for key, value in point.items()]
-                )
+                with open(tmp_gin_fname, "w") as f:
+                    f.write(point)
+                gin.parse_config_file(tmp_gin_fname)
             train()
 
 
@@ -107,8 +115,10 @@ if __name__ == "__main__":
                 "Model.H": [20],
                 "Model.P": [30],
             },
-            "local",
+            "remote",
         )
     elif sys.argv[1] == "work":
-        gin.parse_config_files_and_bindings([], json.loads(sys.argv[3]))
+        with open(tmp_gin_fname, "w") as f:
+            f.write(sys.argv[3])
+        gin.parse_config_file(tmp_gin_fname)
         train()
