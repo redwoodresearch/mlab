@@ -80,7 +80,7 @@ def train(optimizer, num_epochs, lr):
     experiment = Experiment(
         project_name="project_name",
         api_key="vABV7zo6pqS7lfzZBhyabU2Xe",
-    )
+    )  # it doesn't log parameters rn!
     model = Model()
     params = list(model.parameters())
     if optimizer == "sgd":
@@ -115,9 +115,9 @@ if __name__ == "__main__":
                 "Model.K": [10],
                 "Model.H": [20],
                 "Model.P": [30],
-                "data_train.image_name": ["match_sbs.png"],
+                "data_train.image_name": ["image_match1.png"],
             },
-            "remote",
+            "local",
         )
     elif sys.argv[1] == "work":
         params = json.loads(os.environ["PARAMS"])
