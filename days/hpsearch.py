@@ -47,10 +47,11 @@ class Model(nn.Module):
         return self.O(F.gelu(self.K(F.gelu(self.H(F.gelu(self.P(x)))))))
 
 
-def data_train():
+@gin.configurable
+def data_train(image_name):
     import days.training_tests as tt
 
-    return tt.load_image("image_match1.png")[0]  # (train, test)
+    return tt.load_image(image_name)[0]  # (train, test)
 
 
 def search(name, axes, location="local"):
@@ -114,6 +115,7 @@ if __name__ == "__main__":
                 "Model.K": [10],
                 "Model.H": [20],
                 "Model.P": [30],
+                "data_train.image_name": ["match_sbs.png"],
             },
             "remote",
         )
