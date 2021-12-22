@@ -275,17 +275,13 @@ def match_activations_example(args):
     url = "https://i.redd.it/1qyooc1sekb61.jpg"
     img = load_image(url)
 
-    fig, axes = plt.subplots(1, 6, figsize=(15, 5))
-    axes = axes.flatten()
-
-    axes[0].imshow(img)
-    axes[0].set_axis_off()
-
     input = transforms.Resize((224, 224))(
         transforms.ToTensor()(img).unsqueeze(0).to(DEVICE)
     )
     print(input.shape)
     resnet = models.resnet34(pretrained=True)
+    # resnet = torch.load("resnet50_madry")
+
     # print(resnet)
     arg_layers = [
         resnet.bn1,
@@ -297,6 +293,10 @@ def match_activations_example(args):
         resnet.layer4,
         resnet,
     ]
+    fig, axes = plt.subplots(1, len(arg_layers), figsize=(30, 6))
+    axes = axes.flatten()
+    axes[0].imshow(input.cpu()[0].permute(1, 2, 0))
+    axes[0].set_axis_off()
     for i, layer in enumerate(arg_layers, 1):
         vis = activation_match(
             model=resnet, layer=layer, target=input, n_iterations=args.iterations
@@ -306,6 +306,7 @@ def match_activations_example(args):
         axes[i].imshow(feat_vis_img)
         axes[i].set_axis_off()
     plt.show()
+    plt.savefig("match_sbs.png")
 
 
 if __name__ == "__main__":

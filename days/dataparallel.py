@@ -9,12 +9,14 @@ import torch as t
 import numpy as np
 from sklearn.datasets import make_moons
 from utils import *
+import os
+import signal
 
 DEVICE = "cpu"
 
 
 def load_data():
-    X, y = make_moons(n_samples=100000, noise=0.1, random_state=354)
+    X, y = make_moons(n_samples=4 * 4 * 5, noise=0.1, random_state=354)
     X = t.Tensor(X).float()
     y = t.Tensor(y).float()
     return X, y
@@ -86,6 +88,10 @@ def alladd_grad(model):
         op.wait()
 
 
+def killgroup():
+    os.killpg(os.getpgid(os.getpid()), signal.SIGKILL)
+
+
 @gin.configurable()
 def run(
     rank,
@@ -99,7 +105,7 @@ def run(
     model.to(DEVICE)
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
     dataloader = DistributedDataLoader(rank=rank, size=size)
-    for batch in dataloader:
+    for batch_num, batch in enumerate(dataloader):
         # print("batch", batch)
         out = model(batch[0].to(DEVICE))
         loss = t.sum((out - batch[1].to(DEVICE)) ** 2)
@@ -107,7 +113,13 @@ def run(
         alladd_grad(model)
         optimizer.step()
         optimizer.zero_grad()
-        print(rank, "loss", loss.cpu().detach().numpy())
+        # print(rank, "loss", loss.cpu().detach().numpy())
+        print(rank, batch_num)
+    print(rank, "done training")
+    dist.all_reduce(t.zeros(2), op=dist.ReduceOp.SUM)
+
+    if rank == 0:
+        killgroup()
 
 
 @gin.configurable
@@ -137,9 +149,7 @@ def create_processes(
         p = mp.Process(target=init_process, args=(rank, local_parallelism, run, device))
         p.start()
         processes.append(p)
-
-    for p in processes:
-        p.join()
+    # pytorch join requires you to join in order of completion!???
 
 
 if __name__ == "__main__":
