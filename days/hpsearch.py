@@ -61,7 +61,7 @@ def search(name, axes, location="local"):
             name,
             ["python", "days/hpsearch.py", "work"],
             [
-                {"priority": 1, "parameters": {"--grid_point": point}}
+                {"priority": 1, "parameters": {"gin_config": point}}
                 for point in grid_points
             ],
         )
@@ -119,6 +119,6 @@ if __name__ == "__main__":
         )
     elif sys.argv[1] == "work":
         with open(tmp_gin_fname, "w") as f:
-            f.write(sys.argv[3])
+            f.write(os.environ["gin_config"])
         gin.parse_config_file(tmp_gin_fname)
         train()
