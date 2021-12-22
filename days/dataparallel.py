@@ -132,7 +132,6 @@ def init_process(rank, size, run, device, backend="gloo"):
         DEVICE = "cuda:" + str(rank)
     dist.init_process_group(backend, rank=rank, world_size=size)
     print("inited process group", rank)
-    import test_all
 
     run(rank, size)
 
