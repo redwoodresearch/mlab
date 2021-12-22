@@ -33,7 +33,7 @@ class Model(nn.Module):
         self.P = nn.Linear(2, P)
         self.H = nn.Linear(P, H)
         self.K = nn.Linear(H, K)
-        self.P = nn.Linear(K, 3)
+        self.O = nn.Linear(K, 3)
 
     def forward(self, x):
         return self.O(F.gelu(self.K(F.gelu(self.H(F.gelu(self.P(x)))))))
@@ -42,11 +42,12 @@ class Model(nn.Module):
 def data_train():
     import days.training_tests as tt
 
-    return tt.load_image()
+    return tt.load_image("image_match1.png")[0]  # (train, test)
 
 
-def search(name, axes, location="remote"):
+def search(name, axes, location="local"):
     grid_points = make_grid(axes)
+    print(grid_points)
     if location == "remote":
         rrjobs_submit(
             name,
@@ -59,13 +60,18 @@ def search(name, axes, location="remote"):
     else:
         for point in grid_points:
             with gin.unlock_config():
-                gin.parse_config_files_and_bindings([], point)
+                gin.parse_config_files_and_bindings(
+                    [], [f"{key} = {repr(value)}" for key, value in point.items()]
+                )
             train()
 
 
 @gin.configurable
-def train(optimizer, num_epochs, lr, project_name):
-    experiment = Experiment(project_name="project_name")
+def train(optimizer, num_epochs, lr):
+    experiment = Experiment(
+        project_name="project_name",
+        api_key="vABV7zo6pqS7lfzZBhyabU2Xe",
+    )
     model = Model()
     params = list(model.parameters())
     if optimizer == "sgd":
@@ -84,12 +90,25 @@ def train(optimizer, num_epochs, lr, project_name):
             loss = loss_fn(output, target)  # measure how bad predictions are
             loss.backward()  # calculate gradients
             optimizer.step()  # use gradients to update params
+        print(loss)
     experiment.end()
 
 
 if __name__ == "__main__":
     if sys.argv[1] == "orchestrate":
-        search({})
+        print("orchestrateing")
+        search(
+            "test_mlab_rrjobs_search",
+            {
+                "train.lr": [0.001, 0.01],
+                "train.optimizer": ["adam"],
+                "train.num_epochs": [10, 20],
+                "Model.K": [10],
+                "Model.H": [20],
+                "Model.P": [30],
+            },
+            "local",
+        )
     elif sys.argv[1] == "work":
         gin.parse_config_files_and_bindings([], json.loads(sys.argv[3]))
         train()
