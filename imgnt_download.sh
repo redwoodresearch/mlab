@@ -1,0 +1,2 @@
+sudo apt-get install transmission-cli
+transmission-cli ImageNet-ValidationSet.zip-16c5dd6a172ac59e0f27d4b698e5399ea9d48160.torrent
