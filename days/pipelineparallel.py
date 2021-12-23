@@ -15,7 +15,7 @@ import torchvision
 import transformers
 import torchtext
 
-TAGS = {"Y": 1000, "X": 2000, "ACTIVATION": 3000, "GRAD": 4000}
+TAGS = {"Y": 1000, "X": 2000, "ACTIVATION": 3000, "GRAD": 4000, "SYNC": 5000}
 
 
 def make_and_save_resnet_pieces():
@@ -129,6 +129,7 @@ def make_dataset_imdb():
     return data
 
 
+# 'bad address' error means you tried to use operations that weren't supported on cuda
 # I think the gradient accumulation will just work out?
 @gin.configurable()
 def pprun(
@@ -147,7 +148,7 @@ def pprun(
 
     device = "cpu" if use_cpu else "cuda:" + str(rank)
     model: nn.Module = t.load(model_file_name)
-    model.half()
+    # model.half()
     model.train()
     model.to(device)
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
@@ -159,23 +160,26 @@ def pprun(
             for batch in to_batches(dataset, minibatch_size * size, trim=True)
         )
     for batch_num in range(num_batches):
+        dist.all_reduce(t.zeros(1))
+        if rank == 0:
+            print("pre_batch_sync")
         if rank == 0:
             minibatches = next(batches)
             forward_sends = []
             out_tensors = []
             for send in [
-                dist.isend(batch[1], size - 1, tag=TAGS["Y"]) for batch in minibatches
+                dist.send(batch[1], size - 1, tag=TAGS["Y"] + i)
+                for i, batch in enumerate(minibatches)
             ]:
-                send.wait()
+                ...
 
             for i, batch in enumerate(minibatches):
-                out = model(batch[0].long().to(device))
+                with t.autocast(dtype=t.float16, device_type=device[:4]):
+                    out = model(batch[0].long().to(device)).cpu()
                 out_tensors.append(out)
                 forward_sends.append(
-                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + i)
+                    dist.send(out, rank + 1, tag=TAGS["ACTIVATION"] + i)
                 )
-            for forward_pass in forward_sends:
-                forward_pass.wait()
             grad_buffer = t.zeros_like(out)
             for i, out_tensor in enumerate(out_tensors):
                 dist.recv(grad_buffer, rank + 1, tag=TAGS["GRAD"] + i)
@@ -185,57 +189,54 @@ def pprun(
             forward_sends = []
             out_tensors = []
             xs = []
+            backward_sends = []
             for minibatch_num in range(size):
                 x_buffer = t.zeros(minibatch_size, *model_in_shape)
                 dist.recv(x_buffer, rank - 1, tag=TAGS["ACTIVATION"] + minibatch_num)
                 x_buffer.requires_grad = True
-                out = model(x_buffer)
+                with t.autocast(dtype=t.float16, device_type=device[:4]):
+                    out = model(x_buffer.to(device)).cpu()
                 xs.append(x_buffer)
                 out_tensors.append(out)
                 forward_sends.append(
-                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + minibatch_num)
+                    dist.send(out, rank + 1, tag=TAGS["ACTIVATION"] + minibatch_num)
                 )
-            for forward_pass in forward_sends:
-                forward_pass.wait()
             grad_buffer = t.zeros_like(out)
-            backward_sends = []
             for i, (out_tensor, x) in enumerate(zip(out_tensors, xs)):
                 dist.recv(grad_buffer, rank + 1, tag=TAGS["GRAD"] + i)
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
-                backward_sends.append(dist.isend(xgrad, rank - 1, tag=TAGS["GRAD"]))
-            for backward_send in backward_sends:
-                backward_send.wait()
+                backward_sends.append(dist.send(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
 
         elif rank == size - 1:
-            ys = [t.zeros(minibatch_size, *y_size).to(device) for _ in range(size)]
-            for recv in [dist.irecv(y, 0, tag=TAGS["Y"] + i) for i, y in enumerate(ys)]:
-                recv.wait()
             xs = []
             losses = []
+            backward_sends = []
+            ys = [t.zeros(minibatch_size, *y_size) for _ in range(size)]
+            for recv in [dist.recv(y, 0, tag=TAGS["Y"] + i) for i, y in enumerate(ys)]:
+                pass
             for minibatch_num in range(size):
-                x_buffer = t.zeros(minibatch_size, *model_in_shape).to(device)
+                x_buffer = t.zeros(minibatch_size, *model_in_shape)
                 dist.recv(x_buffer, rank - 1, tag=TAGS["ACTIVATION"] + minibatch_num)
                 x_buffer.requires_grad = True
-                out = model(x_buffer)
+                with t.autocast(dtype=t.float16, device_type=device[:4]):
+                    out = model(x_buffer.to(device)).cpu()
                 out = out[
-                    ..., -2:
+                    :, -1, -2:
                 ]  # use the last 2 tokens of LM head as classification head
                 print("out shape", out.shape)
                 print("ys shape", ys[minibatch_num].shape)
-                cur_loss = nn.CrossEntropyLoss()(
-                    out, ys[minibatch_num].long().to(device)
-                )
+                cur_loss = nn.CrossEntropyLoss()(out, ys[minibatch_num].long())
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
-            backward_sends = []
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
                 xgrad = x.grad
-                backward_sends.append(dist.isend(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
-            for backward_send in backward_sends:
-                backward_send.wait()
+                backward_sends.append(dist.send(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
+        dist.all_reduce(t.zeros(1))
+        if rank == 0:
+            print("post_batch_sync")
         optimizer.step()
         optimizer.zero_grad()
         if batch_num % checkpoint_every == checkpoint_every - 1:
@@ -286,7 +287,6 @@ def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple])
     pipe_stages = len(model_paths)
     size = pipe_stages
     for rank, model_part_str in enumerate(model_paths):
-        print("spawning", rank)
         p = mp.Process(
             target=init_process,
             args=(rank, size, pprun, model_part_str, model_in_shapes[rank]),
