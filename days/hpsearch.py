@@ -117,7 +117,7 @@ if __name__ == "__main__":
                 "Model.P": [30],
                 "data_train.image_name": ["image_match1.png"],
             },
-            "local",
+            "remote",
         )
     elif sys.argv[1] == "work":
         params = json.loads(os.environ["PARAMS"])
