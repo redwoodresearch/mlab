@@ -121,6 +121,7 @@ def run(
     model = import_object_from_qualified_name(model_init_fn_name)()
     model.train()
     model.to(DEVICE)
+    print()
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
     dataloader = DistributedDataLoader(rank=rank, size=size)
     loss_fn = t.nn.CrossEntropyLoss(reduction="sum")
