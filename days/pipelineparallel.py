@@ -1,3 +1,4 @@
+from torchtext.datasets.imdb import DATASET_NAME
 import test_all
 from test_all import allclose
 from typing import List
@@ -51,10 +52,23 @@ def make_and_save_resnet_pieces():
     return models
 
 
-def make_t5_and_save_pieces():
-    t5 = transformers.T5ForSequenceClassification.from_pretrained("t5-11b")
-    print(t5)
-    models = []
+def make_gptj_and_save_pieces():
+    model = transformers.AutoModel.from_pretrained("EleutherAI/gpt-j-6B")
+    with open("gptj_arch.txt", "w") as f:
+        f.write(str(model))
+    print(model)
+    num_layers = 28
+    chunks = [2, 3, 4, 4, 4, 4, 3, 3]
+    chunk_cumsum = t.cumsum(t.tensor(chunks), dim=0).tolist()
+    models = [
+        nn.Sequential(*model.h[start : start + size])
+        for start, size in zip(chunk_cumsum, chunks)
+    ]
+    models[0] = nn.Sequential(model.wte, model.drop, *models[0])
+    models[7] = nn.Sequential(*models[7], model.ln_f)
+    for i, model_part in enumerate(models):
+        t.save(model_part, "gpt-j-6b_part" + str(i))
+    return models
 
 
 def make_dataset():
@@ -72,17 +86,28 @@ def make_dataset_imdb():
 
     sent_to_num = {"neg": 0, "pos": 1}
     random.shuffle(train_data)
-    tokenizer = transformers.AutoTokenizer.from_pretrained("t5-11b")
-    print(train_data[0])
+    tokenizer = transformers.AutoTokenizer.from_pretrained("EleutherAI/gpt-j-6B")
+    print("starting tokenization")
     data = [
-        t.stack(
+        t.tensor(
+            # gptj wasn't trained with pad token, so doing this
             [
-                tokenizer(x, return_tensors="pt", padding=512)["input_ids"]
-                for x, _ in train_data
+                x[:256]
+                for x in tokenizer(
+                    [
+                        x
+                        + " _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _-- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _-"
+                        for _, x in train_data
+                    ],
+                    padding=False,
+                    truncation=True,
+                    max_length=256,
+                )["input_ids"]
             ]
         ),
-        t.tensor([sent_to_num[x] for _, x in train_data]),
+        t.tensor([sent_to_num[x] for x, _ in train_data]),
     ]
+    print("finished tokenization")
     return data
 
 
@@ -96,7 +121,7 @@ def pprun(
     minibatch_size: int,
     num_batches,
     y_size,
-    x_size,
+    x_size=None,
     dataset_fn_name: str = "days.pipelineparallel.make_dataset",
     checkpoint_every=10,
     use_cpu=True,
@@ -123,7 +148,7 @@ def pprun(
                 send.wait()
 
             for batch in minibatches:
-                out = model(batch[0].to(device))
+                out = model(batch[0].long().to(device))
                 out_tensors.append(out)
                 forward_sends.append(dist.isend(out, rank + 1))
             for forward_pass in forward_sends:
@@ -138,7 +163,7 @@ def pprun(
             out_tensors = []
             xs = []
             for minibatch_num in range(size):
-                x_buffer = t.zeros(minibatch_size, *x_size)
+                x_buffer = t.zeros(minibatch_size, *model_in_shape)
                 dist.recv(x_buffer, rank - 1)
                 x_buffer.requires_grad = True
                 out = model(x_buffer)
@@ -153,7 +178,7 @@ def pprun(
                 dist.recv(grad_buffer, rank + 1)
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
-                backward_sends.append(dist.send(xgrad, rank - 1))
+                backward_sends.append(dist.isend(xgrad, rank - 1))
             for backward_send in backward_sends:
                 backward_send.wait()
 
@@ -170,7 +195,9 @@ def pprun(
                 out = model(x_buffer)
                 print("out shape", out.shape)
                 print("ys shape", ys[minibatch_num].shape)
-                cur_loss = nn.CrossEntropyLoss()(out, ys[minibatch_num].long())
+                cur_loss = nn.CrossEntropyLoss()(
+                    out, ys[minibatch_num].long().to(device)
+                )
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
@@ -198,7 +225,7 @@ def reference_training(use_cpu=True):
     model.train()
     model.to(device)
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
-    dataset = import_object_from_qualified_name("days.pipelineparallel.make_dataset")()
+    dataset = import_object_from_qualified_name(DATASET_NAME)()
     batches = to_batches(dataset, 12 * 2, trim=True)
     for batch in batches[:num_batches]:
         optimizer.zero_grad()
@@ -242,6 +269,7 @@ def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple])
 
 if __name__ == "__main__":
     # make_and_save_resnet_pieces()
+    # make_gptj_and_save_pieces()
     gin.parse_config_file(sys.argv[1])
     start_pipeline_cluster()
     # reference_training()

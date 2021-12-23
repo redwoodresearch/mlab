@@ -1,7 +1,0 @@
-pprun.num_batches = 100
-pprun.x_size = (3,64,64)
-pprun.y_size = ()
-pprun.minibatch_size = 12
-
-start_pipeline_cluster.model_paths=[".t5-11b_part0",".t5-11b_part0"]
-start_pipeline_cluster.model_in_shapes=[(3,64,64),(512, 8,8)]
