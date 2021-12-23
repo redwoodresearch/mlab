@@ -1,4 +1,3 @@
-import test_all
 from typing import List
 
 from torch import nn
@@ -35,7 +34,9 @@ def pprun(
     model.to(device)
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
     if rank == 0:
-        dataloader = import_object_from_qualified_name(dataloader_fn_name)(batch_size=minibatch_size * size)
+        dataloader = import_object_from_qualified_name(dataloader_fn_name)(
+            batch_size=minibatch_size * size
+        )
     for batch_num in range(num_batches):
         if rank == 0:
             minibatches = [next(dataloader) for _ in range(size)]
