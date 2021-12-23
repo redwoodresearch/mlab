@@ -109,7 +109,7 @@ def make_dataset_imdb():
         t.Tensor(
             # gptj wasn't trained with pad token, so doing this
             [
-                x[:256]
+                x[:8]
                 for x in tokenizer(
                     [
                         x
@@ -118,7 +118,7 @@ def make_dataset_imdb():
                     ],
                     padding=False,
                     truncation=True,
-                    max_length=256,
+                    max_length=8,
                 )["input_ids"]
             ]
         ),
@@ -144,20 +144,21 @@ def pprun(
     dataset_fn_name: str = "days.pipelineparallel.make_dataset",
     checkpoint_every=10,
     use_cpu=True,
+    use_autocast=False,
 ):
-
+    pipe_width = 5  # pipe_width=size
+    autocast_type = t.bfloat16 if use_cpu else t.float16
     device = "cpu" if use_cpu else "cuda:" + str(rank)
     model: nn.Module = t.load(model_file_name)
-    # model.half()
     model.train()
     model.to(device)
-    optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = t.optim.SGD(model.parameters(), lr=1e-4)
     print("model loaded", rank)
     if rank == 0:
         dataset = import_object_from_qualified_name(dataset_fn_name)()
         batches = (
             to_batches(batch, minibatch_size, trim=True)
-            for batch in to_batches(dataset, minibatch_size * size, trim=True)
+            for batch in to_batches(dataset, minibatch_size * pipe_width, trim=True)
         )
     for batch_num in range(num_batches):
         dist.all_reduce(t.zeros(1))
@@ -174,7 +175,9 @@ def pprun(
                 ...
 
             for i, batch in enumerate(minibatches):
-                with t.autocast(dtype=t.float16, device_type=device[:4]):
+                with t.autocast(
+                    dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+                ):
                     out = model(batch[0].long().to(device)).cpu()
                 out_tensors.append(out)
                 forward_sends.append(
@@ -190,11 +193,13 @@ def pprun(
             out_tensors = []
             xs = []
             backward_sends = []
-            for minibatch_num in range(size):
+            for minibatch_num in range(pipe_width):
                 x_buffer = t.zeros(minibatch_size, *model_in_shape)
                 dist.recv(x_buffer, rank - 1, tag=TAGS["ACTIVATION"] + minibatch_num)
                 x_buffer.requires_grad = True
-                with t.autocast(dtype=t.float16, device_type=device[:4]):
+                with t.autocast(
+                    dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+                ):
                     out = model(x_buffer.to(device)).cpu()
                 xs.append(x_buffer)
                 out_tensors.append(out)
@@ -207,29 +212,36 @@ def pprun(
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
                 backward_sends.append(dist.send(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
+                xs[i] = None
+                out_tensors[i] = None
 
         elif rank == size - 1:
             xs = []
             losses = []
             backward_sends = []
-            ys = [t.zeros(minibatch_size, *y_size) for _ in range(size)]
+            ys = [t.zeros(minibatch_size, *y_size) for _ in range(pipe_width)]
             for recv in [dist.recv(y, 0, tag=TAGS["Y"] + i) for i, y in enumerate(ys)]:
                 pass
-            for minibatch_num in range(size):
+            for minibatch_num in range(pipe_width):
                 x_buffer = t.zeros(minibatch_size, *model_in_shape)
                 dist.recv(x_buffer, rank - 1, tag=TAGS["ACTIVATION"] + minibatch_num)
                 x_buffer.requires_grad = True
-                with t.autocast(dtype=t.float16, device_type=device[:4]):
+                with t.autocast(
+                    dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+                ):
                     out = model(x_buffer.to(device)).cpu()
                 out = out[
                     :, -1, -2:
                 ]  # use the last 2 tokens of LM head as classification head
-                print("out shape", out.shape)
-                print("ys shape", ys[minibatch_num].shape)
-                cur_loss = nn.CrossEntropyLoss()(out, ys[minibatch_num].long())
+                cur_loss = nn.CrossEntropyLoss()(out.float(), ys[minibatch_num].long())
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
+            print(
+                "whole batch loss",
+                batch_num,
+                sum([x.cpu().item() for x in losses]) / len(losses),
+            )
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
                 xgrad = x.grad
