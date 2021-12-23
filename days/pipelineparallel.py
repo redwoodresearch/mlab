@@ -37,7 +37,7 @@ def make_and_save_resnet_pieces():
         ),
     ]
     t.save(models[0], ".resnet50_part0")
-    randimg = t.randn(1, 3, 224, 224)
+    randimg = t.randn(1, 3, 64, 64)
     print("intermediate shape", models[0](randimg).shape)
     t.save(models[1], ".resnet50_part1")
     seqran = models[1](models[0](randimg))
@@ -53,9 +53,9 @@ def make_dataset():
     t.manual_seed(0)
     pairs = torchvision.datasets.CIFAR10(root=".data", download=True)
     transforms = torchvision.transforms.Compose(
-        [torchvision.transforms.ToTensor(), torchvision.transforms.Resize((32, 32))]
+        [torchvision.transforms.ToTensor(), torchvision.transforms.Resize((64, 64))]
     )
-    return t.stack([transforms(p[0]) for p in pairs]), t.tensor([p[1] for p in pairs])
+    return t.stack([transforms(p[0]) for p in pairs]), t.Tensor([p[1] for p in pairs])
 
 
 # I think the gradient accumulation will just work out?
@@ -81,6 +81,7 @@ def pprun(
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
     if rank == 0:
         dataset = import_object_from_qualified_name(dataset_fn_name)()
+        print(dataset[1].shape)
         batches = (
             to_batches(batch, minibatch_size, trim=True)
             for batch in to_batches(dataset, minibatch_size * size, trim=True)
@@ -139,9 +140,9 @@ def pprun(
                 dist.recv(x_buffer, rank - 1)
                 x_buffer.requires_grad = True
                 out = model(x_buffer)
-                cur_loss = t.binary_cross_entropy_with_logits(
-                    out, ys[minibatch_num]
-                ).mean()
+                print("out shape", out.shape)
+                print("ys shape", ys[minibatch_num].shape)
+                cur_loss = nn.CrossEntropyLoss()(out, ys[minibatch_num].long())
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
@@ -212,7 +213,7 @@ def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple])
 
 
 if __name__ == "__main__":
-    make_and_save_resnet_pieces()
+    # make_and_save_resnet_pieces()
     gin.parse_config_file(sys.argv[1])
     start_pipeline_cluster()
-    reference_training()
+    # reference_training()
