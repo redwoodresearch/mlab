@@ -13,6 +13,8 @@ from utils import import_object_from_qualified_name
 import torch as t
 from utils import *
 import torchvision
+import transformers
+import torchtext
 
 
 def make_and_save_resnet_pieces():
@@ -49,6 +51,12 @@ def make_and_save_resnet_pieces():
     return models
 
 
+def make_t5_and_save_pieces():
+    t5 = transformers.T5ForSequenceClassification.from_pretrained("t5-11b")
+    print(t5)
+    models = []
+
+
 def make_dataset():
     t.manual_seed(0)
     pairs = torchvision.datasets.CIFAR10(root=".data", download=True)
@@ -56,6 +64,26 @@ def make_dataset():
         [torchvision.transforms.ToTensor(), torchvision.transforms.Resize((64, 64))]
     )
     return t.stack([transforms(p[0]) for p in pairs]), t.Tensor([p[1] for p in pairs])
+
+
+def make_dataset_imdb():
+    train_data = list(torchtext.datasets.IMDB(split="train"))
+    import random
+
+    sent_to_num = {"neg": 0, "pos": 1}
+    random.shuffle(train_data)
+    tokenizer = transformers.AutoTokenizer.from_pretrained("t5-11b")
+    print(train_data[0])
+    data = [
+        t.stack(
+            [
+                tokenizer(x, return_tensors="pt", padding=512)["input_ids"]
+                for x, _ in train_data
+            ]
+        ),
+        t.tensor([sent_to_num[x] for _, x in train_data]),
+    ]
+    return data
 
 
 # I think the gradient accumulation will just work out?
