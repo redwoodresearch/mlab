@@ -107,18 +107,29 @@ def make_dataset_imdb():
     # save as float32 so you don't have to pass dtype around, convert to long right before use
     data = [
         t.Tensor(
-            # gptj wasn't trained with pad token, so doing this
             [
-                x[:8]
+                x[-128:]
                 for x in tokenizer(
                     [
-                        x
-                        + " _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _-- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _- _-"
+                        # gptj wasn't trained with pad token, so doing this
+                        """However, when I quit and come back and try the top command again, it is refreshing the processes information again for every 3 seconds and not with the interval that I've set earlier.
+
+I was looking for a way to configure this interval permanently. I've looked at some articles where in they mentioned to use the toprc file in /etc directory for this configuration.
+
+But it doesn't seem like I have any such file in /etc or my home directory.
+
+How do I set the refresh interval for top command? When generating samples interactively sometimes an "end of text" marker is included on the text. Is this related to the sanitization of the training data?However, when I quit and come back and try the top command again, it is refreshing the processes information again for every 3 seconds and not with the interval that I've set earlier.
+
+I was looking for a way to configure this interval permanently. I've looked at some articles where in they mentioned to use the toprc file in /etc directory for this configuration.
+
+But it doesn't seem like I have any such file in /etc or my home directory.
+
+How do I set the refresh interval for top command? When generating samples interactively sometimes an "end of text" marker is included on the text. Is this related to the sanitization of the training data?<|endoftext|>"""
+                        + x
                         for _, x in train_data
                     ],
                     padding=False,
-                    truncation=True,
-                    max_length=8,
+                    truncation=False,
                 )["input_ids"]
             ]
         ),
@@ -140,13 +151,13 @@ def pprun(
     minibatch_size: int,
     num_batches,
     y_size,
+    pipe_width,
     x_size=None,
     dataset_fn_name: str = "days.pipelineparallel.make_dataset",
-    checkpoint_every=10,
+    checkpoint_every=100,
     use_cpu=True,
     use_autocast=False,
 ):
-    pipe_width = 5  # pipe_width=size
     autocast_type = t.bfloat16 if use_cpu else t.float16
     device = "cpu" if use_cpu else "cuda:" + str(rank)
     model: nn.Module = t.load(model_file_name)
@@ -163,16 +174,14 @@ def pprun(
     for batch_num in range(num_batches):
         dist.all_reduce(t.zeros(1))
         if rank == 0:
-            print("pre_batch_sync")
-        if rank == 0:
             minibatches = next(batches)
             forward_sends = []
             out_tensors = []
             for send in [
-                dist.send(batch[1], size - 1, tag=TAGS["Y"] + i)
+                dist.isend(batch[1], size - 1, tag=TAGS["Y"] + i)
                 for i, batch in enumerate(minibatches)
             ]:
-                ...
+                send.wait()
 
             for i, batch in enumerate(minibatches):
                 with t.autocast(
@@ -181,13 +190,15 @@ def pprun(
                     out = model(batch[0].long().to(device)).cpu()
                 out_tensors.append(out)
                 forward_sends.append(
-                    dist.send(out, rank + 1, tag=TAGS["ACTIVATION"] + i)
+                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + i)
                 )
+            for forward_send in forward_sends:
+                forward_send.wait()
             grad_buffer = t.zeros_like(out)
             for i, out_tensor in enumerate(out_tensors):
                 dist.recv(grad_buffer, rank + 1, tag=TAGS["GRAD"] + i)
                 out_tensor.backward(grad_buffer)
-
+                out_tensors[i] = None
         elif rank != size - 1:
             forward_sends = []
             out_tensors = []
@@ -204,24 +215,28 @@ def pprun(
                 xs.append(x_buffer)
                 out_tensors.append(out)
                 forward_sends.append(
-                    dist.send(out, rank + 1, tag=TAGS["ACTIVATION"] + minibatch_num)
+                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + minibatch_num)
                 )
+            for forward_send in forward_sends:
+                forward_send.wait()
             grad_buffer = t.zeros_like(out)
             for i, (out_tensor, x) in enumerate(zip(out_tensors, xs)):
                 dist.recv(grad_buffer, rank + 1, tag=TAGS["GRAD"] + i)
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
-                backward_sends.append(dist.send(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
+                backward_sends.append(dist.isend(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
                 xs[i] = None
                 out_tensors[i] = None
+            for backward_send in backward_sends:
+                backward_send.wait()
 
         elif rank == size - 1:
             xs = []
             losses = []
             backward_sends = []
             ys = [t.zeros(minibatch_size, *y_size) for _ in range(pipe_width)]
-            for recv in [dist.recv(y, 0, tag=TAGS["Y"] + i) for i, y in enumerate(ys)]:
-                pass
+            for recv in [dist.irecv(y, 0, tag=TAGS["Y"] + i) for i, y in enumerate(ys)]:
+                recv.wait()
             for minibatch_num in range(pipe_width):
                 x_buffer = t.zeros(minibatch_size, *model_in_shape)
                 dist.recv(x_buffer, rank - 1, tag=TAGS["ACTIVATION"] + minibatch_num)
@@ -245,14 +260,18 @@ def pprun(
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
                 xgrad = x.grad
-                backward_sends.append(dist.send(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
+                backward_sends.append(dist.isend(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
+                losses[i] = None
+                xs[i] = None
+            for backward_send in backward_sends:
+                backward_send.wait()
         dist.all_reduce(t.zeros(1))
-        if rank == 0:
-            print("post_batch_sync")
         optimizer.step()
         optimizer.zero_grad()
         if batch_num % checkpoint_every == checkpoint_every - 1:
-            t.save(model, f"checkpoint{batch_num}_rank{rank}")
+            if rank == 0:
+                print("saving")
+            t.save(model, f"./.checkpoints/gptj_imdb_{batch_num}_rank{rank}")
     if rank == 0:
         tpeek("pipe", next(model.parameters()))
 
