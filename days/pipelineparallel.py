@@ -1,7 +1,5 @@
-from torchtext.datasets.imdb import DATASET_NAME
-import test_all
 from test_all import allclose
-from typing import List
+from typing import *
 
 from torch import nn
 import os
@@ -16,6 +14,8 @@ from utils import *
 import torchvision
 import transformers
 import torchtext
+
+TAGS = {"Y": 1000, "X": 2000, "ACTIVATION": 3000, "GRAD": 4000}
 
 
 def make_and_save_resnet_pieces():
@@ -52,20 +52,33 @@ def make_and_save_resnet_pieces():
     return models
 
 
+class HFBlockSequence(nn.Module):
+    def __init__(self, *layers):
+        super().__init__()
+        self.layers = nn.ModuleList(layers)
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)[0]
+        return x
+
+
 def make_gptj_and_save_pieces():
-    model = transformers.AutoModel.from_pretrained("EleutherAI/gpt-j-6B")
+    model_lm = transformers.AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
+    model = model_lm.transformer
     with open("gptj_arch.txt", "w") as f:
         f.write(str(model))
     print(model)
     num_layers = 28
-    chunks = [2, 3, 4, 4, 4, 4, 3, 3]
+    chunks = [2, 4, 4, 4, 4, 4, 4, 2]
     chunk_cumsum = t.cumsum(t.tensor(chunks), dim=0).tolist()
+    print("cumsum", chunk_cumsum)
     models = [
-        nn.Sequential(*model.h[start : start + size])
+        HFBlockSequence(*model.h[start - size : start])
         for start, size in zip(chunk_cumsum, chunks)
     ]
-    models[0] = nn.Sequential(model.wte, model.drop, *models[0])
-    models[7] = nn.Sequential(*models[7], model.ln_f)
+    models[0] = nn.Sequential(model.wte, model.drop, models[0])
+    models[7] = nn.Sequential(models[7], model.ln_f, model_lm.lm_head)
     for i, model_part in enumerate(models):
         t.save(model_part, "gpt-j-6b_part" + str(i))
     return models
@@ -81,6 +94,9 @@ def make_dataset():
 
 
 def make_dataset_imdb():
+    if os.path.exists("imdb_data.pt"):
+        print("reading cached data tensors")
+        return t.load("imdb_data.pt")
     train_data = list(torchtext.datasets.IMDB(split="train"))
     import random
 
@@ -88,8 +104,9 @@ def make_dataset_imdb():
     random.shuffle(train_data)
     tokenizer = transformers.AutoTokenizer.from_pretrained("EleutherAI/gpt-j-6B")
     print("starting tokenization")
+    # save as float32 so you don't have to pass dtype around, convert to long right before use
     data = [
-        t.tensor(
+        t.Tensor(
             # gptj wasn't trained with pad token, so doing this
             [
                 x[:256]
@@ -105,8 +122,9 @@ def make_dataset_imdb():
                 )["input_ids"]
             ]
         ),
-        t.tensor([sent_to_num[x] for x, _ in train_data]),
+        t.Tensor([sent_to_num[x] for x, _ in train_data]),
     ]
+    t.save(data, "imdb_data.pt")
     print("finished tokenization")
     return data
 
@@ -129,12 +147,13 @@ def pprun(
 
     device = "cpu" if use_cpu else "cuda:" + str(rank)
     model: nn.Module = t.load(model_file_name)
+    model.half()
     model.train()
     model.to(device)
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
+    print("model loaded", rank)
     if rank == 0:
         dataset = import_object_from_qualified_name(dataset_fn_name)()
-        print(dataset[1].shape)
         batches = (
             to_batches(batch, minibatch_size, trim=True)
             for batch in to_batches(dataset, minibatch_size * size, trim=True)
@@ -144,18 +163,22 @@ def pprun(
             minibatches = next(batches)
             forward_sends = []
             out_tensors = []
-            for send in [dist.isend(batch[1], size - 1) for batch in minibatches]:
+            for send in [
+                dist.isend(batch[1], size - 1, tag=TAGS["Y"]) for batch in minibatches
+            ]:
                 send.wait()
 
-            for batch in minibatches:
+            for i, batch in enumerate(minibatches):
                 out = model(batch[0].long().to(device))
                 out_tensors.append(out)
-                forward_sends.append(dist.isend(out, rank + 1))
+                forward_sends.append(
+                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + i)
+                )
             for forward_pass in forward_sends:
                 forward_pass.wait()
             grad_buffer = t.zeros_like(out)
-            for _, out_tensor in enumerate(out_tensors):
-                dist.recv(grad_buffer, rank + 1)
+            for i, out_tensor in enumerate(out_tensors):
+                dist.recv(grad_buffer, rank + 1, tag=TAGS["GRAD"] + i)
                 out_tensor.backward(grad_buffer)
 
         elif rank != size - 1:
@@ -164,35 +187,40 @@ def pprun(
             xs = []
             for minibatch_num in range(size):
                 x_buffer = t.zeros(minibatch_size, *model_in_shape)
-                dist.recv(x_buffer, rank - 1)
+                dist.recv(x_buffer, rank - 1, tag=TAGS["ACTIVATION"] + minibatch_num)
                 x_buffer.requires_grad = True
                 out = model(x_buffer)
                 xs.append(x_buffer)
                 out_tensors.append(out)
-                forward_sends.append(dist.isend(out, rank + 1))
+                forward_sends.append(
+                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + minibatch_num)
+                )
             for forward_pass in forward_sends:
                 forward_pass.wait()
             grad_buffer = t.zeros_like(out)
             backward_sends = []
-            for out_tensor, x in zip(out_tensors, xs):
-                dist.recv(grad_buffer, rank + 1)
+            for i, (out_tensor, x) in enumerate(zip(out_tensors, xs)):
+                dist.recv(grad_buffer, rank + 1, tag=TAGS["GRAD"] + i)
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
-                backward_sends.append(dist.isend(xgrad, rank - 1))
+                backward_sends.append(dist.isend(xgrad, rank - 1, tag=TAGS["GRAD"]))
             for backward_send in backward_sends:
                 backward_send.wait()
 
         elif rank == size - 1:
             ys = [t.zeros(minibatch_size, *y_size).to(device) for _ in range(size)]
-            for recv in [dist.irecv(y, 0) for y in ys]:
+            for recv in [dist.irecv(y, 0, tag=TAGS["Y"] + i) for i, y in enumerate(ys)]:
                 recv.wait()
             xs = []
             losses = []
             for minibatch_num in range(size):
                 x_buffer = t.zeros(minibatch_size, *model_in_shape).to(device)
-                dist.recv(x_buffer, rank - 1)
+                dist.recv(x_buffer, rank - 1, tag=TAGS["ACTIVATION"] + minibatch_num)
                 x_buffer.requires_grad = True
                 out = model(x_buffer)
+                out = out[
+                    ..., -2:
+                ]  # use the last 2 tokens of LM head as classification head
                 print("out shape", out.shape)
                 print("ys shape", ys[minibatch_num].shape)
                 cur_loss = nn.CrossEntropyLoss()(
@@ -202,16 +230,16 @@ def pprun(
                 losses.append(cur_loss)
                 xs.append(x_buffer)
             backward_sends = []
-            for loss, x in zip(losses, xs):
+            for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
                 xgrad = x.grad
-                backward_sends.append(dist.isend(xgrad, rank - 1))
+                backward_sends.append(dist.isend(xgrad, rank - 1, tag=TAGS["GRAD"] + i))
             for backward_send in backward_sends:
                 backward_send.wait()
         optimizer.step()
         optimizer.zero_grad()
         if batch_num % checkpoint_every == checkpoint_every - 1:
-            t.save(model, f"checkpoint_rank{rank}")
+            t.save(model, f"checkpoint{batch_num}_rank{rank}")
     if rank == 0:
         tpeek("pipe", next(model.parameters()))
 
@@ -225,7 +253,7 @@ def reference_training(use_cpu=True):
     model.train()
     model.to(device)
     optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
-    dataset = import_object_from_qualified_name(DATASET_NAME)()
+    dataset = import_object_from_qualified_name("os")()
     batches = to_batches(dataset, 12 * 2, trim=True)
     for batch in batches[:num_batches]:
         optimizer.zero_grad()
