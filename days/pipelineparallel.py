@@ -1,4 +1,5 @@
 import test_all
+from test_all import allclose
 from typing import List
 
 from torch import nn
@@ -11,11 +12,50 @@ import sys
 from utils import import_object_from_qualified_name
 import torch as t
 from utils import *
+import torchvision
+
+
+def make_and_save_resnet_pieces():
+    t.manual_seed(0)
+    resnet = torchvision.models.resnet50()
+    print(resnet)
+    models = [
+        nn.Sequential(
+            resnet.conv1,
+            resnet.bn1,
+            resnet.relu,
+            resnet.maxpool,
+            resnet.layer1,
+            resnet.layer2,
+        ),
+        nn.Sequential(
+            resnet.layer3,
+            resnet.layer4,
+            resnet.avgpool,
+            nn.Flatten(),
+            resnet.fc,
+        ),
+    ]
+    t.save(models[0], ".resnet50_part0")
+    randimg = t.randn(1, 3, 224, 224)
+    print("intermediate shape", models[0](randimg).shape)
+    t.save(models[1], ".resnet50_part1")
+    seqran = models[1](models[0](randimg))
+    allclose(
+        seqran,
+        resnet(randimg),
+        "splitresnet",
+    )
+    return models
 
 
 def make_dataset():
-    n = 10000
-    return [t.randn(n, 10).float(), t.randn(n, 10).float()]
+    t.manual_seed(0)
+    pairs = torchvision.datasets.CIFAR10(root=".data", download=True)
+    transforms = torchvision.transforms.Compose(
+        [torchvision.transforms.ToTensor(), torchvision.transforms.Resize((32, 32))]
+    )
+    return t.stack([transforms(p[0]) for p in pairs]), t.tensor([p[1] for p in pairs])
 
 
 # I think the gradient accumulation will just work out?
@@ -33,7 +73,6 @@ def pprun(
     checkpoint_every=10,
     use_cpu=True,
 ):
-    import test_all
 
     device = "cpu" if use_cpu else "cuda:" + str(rank)
     model: nn.Module = t.load(model_file_name)
@@ -103,6 +142,7 @@ def pprun(
                 cur_loss = t.binary_cross_entropy_with_logits(
                     out, ys[minibatch_num]
                 ).mean()
+                # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
             backward_sends = []
@@ -116,6 +156,29 @@ def pprun(
         optimizer.zero_grad()
         if batch_num % checkpoint_every == checkpoint_every - 1:
             t.save(model, f"checkpoint_rank{rank}")
+    if rank == 0:
+        tpeek("pipe", next(model.parameters()))
+
+
+def reference_training(use_cpu=True):
+    num_batches = 100
+    device = "cpu" if use_cpu else "cuda"
+    model: nn.Module = t.nn.Sequential(
+        t.load(".pipe_par_test_model_0"), t.load(".pipe_par_test_model_1")
+    )
+    model.train()
+    model.to(device)
+    optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
+    dataset = import_object_from_qualified_name("days.pipelineparallel.make_dataset")()
+    batches = to_batches(dataset, 12 * 2, trim=True)
+    for batch in batches[:num_batches]:
+        optimizer.zero_grad()
+        out = model(batch[0].to(device))
+        cur_loss = t.binary_cross_entropy_with_logits(out, batch[1]).mean()
+        cur_loss.backward()
+        optimizer.step()
+    tpeek("reference", next(model.parameters()))
+    return list(model.parameters())
 
 
 @gin.configurable
@@ -149,5 +212,7 @@ def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple])
 
 
 if __name__ == "__main__":
+    make_and_save_resnet_pieces()
     gin.parse_config_file(sys.argv[1])
     start_pipeline_cluster()
+    reference_training()
