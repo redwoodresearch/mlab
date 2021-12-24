@@ -3,7 +3,6 @@
 # you want to approximage an n*m matrix as (n*r) @ (r*m). You could do this with SVD (svd produces orthonormal scale orthonormal, you can take only the top k*x part of the scale matrix, and merge scale into orthonormal, to get low rank representation)
 # power sgd has a momentum-like component (it uses an iterative approximation of the low rank decomposition starting with the previous decomposition)
 
-from numpy.core.fromnumeric import compress
 import torch
 import torch as t
 import torch.distributed as dist
@@ -13,15 +12,11 @@ class LowRankCompressionDistributedSGD:
     def __init__(
         self,
         params,
-        size,
-        rank,
         compression_rank,
         lr: float,
         momentum: float,
     ):
         self.cr = compression_rank
-        self.rank = rank
-        self.size = size
         self.lr = lr
         self.mu = momentum
 
