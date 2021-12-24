@@ -119,7 +119,7 @@ def test_evaluate(evaluate):
     dl = DataLoader(TensorDataset(X, Y), batch_size=128)
 
     model = _MLP(2, 32, 3)
-    model = _train(model, dl, lr=0.1)
+    model = _train(model, dl, lr=0.1, momentum=0.5)
     _loss = _evaluate(model, dl)
     loss = evaluate(model, dl)
     _check_equal(torch.Tensor([_loss]), torch.Tensor([loss]))
@@ -143,6 +143,9 @@ def _opt_rosenbrock(xy, lr, momentum, n_iter):
 
 
 def test_rosenbrock(opt_rosenbrock):
+    # THIS IS BROKEN!!!!!!
+    # Needs logs
+
     test_cases = [
         dict(lr=0.001, momentum=0.0, n_iter=10),
         dict(lr=0.001, momentum=0.8, n_iter=20),
