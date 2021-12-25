@@ -45,17 +45,19 @@ class DistributedDataLoader:
         self,
         rank,
         size,
-        mini_batch_size=100,
+        device,
+        mini_batch_size=512,
         random_seed=0,
     ):
         self.rank = rank
         self.size = size
+        self.device = device
         self.mini_batch_size = mini_batch_size
         if rank == 0:
             self.batches = load_data(train=True, bsz=mini_batch_size * size)
-            self.len = t.tensor(len(self.batches))
+            self.len = t.tensor(len(self.batches)).to(device)
         else:
-            self.len = t.tensor(-1)
+            self.len = t.tensor(-1).to(device)
             self.batches = None
 
         print("broadcast length from", self.rank)
@@ -66,29 +68,26 @@ class DistributedDataLoader:
     # so our large distributed job fails cheap
     def __iter__(self):
         for i in range(self.len):
-            x_mb = t.zeros((self.mini_batch_size, 3, 64, 64), dtype=t.float32)
-            y_mb = t.zeros((self.mini_batch_size), dtype=t.int64)
-            tensors = [x_mb, y_mb]
-            # scatter_lists = to_batches(self.batches[i], self.mini_batch_size) if self.batches is not None else [None, None]
             if self.batches is not None:
-                scatter_lists = [
-                    list(rearrange(tensor, "(s m) ... -> s m ...", s=self.size))
-                    for tensor in self.batches[i]
-                ]
+                x_b = rearrange(
+                    self.batches[i][0], "(s m) ... -> s m ...", s=self.size
+                ).to(self.device)
+                y_b = rearrange(
+                    self.batches[i][1], "(s m) ... -> s m ...", s=self.size
+                ).to(self.device)
             else:
-                scatter_lists = [None, None]
+                x_b = t.zeros(
+                    (self.size, self.mini_batch_size, 3, 64, 64), dtype=t.float32
+                ).to(self.device)
+                y_b = t.zeros((self.size, self.mini_batch_size), dtype=t.int64).to(
+                    self.device
+                )
+            dist.broadcast(x_b, src=0, async_op=True).wait()
+            dist.broadcast(y_b, src=0, async_op=True).wait()
+            yield [x_b[self.rank], y_b[self.rank]]
 
-            # dist.scatter_object_list(tensors, scatter_lists, src = 0)
-            dist.scatter(
-                x_mb, scatter_list=scatter_lists[0], src=0, async_op=True
-            ).wait()
-            dist.scatter(
-                y_mb, scatter_list=scatter_lists[1], src=0, async_op=True
-            ).wait()
-            yield tensors
 
-
-def init_process(rank, size, device, backend="gloo"):
+def init_process(rank, size, device, backend="nccl"):
     """Initialize the distributed environment."""
     dist.init_process_group(backend, rank=rank, world_size=size)
 
@@ -101,10 +100,13 @@ def init_process(rank, size, device, backend="gloo"):
     model = load_model()
     model.train()
     model.to(device)
+    # optimizer = LowRankCompressionDistributedSGD(
+    #     model.parameters(), lr=0.005, compression_rank=4, momentum=0.8
+    # )
     optimizer = LowRankCompressionDistributedSGD(
-        model.parameters(), lr=0.005, compression_rank=2, momentum=0.9
+        model.parameters(), lr=0.005, dist_size=size, compression_rank=2, momentum=0.0
     )
-    dataloader = DistributedDataLoader(rank=rank, size=size)
+    dataloader = DistributedDataLoader(rank=rank, size=size, device=device)
     loss_fn = t.nn.CrossEntropyLoss(reduction="mean")
 
     # train
@@ -115,6 +117,17 @@ def init_process(rank, size, device, backend="gloo"):
             # print(f"Loss before: {loss}, pid: {rank}")
             optimizer.zero_grad()
             loss.backward()
+            if False:
+                with t.no_grad():
+                    reductions = []
+                    for param in model.parameters():
+                        if isinstance(param.grad, t.Tensor):
+                            reductions.append(
+                                dist.all_reduce(param.grad, async_op=True)
+                            )
+                            param.grad /= size
+                    for reduction in reductions:
+                        reduction.wait()
             optimizer.step()
         print(f"Epoch: {epoch}, Loss: {loss}")
 
@@ -136,7 +149,7 @@ def init_process(rank, size, device, backend="gloo"):
             f"Final Loss: {total_loss} and rank {rank} and prop correct {correct / total}"
         )
 
-    dist.all_reduce(t.zeros(2), op=dist.ReduceOp.SUM)  # syncs processes
+    dist.all_reduce(t.zeros(2).to(device), op=dist.ReduceOp.SUM)  # syncs processes
 
     if rank == 0:
         os.killpg(os.getpgid(os.getpid()), signal.SIGKILL)
