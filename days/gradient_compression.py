@@ -15,11 +15,12 @@ class LowRankCompressionDistributedSGD:
         self,
         params: List[t.nn.Parameter],
         compression_rank: int,
+        dist_size,
         lr: float,
         momentum: float,
     ):
         self.cr = compression_rank
-        self.lr = lr
+        self.lr = lr / dist_size
         self.mu = momentum
         params = [param for param in params if param.requires_grad]
         self.device = params[0].device
@@ -94,7 +95,8 @@ class LowRankCompressionDistributedSGD:
 
     def zero_grad(self):
         for p in self.params:
-            p.grad = None
+            if p.grad is not None:
+                p.grad.zero_()
 
     def step(self):
         for param in self.params:
