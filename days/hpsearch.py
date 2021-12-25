@@ -1,28 +1,21 @@
-import os
-
-os.system("pip install -r requirements.txt")
-
-import comet_ml
-from comet_ml import Experiment
-import sys
+import itertools
 import json
+import os
+import sys
 
-comet_ml.init()
+from comet_ml import Experiment
 import gin
+import torch
 import torch as t
-from torch import einsum
 from torch import nn
-import math
-import matplotlib.pyplot as plt
-import itertools as pr
-from days.rrjobs import rrjobs_submit
 import torch.nn.functional as F
 
-tmp_gin_fname = ".hpsearch_temp_gin"
+from days.rrjobs import rrjobs_submit
 
+RR_API_KEY = "vABV7zo6pqS7lfzZBhyabU2Xe"
 
 def make_grid(axes):
-    value_sets = list(pr.product(*axes.values()))
+    value_sets = list(itertools.product(*axes.values()))
     points = []
     for item in value_sets:
         point_config = {}
@@ -33,62 +26,77 @@ def make_grid(axes):
         )
     return points
 
+def get_cometml_api_key():
+    api_key = None
+    comet_api_file = os.path.expanduser('~/.comet-api-key')
+    if os.path.exists(comet_api_file):
+        with open(comet_api_file) as f:
+            api_key = f.read().strip()
+    else:
+        print('Using RR Comet ML API key. Results link might be private.')
+        api_key = RR_API_KEY
+    return api_key
 
 @gin.configurable
 class Model(nn.Module):
-    def __init__(self, P, H, K):
+    def __init__(self, hidden1=10, hidden2=10, hidden3=10):
         super().__init__()
-        self.P = nn.Linear(2, P)
-        self.H = nn.Linear(P, H)
-        self.K = nn.Linear(H, K)
-        self.O = nn.Linear(K, 3)
+        n_coords = 2
+        n_colors = 3
+        self.net = nn.Sequential(
+            nn.Linear(n_coords, hidden1),
+            nn.GELU(),
+            nn.Linear(hidden1, hidden2),
+            nn.GELU(),
+            nn.Linear(hidden2, hidden3),
+            nn.GELU(),
+            nn.Linear(hidden3, n_colors),
+        )
 
     def forward(self, x):
-        return self.O(F.gelu(self.K(F.gelu(self.H(F.gelu(self.P(x)))))))
+        return self.net(x)
 
 
 @gin.configurable
 def data_train(image_name):
-    import days.training_tests as tt
+    from days.training_tests import load_image
+    return load_image(image_name)[0]  # (train, test)
 
-    return tt.load_image(image_name)[0]  # (train, test)
 
-
-def search(name, axes, location="local"):
-    grid_points = make_grid(axes)
+def search(name, params, location="local"):
+    grid_points = make_grid(params)
     print(grid_points)
     if location == "remote":
         rrjobs_submit(
             name,
-            ["python", "days/hpsearch.py", "work"],
-            [
+            command=["python", "days/hpsearch.py", "work"],
+            tasks=[
                 {"priority": 1, "parameters": {"gin_config": point}}
                 for point in grid_points
             ],
         )
     else:
         for point in grid_points:
-            with gin.unlock_config():
-                with open(tmp_gin_fname, "w") as f:
-                    f.write(point)
-                gin.parse_config_file(tmp_gin_fname)
+            gin.parse_config(point)
             train()
 
 
 @gin.configurable
-def train(optimizer, num_epochs, lr):
+def train(optimizer='sgd', num_epochs=5, lr=1e-3):
     experiment = Experiment(
         project_name="project_name",
-        api_key="vABV7zo6pqS7lfzZBhyabU2Xe",
+        api_key=get_cometml_api_key(),
     )  # it doesn't log parameters rn!
     model = Model()
-    params = list(model.parameters())
-    if optimizer == "sgd":
-        optimizer = t.optim.SGD(params, lr=lr)
-    elif optimizer == "rmsprop":
-        optimizer = t.optim.RMSprop(params, lr=lr)
-    elif optimizer == "adam":
-        optimizer = t.optim.Adam(params, lr=lr)
+
+    optimizer_fns = {
+        "sgd": torch.optim.SGD,
+        "rmsprop": t.optim.RMSprop,
+        "adam": t.optim.Adam,
+    }
+    optimizer_fn = optimizer_fns[optimizer]
+    optimizer = optimizer_fn(model.parameters(), lr=lr)
+
     loss_fn = t.nn.L1Loss()
     dataloader = data_train()
     for _ in range(num_epochs):
@@ -105,23 +113,22 @@ def train(optimizer, num_epochs, lr):
 
 if __name__ == "__main__":
     if sys.argv[1] == "orchestrate":
-        print("orchestrateing")
+        print("orchestrating")
+        location = 'remote' if len(sys.argv) > 2 and sys.argv[2] == 'remote' else 'local'
         search(
-            "test_mlab_rrjobs_search",
-            {
+            name="test_mlab_rrjobs_search",
+            params={
                 "train.lr": [0.001, 0.01],
                 "train.optimizer": ["adam"],
                 "train.num_epochs": [10, 20],
-                "Model.K": [10],
-                "Model.H": [20],
-                "Model.P": [30],
+                "Model.hidden1": [10],
+                "Model.hidden2": [20],
+                "Model.hidden3": [30],
                 "data_train.image_name": ["image_match1.png"],
             },
-            "local",
+            location=location,
         )
     elif sys.argv[1] == "work":
         params = json.loads(os.environ["PARAMS"])
-        with open(tmp_gin_fname, "w") as f:
-            f.write(params["gin_config"])
-        gin.parse_config_file(tmp_gin_fname)
+        gin.parse_config(params["gin_config"])
         train()
