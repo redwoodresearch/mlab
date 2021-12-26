@@ -112,6 +112,7 @@ def train(optimizer='sgd', num_epochs=5, lr=1e-3):
 
 
 if __name__ == "__main__":
+    os.system("pip install -r requirements.txt") # server does not have all requirements
     if sys.argv[1] == "orchestrate":
         print("orchestrating")
         location = 'remote' if len(sys.argv) > 2 and sys.argv[2] == 'remote' else 'local'
