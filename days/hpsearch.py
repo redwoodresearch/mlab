@@ -2,13 +2,15 @@ import itertools
 import json
 import os
 import sys
+from pprint import pprint
 
 # server is missing requirements
 # this call has to happen before imports
-os.system("pip install -r requirements.txt")
+os.system("pip install -q -r requirements.txt")
 
 from comet_ml import Experiment
 import gin
+import numpy as np
 import torch
 import torch as t
 from torch import nn
@@ -19,16 +21,12 @@ from days.rrjobs import rrjobs_submit
 RR_API_KEY = "vABV7zo6pqS7lfzZBhyabU2Xe"
 
 def make_grid(axes):
-    value_sets = list(itertools.product(*axes.values()))
-    points = []
-    for item in value_sets:
-        point_config = {}
-        for i, key in enumerate(axes.keys()):
-            point_config[key] = item[i]
-        points.append(
-            "\n".join([f"{key} = {repr(value)}" for key, value in point_config.items()])
-        )
-    return points
+    return [{key : value for key, value in zip(axes.keys(), values_choice)}
+            for values_choice in itertools.product(*axes.values())]
+
+def to_gin_config_str(params):
+    return "\n".join(f"{key} = {repr(value)}" for key, value in params.items())
+
 
 def get_cometml_api_key():
     api_key = None
@@ -37,9 +35,11 @@ def get_cometml_api_key():
         with open(comet_api_file) as f:
             api_key = f.read().strip()
     else:
-        print('Using RR Comet ML API key. Results link might be private.')
+        print('Using RR Comet ML API key. Results link might be private. You may instead ' +
+              'add your key to `~/.comet-api-key`.')
         api_key = RR_API_KEY
     return api_key
+
 
 @gin.configurable
 class Model(nn.Module):
@@ -67,30 +67,8 @@ def data_train(image_name):
     return load_image(image_name)[0]  # (train, test)
 
 
-def search(name, params, location="local"):
-    grid_points = make_grid(params)
-    print(grid_points)
-    if location == "remote":
-        rrjobs_submit(
-            name,
-            command=["python", "days/hpsearch.py", "work"],
-            tasks=[
-                {"priority": 1, "parameters": {"gin_config": point}}
-                for point in grid_points
-            ],
-        )
-    else:
-        for point in grid_points:
-            gin.parse_config(point)
-            train()
-
-
 @gin.configurable
 def train(optimizer='sgd', num_epochs=5, lr=1e-3):
-    experiment = Experiment(
-        project_name="project_name",
-        api_key=get_cometml_api_key(),
-    )  # it doesn't log parameters rn!
     model = Model()
 
     optimizer_fns = {
@@ -111,28 +89,61 @@ def train(optimizer='sgd', num_epochs=5, lr=1e-3):
             loss = loss_fn(output, target)  # measure how bad predictions are
             loss.backward()  # calculate gradients
             optimizer.step()  # use gradients to update params
-        print(loss)
+        print(f'loss: {loss.item()}')
+
+
+def run_experiment(project_name, hyperparameters):
+    gin_config_str = to_gin_config_str(hyperparameters)
+    gin.parse_config(gin_config_str)
+
+    print('Running experiment with hyperparameters:')
+    pprint(hyperparameters)
+
+    experiment = Experiment(
+        project_name=project_name,
+        api_key=get_cometml_api_key(),
+    )
+    experiment.log_parameters(hyperparameters)
+    train()
     experiment.end()
 
 
 if __name__ == "__main__":
     if sys.argv[1] == "orchestrate":
-        print("orchestrating")
-        location = 'remote' if len(sys.argv) > 2 and sys.argv[2] == 'remote' else 'local'
-        search(
-            name="test_mlab_rrjobs_search",
-            params={
-                "train.lr": [0.001, 0.01],
-                "train.optimizer": ["adam"],
-                "train.num_epochs": [10, 20],
-                "Model.hidden1": [10],
-                "Model.hidden2": [20],
-                "Model.hidden3": [30],
-                "data_train.image_name": ["image_match1.png"],
-            },
-            location=location,
+        is_remote = len(sys.argv) > 2 and sys.argv[2] == 'remote'
+
+        project_name = f'hpsearch-{np.random.randint(10000)}'
+
+        params={
+            "train.lr": [0.001, 0.01],
+            "train.optimizer": ["adam"],
+            "train.num_epochs": [10, 20],
+            "Model.hidden1": [10],
+            "Model.hidden2": [20],
+            "Model.hidden3": [30],
+            "data_train.image_name": ["image_match1.png"],
+        }
+        hyperparameter_grid = make_grid(params)
+
+        if is_remote:
+            rrjobs_submit(
+                name="test_mlab_rrjobs_search",
+                command=["python", "days/hpsearch.py", "experiment"],
+                tasks=[
+                    {"priority": 1, "parameters":
+                        {
+                            "project_name": project_name,
+                            "hyperparameters": hyperparameters,
+                        }
+                    } for hyperparameters in hyperparameter_grid
+                ],
         )
-    elif sys.argv[1] == "work":
+        else:
+            for hyperparameters in hyperparameter_grid:
+                run_experiment(project_name, hyperparameters)
+
+    elif sys.argv[1] == "experiment":
         params = json.loads(os.environ["PARAMS"])
-        gin.parse_config(params["gin_config"])
-        train()
+        project_name = params["project_name"]
+        hyperparameters = params["hyperparameters"]
+        run_experiment(project_name, hyperparameters)
