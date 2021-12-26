@@ -3,6 +3,10 @@ import json
 import os
 import sys
 
+# server is missing requirements
+# this call has to happen before imports
+os.system("pip install -r requirements.txt")
+
 from comet_ml import Experiment
 import gin
 import torch
@@ -112,7 +116,6 @@ def train(optimizer='sgd', num_epochs=5, lr=1e-3):
 
 
 if __name__ == "__main__":
-    os.system("pip install -r requirements.txt") # server does not have all requirements
     if sys.argv[1] == "orchestrate":
         print("orchestrating")
         location = 'remote' if len(sys.argv) > 2 and sys.argv[2] == 'remote' else 'local'
