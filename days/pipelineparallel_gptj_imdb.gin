@@ -1,6 +1,6 @@
 pprun.num_batches = 100
 pprun.y_size = ()
-pprun.minibatch_size = 4
+pprun.minibatch_size = 12
 pprun.use_cpu = False
 pprun.dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
 pprun.use_autocast = True
