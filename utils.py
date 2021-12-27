@@ -6,8 +6,7 @@ import numpy as np
 import time
 import importlib
 from torchtyping import patch_typeguard, TensorType
-
-patch_typeguard()
+import math
 
 
 def tstat(name, tensor):
@@ -157,3 +156,49 @@ if __name__ == "__main__":
             t.einsum("bsc,bct->bst", i1, i2),
         )
     )
+
+# prior over sequence lenghts is exponentially decaying, 50% chance below 32 - e^(-x/32)
+# p(b) = e^(-x/32)/32
+# D(x) = 1-e^(-x/32)
+# 1-D(x) = e^(-x/32)
+# -x/32 = ln(1-D(x))
+# x = -32ln(1-D(x))
+
+from einops import *
+
+
+def find_max_batch_size(fn, example_dp):
+    def test_fn(bs):
+        dp = t.as_strided(
+            example_dp, (int(bs), *example_dp.shape), (0, *example_dp.stride())
+        )
+        try:
+            fn(dp)
+            return True
+        except Exception as e:
+            if "CUDA out of memory" in e:
+                return False
+            raise e
+
+    return dist_bisect(test_fn)
+
+
+def exp_dist(decay=32):
+    return lambda p: -32 * math.log(1 - max(min(p, 0.999), 0.001))
+
+
+# dist is a function from percentile to value
+def dist_bisect(fn, distribution=exp_dist(decay=32), min_difference=1):
+    lo, hi = 0, 1
+    counter = 0
+    while distribution(hi) - distribution(lo) > min_difference and counter < 20:
+        mid = (hi - lo) / 2 + lo
+        mid_place = distribution(mid)
+        worked = fn(mid_place)
+        if worked:
+            lo = mid
+        else:
+            hi = mid
+        print("testing ", mid_place, worked)
+        counter += 1
+    return distribution(lo)
