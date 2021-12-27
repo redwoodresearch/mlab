@@ -12,29 +12,32 @@ import torch as t
 from utils import *
 import transformers
 import torchtext
+from time import time
 
-TAGS = {"Y": 1000, "X": 2000, "ACTIVATION": 3000, "GRAD": 4000, "SYNC": 5000}
+TAGS = {"Y": 1000, "X": 2000, "ACTIVATION": 3000, "GRAD": 4000, "SYNC": 5000} # why thousands/not single digits?
 
-
+# HuggingFace models return tuples in the middle (things like activation patterns), thus the [0]
 class HFBlockSequence(nn.Module):
     def __init__(self, *layers):
         super().__init__()
-        self.layers = nn.ModuleList(layers)
+        self.layers = nn.ModuleList(layers) # treat like a list
 
     def forward(self, x):
         for layer in self.layers:
             x = layer(x)[0]
         return x
 
-
+# call once
 def make_gptj_and_save_pieces():
     model_lm = transformers.AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
     model = model_lm.transformer
     with open("gptj_arch.txt", "w") as f:
         f.write(str(model))
-    print(model)
+    print(model_lm)
+
     num_layers = 28
-    chunks = [2, 4, 4, 4, 4, 4, 4, 2]
+    chunks = [6, 8, 8, 6] # less at ends due to embeddings/unembed
+    assert sum(chunks) == num_layers
     chunk_cumsum = t.cumsum(t.tensor(chunks), dim=0).tolist()
     print("cumsum", chunk_cumsum)
     models = [
@@ -42,7 +45,7 @@ def make_gptj_and_save_pieces():
         for start, size in zip(chunk_cumsum, chunks)
     ]
     models[0] = nn.Sequential(model.wte, model.drop, models[0])
-    models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head)
+    models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head) 
     for i, model_part in enumerate(models):
         t.save(model_part, "gpt-j-6b_part" + str(i))
     return models
@@ -121,39 +124,41 @@ def pprun(
     optimizer = t.optim.SGD(model.parameters(), lr=1e-4)
     print("model loaded", rank)
     if rank == 0:
-        dataset = import_object_from_qualified_name(dataset_fn_name)()
+        dataset = import_object_from_qualified_name(dataset_fn_name)() #tokenizer. embedding in the model (don't worry)
         batches = (
             to_batches(batch, minibatch_size, trim=True)
             for batch in to_batches(dataset, minibatch_size * pipe_width, trim=True)
         )
+    total_examples = num_batches * minibatch_size * pipe_width
+    start = time()
     for batch_num in range(num_batches):
-        dist.all_reduce(t.zeros(1))
+        # dist.all_reduce(t.zeros(1))
         if rank == 0:
             minibatches = next(batches)
             forward_sends = []
             out_tensors = []
-            for send in [
-                dist.isend(batch[1], size - 1, tag=TAGS["Y"] + i)
+            for send in [ # send the ys all the way to the end
+                dist.isend(batch[1], size - 1, tag=TAGS["Y"] + i) # tag on the send forces it to only be received by same tag
                 for i, batch in enumerate(minibatches)
             ]:
-                send.wait()
+                send.wait() # compute all, then wait
 
             for i, batch in enumerate(minibatches):
                 with t.autocast(
                     dtype=autocast_type, device_type=device[:4], enabled=use_autocast
                 ):
-                    out = model(batch[0].long().to(device)).cpu()
+                    out = model(batch[0].long().to(device)).cpu() # all the gpu action
                 out_tensors.append(out)
                 forward_sends.append(
-                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + i)
+                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + i) #shouldn't this be async?
                 )
-            for forward_send in forward_sends:
-                forward_send.wait()
+            for forward_send in forward_sends: #send activations forward
+                forward_send.wait() 
             grad_buffer = t.zeros_like(out)
             for i, out_tensor in enumerate(out_tensors):
                 dist.recv(grad_buffer, rank + 1, tag=TAGS["GRAD"] + i)
                 out_tensor.backward(grad_buffer)
-                out_tensors[i] = None
+                out_tensors[i] = None # why is this necessary? saves memory?
         elif rank != size - 1:
             forward_sends = []
             out_tensors = []
@@ -198,7 +203,7 @@ def pprun(
                 x_buffer.requires_grad = True
                 with t.autocast(
                     dtype=autocast_type, device_type=device[:4], enabled=use_autocast
-                ):
+                ): # save memory by computing with less precision
                     out = model(x_buffer.to(device)).cpu()
                 out = out[
                     :, -1, -2:
@@ -226,7 +231,12 @@ def pprun(
         if batch_num % checkpoint_every == checkpoint_every - 1:
             if rank == 0:
                 print("saving")
-            t.save(model, f"./.checkpoints/gptj_imdb_{batch_num}_rank{rank}")
+            filename = f"./.checkpoints/gptj_imdb_{batch_num}_rank{rank}"
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            with open(filename, "wb") as f: # added this
+                t.save(model, f)
+    end = time()
+    print(f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {rank}")
     if rank == 0:
         tpeek("pipe", next(model.parameters()))
 
@@ -239,12 +249,11 @@ def init_process(rank, size, run, *args, **kwargs):
     print("will init process group", rank)
     dist.init_process_group(backend="gloo", rank=rank, world_size=size)
     print("inited process group", rank)
-
     run(rank, size, *args, **kwargs)
 
 
 @gin.configurable
-def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple]):
+def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple]): # does gin add the arguments here? crazy
     processes = []
     mp.set_start_method("spawn")
     pipe_stages = len(model_paths)
@@ -255,10 +264,13 @@ def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple])
             args=(rank, size, pprun, model_part_str, model_in_shapes[rank]),
         )
         p.start()
-        processes.append(p)
+        processes.append(p) # why are we doing this? and why aren't we joining?
 
+# 2,8 produces 0.18 time units and final loss of 0.10 (noisy)
+# 2,10 breaks (too much mem)
+# 4,4 produced something like 0.17 time-units/example, final loss of 0.11, half-way 0.38
+# 8,2 produced something like 0.10 time-units/example, final loss of 0.37, half-way 0.53
 
 if __name__ == "__main__":
-    # make_gptj_and_save_pieces()
-    gin.parse_config_file(sys.argv[1])
+    #make_gptj_and_save_pieces()
     start_pipeline_cluster()
