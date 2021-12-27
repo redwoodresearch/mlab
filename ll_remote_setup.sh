@@ -1,2 +1,2 @@
 command="$(<lambda-labs-setup.sh)"
-ssh -i ~/.ssh/mlab $1 "$command"
+ssh -i ~/mlab_ssh $1 "$command"

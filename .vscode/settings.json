@@ -1,4 +1,8 @@
 {
   "python.formatting.provider": "black",
-  "jupyter.jupyterServerType": "local"
+  "jupyter.jupyterServerType": "local",
+  "remote.SSH.defaultExtensions": [
+    "ms-python.python",
+    "ms-toolsai.jupyter"
+  ]
 }
