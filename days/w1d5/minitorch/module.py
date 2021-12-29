@@ -1,6 +1,3 @@
-from copy import deepcopy
-
-
 class Module:
     """
     Modules form a tree that store parameters and other
@@ -24,15 +21,13 @@ class Module:
 
     def train(self):
         "Set the mode of this module and all descendent modules to `train`."
-        self.training = True
-        for module in self.modules():
-            module.train()
+        # TODO: Implement for Task 0.4.
+        raise NotImplementedError('Need to implement for Task 0.4')
 
     def eval(self):
         "Set the mode of this module and all descendent modules to `eval`."
-        self.training = False
-        for module in self.modules():
-            module.eval()
+        # TODO: Implement for Task 0.4.
+        raise NotImplementedError('Need to implement for Task 0.4')
 
     def named_parameters(self):
         """
@@ -41,17 +36,13 @@ class Module:
         Returns:
             list of pairs: Contains the name and :class:`Parameter` of each ancestor parameter.
         """
-        params = deepcopy(self._parameters)
-        for mod_name, mod in self._modules.items():
-            mod_params = mod.named_parameters()
-            mod_params = {f"{mod_name}.{param_name}": param for param_name, param in mod_params.items()}
-            params.update(mod_params)
-        return params
-
+        # TODO: Implement for Task 0.4.
+        raise NotImplementedError('Need to implement for Task 0.4')
 
     def parameters(self):
         "Enumerate over all the parameters of this module and its descendents."
-        return self.named_parameters().values()
+        # TODO: Implement for Task 0.4.
+        raise NotImplementedError('Need to implement for Task 0.4')
 
     def add_parameter(self, k, v):
         """

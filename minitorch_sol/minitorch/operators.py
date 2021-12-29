@@ -179,7 +179,6 @@ def reduce(fn, start):
         for e in ls:
             start = fn(e, start)
         return start
-    
     return lambda ls: inner(ls, start)
 
 

@@ -1,0 +1,7 @@
+README.md
+setup.cfg
+setup.py
+minitorch.egg-info/PKG-INFO
+minitorch.egg-info/SOURCES.txt
+minitorch.egg-info/dependency_links.txt
+minitorch.egg-info/top_level.txt

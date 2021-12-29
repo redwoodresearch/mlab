@@ -190,8 +190,8 @@ class History:
         Returns:
             list of numbers : a derivative with respect to `inputs`
         """
-        ret = self.last_fn.chain_rule(self.ctx, self.inputs, d_output)
-        return ret
+        # TODO: Implement for Task 1.4.
+        raise NotImplementedError('Need to implement for Task 1.4')
 
 
 class FunctionBase:
@@ -271,8 +271,10 @@ class FunctionBase:
             (see `is_constant` to remove unneeded variables)
 
         """
-        d_inputs = wrap_tuple(cls.backward(ctx, d_output))
-        return [(inp, d_inp) for inp, d_inp in zip(inputs, d_inputs) if not is_constant(inp)]
+        # Tip: Note when implementing this function that
+        # cls.backward may return either a value or a tuple.
+        # TODO: Implement for Task 1.3.
+        raise NotImplementedError('Need to implement for Task 1.3')
 
 
 # Algorithms for backpropagation
@@ -293,15 +295,8 @@ def topological_sort(variable):
         list of Variables : Non-constant Variables in topological order
                             starting from the right.
     """
-    def visit(v, visited):
-        if not v.is_leaf():
-            for inp in v.history.inputs:
-                if not is_constant(inp) and inp.unique_id not in [n[0] for n in visited]:
-                    visited = visit(inp, visited)
-        visited = [(v.unique_id, v)] + visited
-        return visited
-
-    return visit(variable, [])
+    # TODO: Implement for Task 1.4.
+    raise NotImplementedError('Need to implement for Task 1.4')
 
 
 def backpropagate(variable, deriv):
@@ -317,15 +312,5 @@ def backpropagate(variable, deriv):
 
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
-    vs = [v[1] for v in topological_sort(variable)]
-    derivs = {variable.unique_id: deriv}
-    for v in vs:
-        if not v.is_leaf():
-            new_derivs = v.history.backprop_step(derivs[v.unique_id])
-            for i, di in new_derivs:
-                if i.unique_id not in derivs:
-                    derivs[i.unique_id] = 0.0
-                derivs[i.unique_id] += di
-        else:
-            v.accumulate_derivative(derivs[v.unique_id])
-
+    # TODO: Implement for Task 1.4.
+    raise NotImplementedError('Need to implement for Task 1.4')
