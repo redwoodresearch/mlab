@@ -8,3 +8,5 @@ scratch/
 .ipynb_checkpoints/
 image*
 infrastructure/.lambda_account.json
+.hypothesis
+launch.json
