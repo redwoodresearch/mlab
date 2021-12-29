@@ -1,0 +1,7 @@
+train.lr = 0.001
+train.optimizer = 'adam'
+train.num_epochs = 10
+Model.K = 10
+Model.H = 20
+Model.P = 30
+data_train.image_name = 'image_match1.png'
