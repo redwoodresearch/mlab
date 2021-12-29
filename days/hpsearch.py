@@ -69,7 +69,7 @@ class Model(nn.Module):
 
 @gin.configurable
 def data_train(image_name):
-    from days.training_tests import load_image
+    from days.w1d3_tests import load_image
 
     return load_image(image_name)[0]  # (train, test)
 
