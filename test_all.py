@@ -44,7 +44,7 @@ import days.modules as modules
 from transformers.utils.dummy_sentencepiece_objects import PegasusTokenizer
 import days.bert as bert
 import days.gpt2 as gpt2
-import days.resnet as resnet
+import days.old_resnet as old_resnet
 import pytest
 import transformers
 from utils import tpeek, tstat
@@ -357,7 +357,7 @@ def test_dp():
 
 
 def test_resnet():
-    resnet.resnet34_with_pretrained_weights()
+    old_resnet.resnet34_with_pretrained_weights()
 
 
 if __name__ == "__main__":
