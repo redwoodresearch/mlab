@@ -20,9 +20,13 @@ from days.rrjobs import rrjobs_submit
 
 RR_API_KEY = "vABV7zo6pqS7lfzZBhyabU2Xe"
 
+
 def make_grid(axes):
-    return [{key : value for key, value in zip(axes.keys(), values_choice)}
-            for values_choice in itertools.product(*axes.values())]
+    return [
+        {key: value for key, value in zip(axes.keys(), values_choice)}
+        for values_choice in itertools.product(*axes.values())
+    ]
+
 
 def to_gin_config_str(params):
     return "\n".join(f"{key} = {repr(value)}" for key, value in params.items())
@@ -30,13 +34,15 @@ def to_gin_config_str(params):
 
 def get_cometml_api_key():
     api_key = None
-    comet_api_file = os.path.expanduser('~/.comet-api-key')
+    comet_api_file = os.path.expanduser("~/.comet-api-key")
     if os.path.exists(comet_api_file):
         with open(comet_api_file) as f:
             api_key = f.read().strip()
     else:
-        print('Using RR Comet ML API key. Results link might be private. You may instead ' +
-              'add your key to `~/.comet-api-key`.')
+        print(
+            "Using RR Comet ML API key. Results link might be private. You may instead "
+            + "add your key to `~/.comet-api-key`."
+        )
         api_key = RR_API_KEY
     return api_key
 
@@ -64,11 +70,12 @@ class Model(nn.Module):
 @gin.configurable
 def data_train(image_name):
     from days.training_tests import load_image
+
     return load_image(image_name)[0]  # (train, test)
 
 
 @gin.configurable
-def train(optimizer='sgd', num_epochs=5, lr=1e-3):
+def train(optimizer="sgd", num_epochs=5, lr=1e-3):
     model = Model()
 
     optimizer_fns = {
@@ -89,14 +96,14 @@ def train(optimizer='sgd', num_epochs=5, lr=1e-3):
             loss = loss_fn(output, target)  # measure how bad predictions are
             loss.backward()  # calculate gradients
             optimizer.step()  # use gradients to update params
-        print(f'loss: {loss.item()}')
+        print(f"loss: {loss.item()}")
 
 
 def run_experiment(project_name, hyperparameters):
     gin_config_str = to_gin_config_str(hyperparameters)
     gin.parse_config(gin_config_str)
 
-    print('Running experiment with hyperparameters:')
+    print("Running experiment with hyperparameters:")
     pprint(hyperparameters)
 
     experiment = Experiment(
@@ -110,11 +117,11 @@ def run_experiment(project_name, hyperparameters):
 
 if __name__ == "__main__":
     if sys.argv[1] == "orchestrate":
-        is_remote = len(sys.argv) > 2 and sys.argv[2] == 'remote'
+        is_remote = len(sys.argv) > 2 and sys.argv[2] == "remote"
 
-        project_name = f'hpsearch-{np.random.randint(10000)}'
+        project_name = f"hpsearch-{np.random.randint(10000)}"
 
-        params={
+        params = {
             "train.lr": [0.001, 0.01],
             "train.optimizer": ["adam"],
             "train.num_epochs": [10, 20],
@@ -130,14 +137,16 @@ if __name__ == "__main__":
                 name="test_mlab_rrjobs_search",
                 command=["python", "days/hpsearch.py", "experiment"],
                 tasks=[
-                    {"priority": 1, "parameters":
-                        {
+                    {
+                        "priority": 1,
+                        "parameters": {
                             "project_name": project_name,
                             "hyperparameters": hyperparameters,
-                        }
-                    } for hyperparameters in hyperparameter_grid
+                        },
+                    }
+                    for hyperparameters in hyperparameter_grid
                 ],
-        )
+            )
         else:
             for hyperparameters in hyperparameter_grid:
                 run_experiment(project_name, hyperparameters)

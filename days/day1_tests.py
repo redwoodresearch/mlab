@@ -181,8 +181,8 @@ def ex6(n: int, probs: torch.Tensor):
 
 
 def test_fn_6(fn):
-    probs = t.nn.functional.softmax(t.rand(10), dim=-1)
-    t = t.stack([fn(probs) for _ in range(1000)], dim=0).sum(0)
+    probs = torch.nn.functional.softmax(t.rand(10), dim=-1)
+    t = torch.stack([fn(probs) for _ in range(1000)], dim=0).sum(0)
     assert t.allclose(probs, t, atol=0.05, rtol=0.1)
 
 

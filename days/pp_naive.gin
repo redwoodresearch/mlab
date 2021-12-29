@@ -1,9 +1,9 @@
 pprun.num_batches = 100
 pprun.y_size = ()
-pprun.minibatch_size = 16
 pprun.use_cpu = False
 pprun.dataset_fn_name = "days.pp_nominibatch.make_dataset_imdb"
 pprun.use_autocast = True
+pprun.batch_size = 64
 # pprun.autocast_type = "float16"
 start_pipeline_cluster.model_paths = [
     "gpt-j-6b_part0",

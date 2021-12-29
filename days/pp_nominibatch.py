@@ -14,18 +14,25 @@ import transformers
 import torchtext
 from time import time
 
-TAGS = {"Y": 1000, "X": 2000, "ACTIVATION": 3000, "GRAD": 4000, "SYNC": 5000} # why thousands/not single digits?
+TAGS = {
+    "Y": 1000,
+    "X": 2000,
+    "ACTIVATION": 3000,
+    "GRAD": 4000,
+    "SYNC": 5000,
+}  # why thousands/not single digits?
 
 # HuggingFace models return tuples in the middle (things like activation patterns), thus the [0]
 class HFBlockSequence(nn.Module):
     def __init__(self, *layers):
         super().__init__()
-        self.layers = nn.ModuleList(layers) # treat like a list
+        self.layers = nn.ModuleList(layers)  # treat like a list
 
     def forward(self, x):
         for layer in self.layers:
             x = layer(x)[0]
         return x
+
 
 # call once
 def make_gptj_and_save_pieces():
@@ -36,7 +43,7 @@ def make_gptj_and_save_pieces():
     print(model_lm)
 
     num_layers = 28
-    chunks = [6, 8, 8, 6] # less at ends due to embeddings/unembed
+    chunks = [6, 8, 8, 6]  # less at ends due to embeddings/unembed
     assert sum(chunks) == num_layers
     chunk_cumsum = t.cumsum(t.tensor(chunks), dim=0).tolist()
     print("cumsum", chunk_cumsum)
@@ -45,7 +52,7 @@ def make_gptj_and_save_pieces():
         for start, size in zip(chunk_cumsum, chunks)
     ]
     models[0] = nn.Sequential(model.wte, model.drop, models[0])
-    models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head) 
+    models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head)
     for i, model_part in enumerate(models):
         t.save(model_part, "gpt-j-6b_part" + str(i))
     return models
@@ -97,6 +104,7 @@ def make_dataset_imdb():
     print("finished tokenization")
     return data
 
+
 # 'bad address' error means you tried to use operations that weren't supported on cuda
 # I think the gradient accumulation will just work out?
 @gin.configurable()
@@ -122,26 +130,35 @@ def pprun(
     optimizer = t.optim.SGD(model.parameters(), lr=1e-4)
     print("model loaded", rank)
     if rank == 0:
-        dataset = import_object_from_qualified_name(dataset_fn_name)() #tokenizer. embedding in the model (don't worry)
-        batches = to_batches(dataset, batch_size, trim=True)
-    
+        dataset = import_object_from_qualified_name(
+            dataset_fn_name
+        )()  # tokenizer. embedding in the model (don't worry)
+        batches = iter(to_batches(dataset, batch_size, trim=True))
+
     total_examples = num_batches * batch_size
     start = time()
-    for batch_num, batch in enumerate(batches):
+    last_loss_time = time()
+    for batch_num in range(num_batches):
+
         if rank == 0:
+            batch = next(batches)
             dist.send(batch[1], size - 1, tag=TAGS["Y"])
-            with t.autocast(dtype=autocast_type, device_type=device[:4], enabled=use_autocast):
-                out = model(batch[0].long().to(device)).cpu() # all the gpu action
-            dist.send(out, rank + 1, tag=TAGS["ACTIVATION"]) 
+            with t.autocast(
+                dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+            ):
+                out = model(batch[0].long().to(device)).cpu()  # all the gpu action
+            dist.send(out, rank + 1, tag=TAGS["ACTIVATION"])
             grad_buffer = t.zeros_like(out)
             dist.recv(grad_buffer, rank + 1, tag=TAGS["GRAD"])
             out.backward(grad_buffer)
-            out = None # why is this necessary? saves memory?
+            out = None  # why is this necessary? saves memory?
         elif rank != size - 1:
             x = t.zeros(batch_size, *model_in_shape)
             dist.recv(x, rank - 1, tag=TAGS["ACTIVATION"])
             x.requires_grad = True
-            with t.autocast(dtype=autocast_type, device_type=device[:4], enabled=use_autocast):
+            with t.autocast(
+                dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+            ):
                 out = model(x.to(device)).cpu()
             dist.send(out, rank + 1, tag=TAGS["ACTIVATION"])
             grad_buffer = t.zeros_like(out)
@@ -158,11 +175,22 @@ def pprun(
             x = t.zeros(batch_size, *model_in_shape)
             dist.recv(x, rank - 1, tag=TAGS["ACTIVATION"])
             x.requires_grad = True
-            with t.autocast(dtype=autocast_type, device_type=device[:4], enabled=use_autocast): # save memory by computing with less precision
+            with t.autocast(
+                dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+            ):  # save memory by computing with less precision
                 out = model(x.to(device)).cpu()
-            out = out[:, -1, -2:]  # use the last 2 tokens of LM head as classification head
+            out = out[
+                :, -1, -2:
+            ]  # use the last 2 tokens of LM head as classification head
             loss = nn.CrossEntropyLoss()(out.float(), y.long())
-            print( "whole batch loss", batch_num,loss)
+            print(
+                "whole batch loss",
+                batch_num,
+                loss,
+                "took",
+                time() - last_loss_time,
+            )
+            last_loss_time = time()
             loss.backward()
             xgrad = x.grad
             dist.send(xgrad, rank - 1, tag=TAGS["GRAD"])
@@ -176,10 +204,12 @@ def pprun(
                 print("saving")
             filename = f"./.checkpoints/gptj_imdb_{batch_num}_rank{rank}"
             os.makedirs(os.path.dirname(filename), exist_ok=True)
-            with open(filename, "wb") as f: # added this
+            with open(filename, "wb") as f:  # added this
                 t.save(model, f)
     end = time()
-    print(f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {rank}")
+    print(
+        f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {rank}"
+    )
     if rank == 0:
         tpeek("pipe", next(model.parameters()))
 
@@ -196,7 +226,9 @@ def init_process(rank, size, run, *args, **kwargs):
 
 
 @gin.configurable
-def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple]): # does gin add the arguments here? crazy
+def start_pipeline_cluster(
+    model_paths: List[str], model_in_shapes: List[tuple]
+):  # does gin add the arguments here? crazy
     processes = []
     mp.set_start_method("spawn")
     pipe_stages = len(model_paths)
@@ -207,7 +239,8 @@ def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple])
             args=(rank, size, pprun, model_part_str, model_in_shapes[rank]),
         )
         p.start()
-        processes.append(p) # why are we doing this? and why aren't we joining?
+        processes.append(p)  # why are we doing this? and why aren't we joining?
+
 
 # 2,8 produces 0.18 time units and final loss of 0.10 (noisy)
 # 2,10 breaks (too much mem)
@@ -215,6 +248,6 @@ def start_pipeline_cluster(model_paths: List[str], model_in_shapes: List[tuple])
 # 8,2 produced something like 0.10 time-units/example, final loss of 0.37, half-way 0.53
 
 if __name__ == "__main__":
-    #make_gptj_and_save_pieces()
+    # make_gptj_and_save_pieces()
     gin.parse_config_file(sys.argv[1])
     start_pipeline_cluster()
