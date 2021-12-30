@@ -3,7 +3,7 @@ import numpy as np
 from modules import cross_entropy
 from einops import rearrange
 from days.bert import Bert, my_bert_from_hf_weights
-from utils import tpeek, tstat
+from utils import tpeek
 import transformers
 import torchtext
 import gin
@@ -26,10 +26,13 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=10, lr=1e-5):
     batch_size = 16
     mask_fraction = 0.15
     trunc_token_ids = token_ids[
-        : (token_ids.shape[0] // (batch_size * train_context_length)) * (batch_size * train_context_length)
+        : (token_ids.shape[0] // (batch_size * train_context_length))
+        * (batch_size * train_context_length)
     ]
     print("have token ids")
-    batches = rearrange(trunc_token_ids, "(n b l) -> n b l", b=batch_size, l=train_context_length)
+    batches = rearrange(
+        trunc_token_ids, "(n b l) -> n b l", b=batch_size, l=train_context_length
+    )
     batches = batches[t.randperm(batches.shape[0])]
     print("batches", batches.shape)
     print_every_n = 10
@@ -39,10 +42,18 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=10, lr=1e-5):
         for i in range(batches.shape[0]):
             input_ids = batches[i].to(device)
             # mask tokens in sequence, not batches (that's why it's index 1)
-            mask_ids = t.FloatTensor(batch_size, train_context_length).to(device).uniform_(0, 1) < mask_fraction
+            mask_ids = (
+                t.FloatTensor(batch_size, train_context_length)
+                .to(device)
+                .uniform_(0, 1)
+                < mask_fraction
+            )
             masked_input_ids = input_ids * ~mask_ids
             masked_input_ids += mask_ids * tokenizer.mask_token_id
-            model_output = model(input_ids=masked_input_ids, token_type_ids=t.zeros_like(input_ids).to(device)).logits
+            model_output = model(
+                input_ids=masked_input_ids,
+                token_type_ids=t.zeros_like(input_ids).to(device),
+            ).logits
             if t.any(t.isnan(model_output)):
                 print("NAN output!!!!!")
             # model_output = model_output.logits
@@ -50,7 +61,9 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=10, lr=1e-5):
             # hidden_input_ids = t.randint(1,1000,input_ids.shape).to(device)
             model_output_flattened = rearrange(model_output, "b s c -> (b s) c")
             hidden_input_ids_flattened = rearrange(hidden_input_ids, "b s -> (b s)")
-            loss = cross_entropy(model_output_flattened, hidden_input_ids_flattened, ignore_index=0)
+            loss = cross_entropy(
+                model_output_flattened, hidden_input_ids_flattened, ignore_index=0
+            )
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -67,7 +80,9 @@ def bert_mlm_pretrain(model, tokenizer, dataset, epochs=10, lr=1e-5):
 
 def ids_to_strings(tokenizer, ids):
     token_strings = tokenizer.convert_ids_to_tokens(ids)
-    token_strings = [tokenizer.convert_tokens_to_string([string]) for string in token_strings]
+    token_strings = [
+        tokenizer.convert_tokens_to_string([string]) for string in token_strings
+    ]
     return token_strings
 
 
@@ -88,7 +103,11 @@ def infer_show_bert(model, tokenizer, text):
 
 
 def eval_bert_mlm(model, dataset):
-    fun_texts = ["my name is Amy. Also, my name is [MASK].", "Hello, my name is [MASK].", "[MASK], my name is Amy."]
+    fun_texts = [
+        "my name is Amy. Also, my name is [MASK].",
+        "Hello, my name is [MASK].",
+        "[MASK], my name is Amy.",
+    ]
 
     for fun_text in fun_texts:
         infer_show_bert(model, tokenizer, fun_text)
@@ -96,7 +115,9 @@ def eval_bert_mlm(model, dataset):
 
 if __name__ == "__main__":
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
-    model = Bert({"hidden_size": 256, "intermediate_size": 1024, "num_layers": 3, "num_heads": 8})
+    model = Bert(
+        {"hidden_size": 256, "intermediate_size": 1024, "num_layers": 3, "num_heads": 8}
+    )
     model = my_bert_from_hf_weights()
     print(model)
     train_data_sentence_iterator = torchtext.datasets.WikiText2(split="valid")

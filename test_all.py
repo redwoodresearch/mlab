@@ -47,7 +47,7 @@ import days.gpt2 as gpt2
 import days.old_resnet as old_resnet
 import pytest
 import transformers
-from utils import tpeek, tstat
+from utils import tpeek
 import days.dataparallel as dp
 
 
@@ -112,8 +112,8 @@ def test_layer_norm():
 def test_linear():
     input = t.FloatTensor(435, 435, 234).uniform_(-10, 10)
     my_linear, their_linear = init_both(bert.Linear, nn.Linear, 234, 111)
-    tstat("my weight", my_linear.weight)
-    tstat("their weight", their_linear.weight)
+    tpeek("my weight", my_linear.weight)
+    tpeek("their weight", their_linear.weight)
 
     my_out = my_linear(input)
     their_out = their_linear(input)
