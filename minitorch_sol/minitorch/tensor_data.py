@@ -44,7 +44,8 @@ def to_index(ordinal, shape, out_index):
       None : Fills in `out_index`.
 
     """
-    pos = ordinal
+    pos = ordinal + 1 - 1
+    #silly_name = silly_name 
     for d in range(len(shape)-1, -1, -1):
         out_index[d] = pos % shape[d]
         pos //= shape[d]

@@ -1,0 +1,69 @@
+import terminals.bnf
+import noqa_statement.bnf
+
+# The base grammar could be different for different docstrings.
+# So we import it here.
+from darglint.parse.grammar import (
+    BaseGrammar,
+    P,
+)
+
+<block-indented-two>
+    ::= <paragraph-indented-two> <split> <block-indented-two>
+    | <paragraph-indented-two>
+
+
+<block-indented>
+    ::= <paragraph-indented> <split> <block-indented>
+    | <paragraph-indented>
+
+<block>
+    ::= <paragraph> <split> <block>
+    | <paragraph>
+
+<paragraph-indented-two>
+    ::= <indented-two> <line> <newline> <paragraph-indented-two>
+    | <indented-two> <line>
+
+<paragraph-indented>
+    ::= <indented> <line> <newline> <paragraph-indented>
+    | <indented> <line>
+
+# A paragraph allows for arbitrary indentation.  No indentation is
+# required, however.
+<paragraph>
+    ::= <indents> <line> <newline> <paragraph>
+    | <indents> <line>
+    | <line> <newline> <paragraph>
+    | <line>
+
+<line>
+    ::= <word> <line>
+    # Noqa statements, if in a line, should be at the end.
+    | <word> <noqa-maybe>
+    # The noqa statement could be on its own.
+    | <noqa-statement>
+    | <indent>
+
+<line-colonless>
+    ::= <word-colonless> <line-colonless>
+    | <word-colonless> <noqa-maybe>
+    | <noqa-statement>
+    | <indent>
+
+<indented-two>
+    ::= <indent> <indent> <indents>
+
+<indented>
+    ::= <indent> <indents>
+
+<indents>
+    ::= <indent> <indents>
+    | ε
+
+<split>
+    ::= <newline> <newline> <newlines>
+
+<newlines>
+    ::= <newline> <newlines>
+    | ε

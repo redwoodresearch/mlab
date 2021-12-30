@@ -1,0 +1,27 @@
+import google_base.bnf
+import google_types.bnf
+
+Grammar: YieldsGrammar
+
+start: <yields-section>
+
+<yields-section>
+    ::= <yields-head> <yields-body>
+
+<yields-head>
+    ::= <yields> <colon> <newline>
+
+<yields-body>
+    ::= <indented> <yields-type> <yields-content>
+    | <indented> <yields-content-colonless>
+
+<yields-type>
+    ::= <type-section-colon>
+
+<yields-content>
+    ::= <line> <newlines>
+    | <line> <newline> <block-indented> <newlines>
+
+<yields-content-colonless>
+    ::= <line-colonless> <newlines>
+    | <line-colonless> <newline> <block-indented> <newlines>

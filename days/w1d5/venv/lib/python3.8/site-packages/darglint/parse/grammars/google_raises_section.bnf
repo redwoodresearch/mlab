@@ -1,0 +1,45 @@
+import google_base.bnf
+import google_types.bnf
+
+from darglint.errors import (
+    IndentError,
+    EmptyDescriptionError,
+)
+from darglint.parse.identifiers import (
+    ExceptionIdentifier,
+    ExceptionItemIdentifier,
+)
+
+Grammar: RaisesGrammar
+
+start: <raises-section>
+
+<raises-section>
+    ::= <raises> <colon> <newline> <items-exception> <newlines>
+
+<items-exception>
+    ::= <item-exception> <newline> <items-exception>
+    | <item-exception>
+
+<item-exception>
+    ::= 2 @ExceptionItemIdentifier
+      <head-exception> <line> <newline> <paragraph-indented-two>
+    | 2 @ExceptionItemIdentifier
+      <head-exception> <line>
+    | @IndentError
+      @ExceptionItemIdentifier
+      <head-exception> <line> <newline> <paragraph>
+    | @IndentError
+      @ExceptionItemIdentifier
+      <head-exception> <line> <newline> <paragraph> <newline>
+    | @IndentError
+      @ExceptionItemIdentifier
+      <head-exception> <newline> <paragraph>
+    | @EmptyDescriptionError
+      <head-exception>
+
+<head-exception>
+    ::= @ExceptionIdentifier <indent> <exception> <colon>
+
+<exception>
+    ::= "TokenType\.WORD"

@@ -1,0 +1,55 @@
+import numpy.bnf
+import terminals.bnf
+import noqa_statement.bnf
+
+from darglint.parse.grammar import (
+    BaseGrammar,
+    P,
+)
+from darglint.parse.identifiers import (
+    ExceptionItemIdentifier,
+)
+from darglint.errors import (
+    EmptyDescriptionError,
+    EmptyTypeError,
+)
+
+
+Grammar: RaisesGrammar
+
+start: <raises-section>
+
+
+<raises-section>
+    ::= <raises-header> <newlines>
+    | <raises-header> <newline> <raises-body> <newlines>
+
+<raises-header>
+    ::= <raises> <newline> <header>
+
+<raises-body>
+    ::= <raises-item> <newline> <raises-body>
+    | <raises-item>
+
+<raises-item>
+    ::= @ExceptionItemIdentifier
+        <ident> <noqa-maybe> <newline>
+        <block-indented>
+    # FIXME: The symbol raises-item gets elided during translation,
+    # so the annotations are lost.
+    | @ExceptionItemIdentifier
+      @EmptyDescriptionError
+      <ident>
+    # Although it's not a part of the numpy standard, we allow a
+    # type for errors.  This allows us to capture excess colons
+    # that could be left by users.  In any case, we can raise
+    # just about anything, so even though the function can't
+    # annotate the exception type, the docstring could.
+    | @ExceptionItemIdentifier
+      @EmptyTypeError
+      <ident> <colon> <line> <newline>
+      <block-indented>
+    | @ExceptionItemIdentifier
+      @EmptyTypeError
+      <ident> <colon> <noqa-maybe> <newline>
+      <block-indented>

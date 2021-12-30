@@ -1,0 +1,6 @@
+[console_scripts]
+darglint=darglint.driver:main
+
+[flake8.extension]
+DAR=darglint.flake8_entry:DarglintChecker
+

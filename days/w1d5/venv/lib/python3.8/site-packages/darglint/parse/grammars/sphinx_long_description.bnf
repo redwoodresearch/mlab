@@ -1,0 +1,9 @@
+import sphinx_base.bnf
+
+Grammar: LongDescriptionGrammar
+
+start: <long-description>
+
+<long-description>
+    ::= <indents> <block>
+    | <block> <newlines>

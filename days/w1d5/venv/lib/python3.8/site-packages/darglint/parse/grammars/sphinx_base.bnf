@@ -1,0 +1,67 @@
+import terminals.bnf
+import noqa_statement.bnf
+
+from darglint.parse.grammar import (
+    BaseGrammar,
+    P,
+)
+from darglint.errors import (
+    IndentError,
+)
+
+
+<item-body>
+    ::= 2 <line>
+    | 2 <line> <newline> <block-indented>
+    | 2 <line> <newlines> <block-indented>
+    | 2 <line> <newline> <indent> <newline> <newlines> <block-indented>
+    | 1 @IndentError <line> <newline> <block>
+
+<blanks>
+    ::= <split>
+    | <split-indented>
+
+<block-indented>
+    ::= <paragraph-indented> <split> <block-indented>
+    | <paragraph-indented> <split-indented> <block-indented>
+    | <paragraph-indented>
+
+<split-indented>
+    ::= <newline> <indents> <newlines>
+
+<paragraph-indented>
+    ::= <indented> <line> <newline> <paragraph-indented>
+    | <indented> <line>
+
+<indented>
+    ::= <indent> <indents>
+
+<block>
+    ::= <paragraph> <split> <block>
+    | <paragraph>
+
+<paragraph>
+    ::= <indents> <line> <newline> <paragraph>
+    | <indents> <line>
+    | <line> <newline> <paragraph>
+    | <line>
+
+<line>
+    ::= <word> <line>
+    # Noqa statements, if in a line, should be at the end.
+    | <word> <noqa-maybe>
+    # The noqa statement could be on its own.
+    | <noqa-statement>
+    | <indent>
+
+
+<indents>
+    ::= <indent> <indents>
+    | ε
+
+<split>
+    ::= <newline> <newline> <newlines>
+
+<newlines>
+    ::= <newline> <newlines>
+    | ε

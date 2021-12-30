@@ -1,0 +1,62 @@
+import terminals.bnf
+import noqa_statement.bnf
+import numpy.bnf
+
+from darglint.errors import (
+    EmptyDescriptionError,
+    EmptyTypeError,
+)
+from darglint.parse.grammar import (
+    BaseGrammar,
+    P,
+)
+from darglint.parse.identifiers import (
+    ArgumentItemIdentifier,
+    ArgumentTypeIdentifier,
+)
+
+
+Grammar: ArgumentsGrammar
+
+start: <arguments-section>
+
+
+<arguments-section>
+    ::= <arguments-header> <newlines>
+    | <arguments-header> <newline> <arguments-body> <newlines>
+
+<arguments-header>
+    ::= <arguments> <newline> <header>
+
+<arguments-body>
+    ::= <argument-item-header> <argument-item-body> <newline> <arguments-body>
+    | <argument-item-header> <argument-item-body>
+    | <argument-item-header-no-follow> <newline> <arguments-body>
+    | <argument-item-header-no-follow>
+
+<argument-item-header>
+    ::= @ArgumentItemIdentifier
+        <ident-list> <newlines>
+    | @ArgumentItemIdentifier
+      @EmptyTypeError
+        <ident-list> <colon> <newlines>
+    | @ArgumentItemIdentifier
+      @ArgumentTypeIdentifier
+        <ident-list> <colon> <line> <newlines>
+
+<argument-item-header-no-follow>
+    ::= @ArgumentItemIdentifier
+        @EmptyDescriptionError
+        <ident-list> <newlines>
+    | @ArgumentItemIdentifier
+      @EmptyDescriptionError
+      @EmptyTypeError
+        <ident-list> <colon> <newlines>
+    | @ArgumentItemIdentifier
+      @ArgumentTypeIdentifier
+      @EmptyDescriptionError
+        <ident-list> <colon> <line> <newlines>
+
+<argument-item-body>
+    ::= <block-indented> <newlines>
+    | <block-indented> <newline> <indents> <newlines>

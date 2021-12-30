@@ -304,7 +304,7 @@ def topological_sort(variable):
     vars_with_ids = visit(variable, [])
     #raise AssertionError(f" {type(vars_with_ids[0])}")
     #raise AssertionError(f" {[var[1] for var in vars_with_ids]}")
-    return [var[1] for var in vars_with_ids]
+    #return [var[1] for var in vars_with_ids]
     return visit(variable, [])
 
 

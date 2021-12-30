@@ -1,0 +1,51 @@
+import google_base.bnf
+import terminals.bnf
+
+from darglint.errors import (
+    ParameterMalformedError,
+)
+
+# Since we're not capturing commas, this assumes that a comma is
+# present.  We'll probably want to add commas to the parsed symbols.
+Grammar: TypesGrammar
+
+start: <type-section>
+
+<type-section>
+    ::= 2 <type-section-colon>
+    | 1 <type-section-parens>
+
+<type-section-colon>
+    ::= <type-words> <colon>
+
+<type-section-parens>
+    ::= <lparen> <type-words-colon> <rparen>
+
+# The type words, but allowing colons.
+<type-words-colon>
+    ::= <type-word-colon> <type-words-colon>
+    | @ParameterMalformedError <malformed-type-words>
+    | <type-word-colon> <newline> <indents> <type-words-colon>
+    | ε
+
+<type-word-colon>
+    ::= <ident>
+    | <colon>
+    | <indent>
+
+<malformed-type-words>
+    ::= <malformed-type-word> <malformed-type-words>
+    | <malformed-type-word>
+
+<malformed-type-word>
+    ::= <ident>
+    | <lparen>
+    | <rparen>
+
+<type-words>
+    ::= <type-word> <type-words>
+    | <type-word> <newline> <indents> <type-words>
+    | <type-word>
+
+<type-word>
+    ::= <ident>

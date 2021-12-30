@@ -1,0 +1,118 @@
+from darglint.token import (
+    TokenType,
+)
+
+<word>
+    ::= <colon>
+    | <hash>
+    | <indent>
+    | <lparen>
+    | <rparen>
+    | <ident>
+    | <header>
+
+<word-colonless>
+    ::= <ident>
+    | <hash>
+    | <indent>
+    | <lparen>
+    | <rparen>
+    | <header>
+
+<ident>
+    ::= "TokenType\.WORD"
+    | <raises>
+    | <arguments>
+    | <argument-type>
+    | <raises>
+    | <returns>
+    | <return-type>
+    | <yields>
+    | <yield-type>
+    | <variables>
+    | <variable-type>
+    | <noqa>
+    | <other>
+    | <receives>
+    | <warns>
+    | <see>
+    | <also>
+    | <notes>
+    | <examples>
+    | <references>
+
+
+<header>
+    ::= "TokenType\.HEADER"
+
+<arguments>
+    ::= "TokenType\.ARGUMENTS"
+
+<argument-type>
+    ::= "TokenType\.ARGUMENT_TYPE"
+
+<colon>
+    ::= "TokenType\.COLON"
+
+<hash>
+    ::= "TokenType\.HASH"
+
+<indent>
+    ::= "TokenType\.INDENT"
+
+<lparen>
+    ::= "TokenType\.LPAREN"
+
+<newline>
+    ::= "TokenType\.NEWLINE"
+
+<raises>
+    ::= "TokenType\.RAISES"
+
+<returns>
+    ::= "TokenType\.RETURNS"
+
+<return-type>
+    ::= "TokenType\.RETURN_TYPE"
+
+<rparen>
+    ::= "TokenType\.RPAREN"
+
+<yields>
+    ::= "TokenType\.YIELDS"
+
+<yield-type>
+    ::= "TokenType\.YIELD_TYPE"
+
+<variables>
+    ::= "TokenType\.VARIABLES"
+
+<variable-type>
+    ::= "TokenType\.VARIABLE_TYPE"
+
+<noqa>
+    ::= "TokenType\.NOQA"
+
+<other>
+    ::= "TokenType\.OTHER"
+
+<receives>
+    ::= "TokenType\.RECEIVES"
+
+<warns>
+    ::= "TokenType\.WARNS"
+
+<see>
+    ::= "TokenType\.SEE"
+
+<also>
+    ::= "TokenType\.ALSO"
+
+<notes>
+    ::= "TokenType\.NOTES"
+
+<examples>
+    ::= "TokenType\.EXAMPLES"
+
+<references>
+    ::= "TokenType\.REFERENCES"

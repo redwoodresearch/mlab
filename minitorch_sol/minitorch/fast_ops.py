@@ -6,6 +6,7 @@ from .tensor_data import (
     shape_broadcast,
 )
 from numba import njit, prange
+import minitorch
 
 
 # TIP: Use `NUMBA_DISABLE_JIT=1 pytest tests/ -m task3_1` to run these tests without JIT.
@@ -41,8 +42,8 @@ def tensor_map(fn):
         None : Fills in `out`
     """
     def _map(out, out_shape, out_strides, in_storage, in_shape, in_strides):
-        out_index = np.array(out_shape)
-        in_index = np.array(in_shape)
+        out_index = out_shape.copy()
+        in_index = in_shape.copy()
         for i in range(len(out)):
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, in_shape, in_index)
@@ -53,6 +54,7 @@ def tensor_map(fn):
             out[out_pos] = map_data
 
     return njit(parallel=True)(_map)
+
 
 
 def map(fn):
@@ -79,7 +81,18 @@ def map(fn):
     def ret(a, out=None):
         if out is None:
             out = a.zeros(a.shape)
-        f(*out.tuple(), *a.tuple())
+
+        # The pre-existing implementation
+        # f(*out.tuple(), *a.tuple())
+
+        # Passes some JIT tests, very slowly
+        _, out_size, out_stride = out.tuple()
+        _, a_size, a_stride = a.tuple()
+        out_size = out_size.astype(float)
+        out_stride = out_stride.astype(float)
+        a_size = a_size.astype(float)
+        a_stride = a_stride.astype(float)
+        f(out._tensor._storage, out_size, out_stride, a._tensor._storage, a_size, a_stride)
         return out
 
     return ret
@@ -111,7 +124,6 @@ def tensor_zip(fn):
     Returns:
         None : Fills in `out`
     """
-
     def _zip(
         out,
         out_shape,
@@ -123,9 +135,9 @@ def tensor_zip(fn):
         b_shape,
         b_strides,
     ):
-        out_index = np.array(out_shape, np.float32)
-        a_index = np.array(a_shape, np.float32)
-        b_index = np.array(b_shape, np.float32)
+        out_index = out_shape.copy()
+        a_index = a_shape.copy()
+        b_index = b_shape.copy()
         for i in prange(len(out)):
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, a_shape, a_index)
@@ -161,7 +173,23 @@ def zip(fn):
     def ret(a, b):
         c_shape = shape_broadcast(a.shape, b.shape)
         out = a.zeros(c_shape)
-        f(*out.tuple(), *a.tuple(), *b.tuple())
+    
+        # The pre-existing implementation
+        # f(*out.tuple(), *a.tuple(), *b.tuple())
+
+        # Passes more JIT tests, but very slowly
+        _, out_size, out_stride = out.tuple()
+        _, a_size, a_stride = a.tuple()
+        _, b_size, b_stride = b.tuple()
+
+        out_size = out_size.astype(float)
+        out_stride = out_stride.astype(float)
+        a_size = a_size.astype(float)
+        a_stride = a_stride.astype(float)
+        b_size = b_size.astype(float)
+        b_stride = b_stride.astype(float)
+
+        f(out._tensor._storage, out_size, out_stride, a._tensor._storage, a_size, a_stride, b._tensor._storage, b_size, b_stride)
         return out
 
     return ret
@@ -191,13 +219,13 @@ def tensor_reduce(fn):
         None : Fills in `out`
 
     """
-
+     
     def _reduce(out, out_shape, out_strides, a_storage, a_shape, a_strides, reduce_dim):
-        reduce_index = np.array(a_shape[reduce_dim], np.float32)
-        reduce_shape = [a_shape[d] if d == reduce_dim else 1 for d in range(len(a_shape))]
-        reduce_size = a_shape[reduce_dim]
-        out_index = np.array(out_shape, np.float32)
-        reduce_index = np.array(reduce_shape, np.float32)
+        reduce_index = a_shape[reduce_dim] + 1 - 1 # these matter for JIT
+        reduce_shape = np.array([a_shape[d] if d == reduce_dim else 1 for d in range(len(a_shape))]).copy()
+        reduce_size = a_shape[reduce_dim] + 1 - 1
+        out_index = out_shape.copy()
+        reduce_index = reduce_shape.copy()
         for i in prange(len(out)):
             to_index(i, out_shape, out_index)
             out_pos = index_to_position(out_index, out_strides)
@@ -237,7 +265,20 @@ def reduce(fn, start=0.0):
         out = a.zeros(tuple(out_shape))
         out._tensor._storage[:] = start
 
-        f(*out.tuple(), *a.tuple(), dim)
+
+        # The pre-existing implementation
+        # f(*out.tuple(), *a.tuple(), *b.tuple())
+
+        # Passes more JIT tests, but very slowly
+        _, out_size, out_stride = out.tuple()
+        _, a_size, a_stride = a.tuple()
+
+        out_size = out_size.astype(float)
+        out_stride = out_stride.astype(float)
+        a_size = a_size.astype(float)
+        a_stride = a_stride.astype(float)
+
+        f(out._tensor._storage, out_size, out_stride, a._tensor._storage, a_size, a_stride, dim)
         return out
 
     return ret

@@ -1,0 +1,22 @@
+import sphinx_base.bnf
+
+from darglint.errors import (
+    EmptyDescriptionError,
+)
+
+
+Grammar: ReturnsGrammar
+
+start: <returns-section>
+
+<returns-section>
+    ::= <rethead> <item-body> <newlines>
+    | <rethead> <blanks> <item-body> <newlines>
+    | <rethead-no-follow> <newlines>
+
+<rethead>
+    ::= <colon> <returns> <colon>
+
+<rethead-no-follow>
+    ::= @EmptyDescriptionError
+        <colon> <returns> <colon>
