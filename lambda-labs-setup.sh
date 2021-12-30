@@ -1,4 +1,3 @@
-# TODO: write this
 conda deactivate
 cd ~;
 git clone https://github.com/taoroalin/mlab
@@ -12,7 +11,7 @@ code --install-extension ms-python.python
 code --install-extension ms-toolsai.jupyter
 python -c "import torch; import torchvision.models;import torchtext; import transformers; transformers.AutoModelForCausalLM.from_pretrained('gpt2');transformers.AutoModel.from_pretrained('bert-base-cased');torchvision.models.resnet34(pretrained=True);torchvision.models.resnet50(pretrained=True);torchtext.datasets.WikiText2(split='train');torchtext.datasets.WikiText103(split='train');torchtext.datasets.IMDB(split='train');" &
 
-python -c "import transformers; transformers.AutoModelForCausalLM.from_pretrained('EleutherAI/gpt-j-6B'); transformers.AutoModelForCausalLM.from_pretrained('EleutherAI/gpt-neo-2.6B')" &
+python -c "import transformers; transformers.AutoModelForCausalLM.from_pretrained('EleutherAI/gpt-j-6B'); transformers.AutoModelForCausalLM.from_pretrained('EleutherAI/gpt-neo-2.7B')" &
 
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null

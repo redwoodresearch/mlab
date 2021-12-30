@@ -6,6 +6,7 @@ from scipy.stats import chisquare
 import torch
 from typing import Collection, Optional
 
+
 def _allclose_tensorlists(tensorlist1, tensorlist2):
     if isinstance(tensorlist1, torch.Tensor) and isinstance(tensorlist2, torch.Tensor):
         tensorlist1 = [tensorlist1]
@@ -16,6 +17,7 @@ def _allclose_tensorlists(tensorlist1, tensorlist2):
         if not torch.allclose(t1, t2):
             return False
     return True
+
 
 def _set_seeds(seed):
     rs = np.random.RandomState(seed)
@@ -43,12 +45,32 @@ def test(f, ex_num, n_tests=10):
     testcase = g.get(f"testcase{ex_num}")
     assert ex, f"There's no solution for exercise {ex_num}"
 
-    deterministic_exercises = {1, 2, 3, 5, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21}
+    deterministic_exercises = {
+        1,
+        2,
+        3,
+        5,
+        7,
+        8,
+        9,
+        11,
+        12,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+    }
 
     if ex_num in deterministic_exercises:
         for seed in range(n_tests):
             tc = testcase(seed)
-            if not _allclose_tensorlists(f(*tc), ex(*tc)): # most of these funcs don't return lists??
+            if not _allclose_tensorlists(
+                f(*tc), ex(*tc)
+            ):  # most of these funcs don't return lists??
                 print(f"Wrong answer for testcase{ex_num}({seed}).")
                 return
 
@@ -67,7 +89,10 @@ def test(f, ex_num, n_tests=10):
             frequencies = _count(f(*tc), range(len(tc[1])))
             chisq, p = chisquare(frequencies, tc[0] * tc[1], axis=None)
             if p < 0.01:
-                print("Your function returned an unexpected sample for " f"testcase{ex_num}({seed}). (p-value = {p})")
+                print(
+                    "Your function returned an unexpected sample for "
+                    f"testcase{ex_num}({seed}). (p-value = {p})"
+                )
                 return
 
     if ex_num == 10:
@@ -77,7 +102,9 @@ def test(f, ex_num, n_tests=10):
             for i, (Arow, Brow) in enumerate(zip(A, B)):
                 expected = _count(Arow, {a.item() for a in Arow})
                 observed = _count(Brow, {a.item() for a in Arow})
-                chisq, p = chisquare(observed, expected / sum(expected) * sum(observed), axis=None)
+                chisq, p = chisquare(
+                    observed, expected / sum(expected) * sum(observed), axis=None
+                )
                 if p < 0.01:
                     print(
                         "Your function returned an unexpected sample for "
@@ -91,12 +118,17 @@ def test(f, ex_num, n_tests=10):
             if is_train:
                 out = f(tensor, dropout_p, is_train)
                 is_zero = out == 0.0
-                if not torch.allclose(out[~is_zero], tensor[~is_zero] / (1 - dropout_p)):
+                if not torch.allclose(
+                    out[~is_zero], tensor[~is_zero] / (1 - dropout_p)
+                ):
                     print(f"Wrong answer for testcase{ex_num}({seed}).")
                     return
 
                 if abs(is_zero.sum() - dropout_p * len(tensor.flatten())) > 5:
-                    print("Your function zeroed out an unexpected number of elements for " f"testcase{ex_num}({seed}).")
+                    print(
+                        "Your function zeroed out an unexpected number of elements for "
+                        f"testcase{ex_num}({seed})."
+                    )
                     return
             else:
                 if not torch.allclose(tensor, f(tensor, dropout_p, is_train)):
@@ -154,7 +186,12 @@ def ex4(H: float, W: float, n: int):
     xtile = torch.tile(xaxis, dims=(n + 1, 1))
     yaxis = torch.linspace(0, W, n + 1)[:, None]
     ytile = torch.tile(yaxis, dims=(n + 1,))
-    return torch.stack([einops.rearrange(xtile, "h w -> (h w)"), einops.rearrange(ytile, "h w -> (h w)")]).T
+    return torch.stack(
+        [
+            einops.rearrange(xtile, "h w -> (h w)"),
+            einops.rearrange(ytile, "h w -> (h w)"),
+        ]
+    ).T
 
 
 def testcase4(seed=0):
@@ -290,7 +327,11 @@ def testcase13(seed=0):
     return [_rand_tensor(shape), drop_fraction, is_train]
 
 
-def linear(tensor: torch.FloatTensor, weight: torch.FloatTensor, bias: Optional[torch.FloatTensor]):
+def linear(
+    tensor: torch.FloatTensor,
+    weight: torch.FloatTensor,
+    bias: Optional[torch.FloatTensor],
+):
     x = torch.einsum("...j,kj->...k", tensor, weight)
     if bias is not None:
         x += bias
@@ -308,7 +349,12 @@ def testcase14(seed=0):
     return [tensor, weight, bias]
 
 
-def layer_norm(x: torch.FloatTensor, reduce_dims, weight: torch.FloatTensor, bias: torch.FloatTensor):
+def layer_norm(
+    x: torch.FloatTensor,
+    reduce_dims,
+    weight: torch.FloatTensor,
+    bias: torch.FloatTensor,
+):
     red_dim_indices = list(range(len(x.shape) - len(reduce_dims), len(x.shape)))
     xmean = x.mean(dim=red_dim_indices, keepdim=True)
     var = ((x - xmean) ** 2).mean(dim=red_dim_indices, keepdim=True)
@@ -342,7 +388,7 @@ def testcase16(seed=0):
 
 def softmax(tensor: torch.FloatTensor):
     exps = torch.exp(tensor)
-    return exps / exps.sum(dim=1, keepdim=True)
+    return exps / exps.sum(dim=-1, keepdim=True)
 
 
 def testcase17(seed=0):
@@ -354,7 +400,8 @@ def testcase17(seed=0):
 
 def logsoftmax(tensor: torch.FloatTensor):
     C = tensor.max(dim=1, keepdim=True).values
-    return tensor - C - (tensor - C).exp().sum(dim=1, keepdim=True).log()
+    # subtracting max from both sides to avoid exponential going above the floating point range
+    return tensor - C - (tensor - C).exp().sum(dim=-1, keepdim=True).log()
 
 
 testcase18 = testcase17
@@ -381,6 +428,7 @@ def ex20(x, weight):
     summed = reduce(added, "s k -> s", "sum")
     return summed
 
+
 # def ex20_2(v, w):
 #     outlen = len(v) - len(w) + 1
 #     reps = repeat(t.arange(len(w)), 'w -> h w', h = outlen)
@@ -400,12 +448,18 @@ def ex21(x, weight):
     out_channels, _, kernel_size = weight.shape
     B, S, C = x.shape
     x = x.contiguous()
-    strided_input = torch.as_strided(x, (B, S - kernel_size + 1, kernel_size, C, out_channels), (S * C, C, C, 1, 0), 0)
+    strided_input = torch.as_strided(
+        x,
+        (B, S - kernel_size + 1, kernel_size, C, out_channels),
+        (S * C, C, C, 1, 0),
+        0,
+    )
     weight_rearranged = rearrange(weight, "o i k -> k i o")
     added = strided_input * weight_rearranged
     summed = reduce(added, "b s c in_channels out_channels -> b s out_channels", "sum")
     summed = rearrange(summed, "b s c->b c s")
     return summed
+
 
 # def ex21_2(v, w):
 #     batch_size, in_chans, seq_len = v.shape
@@ -425,12 +479,23 @@ def testcase21(seed=0):
     data = _rand_tensor((batch_size, n_channels, data_len))
     return [data, weight]
 
-def ex22(v, w, padding = 0, stride = 1):
+
+def ex22(v, w, padding=0, stride=1):
     batch_size, in_chans, seq_len = v.shape
     kernel_size = w.shape[-1]
-    outlen = int((seq_len - kernel_size + padding * 2)/stride + 1)
-    v = torch.cat([torch.zeros(batch_size, in_chans, padding), v, torch.zeros(batch_size, in_chans, padding)], dim = -1)
-    u = v.as_strided((batch_size, outlen, in_chans, kernel_size), (in_chans * seq_len, stride, seq_len, 1))
+    outlen = int((seq_len - kernel_size + padding * 2) / stride + 1)
+    v = torch.cat(
+        [
+            torch.zeros(batch_size, in_chans, padding),
+            v,
+            torch.zeros(batch_size, in_chans, padding),
+        ],
+        dim=-1,
+    )
+    u = v.as_strided(
+        (batch_size, outlen, in_chans, kernel_size),
+        (in_chans * seq_len, stride, seq_len, 1),
+    )
     return torch.einsum("btik, oik -> bot", [u, w])
 
 

@@ -8,15 +8,15 @@ import importlib
 from torchtyping import patch_typeguard, TensorType
 import math
 
+from PIL import Image
+import requests
+from io import BytesIO
+import torchvision
 
-def tstat(name, tensor):
-    print(
-        name,
-        "mean",
-        "{0:.4g}".format(t.mean(tensor).cpu().item()),
-        "var",
-        "{0:.4g}".format(t.var(tensor).cpu().item()),
-    )
+
+def load_image(url):
+    response = requests.get(url)
+    return torchvision.transforms.ToTensor(Image.open(BytesIO(response.content)))
 
 
 def to_batches(list_of_tensors, batch_size, trim=False):
@@ -32,7 +32,7 @@ def to_batches(list_of_tensors, batch_size, trim=False):
 def itpeek(tensor: t.Tensor):
     contains_nan = t.any(t.isnan(tensor)).item()
     contains_inf = t.any(t.isinf(tensor)).item()
-    string = f"SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor.float()).cpu().item())} VAR: {'{0:.4g}'.format(t.var(tensor.float()).cpu().item())} {'CONTAINS_NAN! ' if contains_nan else ''}{'CONTAINS_INF! ' if contains_inf else ''}VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}{'...' if tensor.numel()>10 else ''}]"
+    string = f"SHAPE {tuple(tensor.shape)} MEAN: {'{0:.4g}'.format(t.mean(tensor.float()).cpu().item())} STD: {'{0:.4g}'.format(t.std(tensor.float()).cpu().item())} {'CONTAINS_NAN! ' if contains_nan else ''}{'CONTAINS_INF! ' if contains_inf else ''}VALS [{' '.join(['{0:.4g}'.format(x) for x in t.flatten(tensor)[:10].cpu().tolist()])}{'...' if tensor.numel()>10 else ''}]"
     return string
 
 
