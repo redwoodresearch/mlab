@@ -91,8 +91,8 @@ def get_params_and_image(
     decorrelate=True,
     fft=True,
 ):
-    if height is None:
-        height = width
+    if width is None:
+        width = height
 
     shape = [n_batches, n_channels, height, width]
     param_f = freq_params_image if fft else pixel_params_image
