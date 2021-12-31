@@ -1,0 +1,18 @@
+train_dqn.experiment_name = "cart_pole_tweaked"
+train_dqn.env_id = "CartPole-v1"
+train_dqn.gamma = 0.98
+train_dqn.steps = 100000
+train_dqn.start_eps = 0.5
+train_dqn.end_eps = 0.05
+train_dqn.exploration_frac = 1.0
+train_dqn.lr = 1e-3
+train_dqn.train_freq = 16
+train_dqn.batch_size = 128
+train_dqn.buffer_size = 10000
+train_dqn.eval_freq = 10000
+train_dqn.use_double_dqn = True
+train_dqn.multi_step_n = 3
+
+dqn_head.use_dueling = True
+
+mlp_model.hidden_size = 64

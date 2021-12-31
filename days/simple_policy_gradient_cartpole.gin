@@ -1,0 +1,12 @@
+train_simple_policy.experiment_name = "spg_cart_pole_from_the_start"
+train_simple_policy.env_id = "CartPole-v1"
+train_simple_policy.steps = 200_000
+train_simple_policy.lr = 1e-3
+train_simple_policy.batch_size = 256
+train_simple_policy.rewards_to_go = True
+train_simple_policy.advantage_estimation = True
+train_simple_policy.gamma = 0.98
+train_simple_policy.advantage_estim_lambda = 0.95
+train_simple_policy.value_loss_alpha = 0.2
+
+MLPPolicy.hidden_size = 64
