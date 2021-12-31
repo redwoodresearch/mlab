@@ -52,9 +52,19 @@ print(dest)
 
 # Note that pycuda *isn't* a great way to write maintainable pytorch cuda code
 # in practice. Typically you'd write cuda c++ code and use pybind11 with the
-# pytorch c++ api, but pycuda's convenient for experimenting here. This is much
-# nicer in many ways. For instance, pybind11 does catch type errors.
+# pytorch c++ api, but pycuda's convenient for experimenting here without
+# having to worry about CUDA memory managment or the pytorch c++ api. Using c++
+# is nicer in many ways. For instance, pybind11 does catch type errors.
 #
+# If you'd like, you can write all of your cuda kernels in a separate file with
+# the .cu file extension and then read in the file with python. This will allow
+# for getting c++/cuda syntax highlighting and other nice things like that.
+# Here's an example of this:
+
+file_mod = SourceModule(open('days/cuda_load_from_file_example.cu', 'r').read())
+zero_kernel = file_mod.get_function("zero")
+one_kernel = file_mod.get_function("one")
+
 # Next, let's create a kernel which computes out = a * b + c with float inputs
 # out, a, b, and c. Use the kernel on gpu tensor inputs of size 128 with values
 # of your choice (you can keep using a block size of 128).
@@ -298,8 +308,8 @@ print(index(a, b))
 #
 # When will this kernel be slow and fail to use the parallelism of the gpu?
 #
-# This is our last kernel with pycuda before transitioning to writing our
-# kernels independently from python (in just c++).
+# This is the last task in this file, so after completing this look at the
+# instructions doc for next steps.
 
 # solution (not in student copy ofc):
 reduce_mod = SourceModule("""
