@@ -133,19 +133,17 @@ def _opt_rosenbrock(xy, lr, momentum, n_iter):
     w_history = torch.zeros([n_iter+1, 2])
     w_history[0] = xy.detach()
     opt = torch.optim.SGD([xy], lr=lr, momentum=momentum)
-
+    
     for i in range(n_iter):
         opt.zero_grad()
         _rosenbrock(xy[0], xy[1]).backward()
+        
         opt.step()
         w_history[i+1] = xy.detach()
     return w_history
 
 
 def test_rosenbrock(opt_rosenbrock):
-    # THIS IS BROKEN!!!!!!
-    # Needs logs
-
     test_cases = [
         dict(lr=0.001, momentum=0.0, n_iter=10),
         dict(lr=0.001, momentum=0.8, n_iter=20),
