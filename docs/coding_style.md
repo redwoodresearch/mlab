@@ -174,3 +174,15 @@ Git is the most commonly used system and well worth learning for any programmer,
 
 `torch.set_printoptions` and `numpy.set_printoptions` are occasionally useful. 
 
+Pickle vs joblib vs torch.save
+
+Move functions into scripts and import them. Use %%load_ext autoreload
+
+%pdb
+%%timeit
+
+run top-down sometimes
+
+result = _NUMBER
+
+use asserts
