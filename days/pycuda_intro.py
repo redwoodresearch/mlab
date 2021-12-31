@@ -61,7 +61,7 @@ print(dest)
 # for getting c++/cuda syntax highlighting and other nice things like that.
 # Here's an example of this:
 
-file_mod = SourceModule(open('days/cuda_load_from_file_example.cu', 'r').read())
+file_mod = SourceModule(open('days/cuda_load_from_file_example.cu').read())
 zero_kernel = file_mod.get_function("zero")
 one_kernel = file_mod.get_function("one")
 
