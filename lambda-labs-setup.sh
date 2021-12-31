@@ -9,6 +9,7 @@ mkdir ~/working
 sudo snap install code --classic
 code --install-extension ms-python.python
 code --install-extension ms-toolsai.jupyter
+mkdir ~/mlab_trial
 python -c "import torch; import torchvision.models;import torchtext; import transformers; transformers.AutoModelForCausalLM.from_pretrained('gpt2');transformers.AutoModel.from_pretrained('bert-base-cased');torchvision.models.resnet34(pretrained=True);torchvision.models.resnet50(pretrained=True);torchtext.datasets.WikiText2(split='train');torchtext.datasets.WikiText103(split='train');torchtext.datasets.IMDB(split='train');" &
 
 python -c "import transformers; transformers.AutoModelForCausalLM.from_pretrained('EleutherAI/gpt-j-6B'); transformers.AutoModelForCausalLM.from_pretrained('EleutherAI/gpt-neo-2.7B')" &
