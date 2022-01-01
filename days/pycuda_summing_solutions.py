@@ -6,7 +6,6 @@ from pycuda.compiler import SourceModule
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 
 from days.pycuda_utils import Holder, ceil_divide
 
