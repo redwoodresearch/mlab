@@ -128,8 +128,8 @@ if __name__ == "__main__":
         times = np.array(times)
         plt.plot(sizes, sizes / times, label=label)
 
-    # threshs = [0.01, 0.05, 0.2, 0.5, 0.9]
-    threshs = [0.2]
+    threshs = [0.01, 0.05, 0.2, 0.5, 0.9]
+    # threshs = [0.2]
 
     for thresh in tqdm(threshs):
         plot_benchs(filter_atomic, 26, thresh, f"atomic {thresh}")
