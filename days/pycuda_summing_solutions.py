@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
     check_reducer(shfl_reduce)
 
-    end = 24
+    end = 50
 
     def plot_benchs(reducer, max_size_power, label, cpu=False):
         sizes, times = all_benchmarks(reducer,
