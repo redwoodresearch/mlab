@@ -19,8 +19,13 @@ shfl_reduce_kernel = mod.get_function("shfl_reduce_kernel")
 DEVICE = torch.device('cuda:0')
 
 
+def check_inp(inp: torch.Tensor) -> None:
+    assert inp.dim() == 1
+    assert inp.dtype == torch.float32
+
+
 def sum_atomic(inp: torch.Tensor, block_size: int = 512) -> torch.Tensor:
-    assert len(inp.size()) == 1
+    check_inp(inp)
 
     inp = inp.to(DEVICE)
 
@@ -37,7 +42,8 @@ def sum_atomic(inp: torch.Tensor, block_size: int = 512) -> torch.Tensor:
 
 
 def simple_sum_per_block(inp: torch.Tensor) -> torch.Tensor:
-    assert len(inp.size()) == 1
+    check_inp(inp)
+
     block_size = 512
     inp = inp.to(DEVICE)
     n_blocks = ceil_divide(inp.size(0), block_size)
@@ -53,7 +59,8 @@ def simple_sum_per_block(inp: torch.Tensor) -> torch.Tensor:
 
 
 def simple_sum_segments(inp: torch.Tensor) -> torch.Tensor:
-    assert len(inp.size()) == 1
+    check_inp(inp)
+
     block_size = 512
     inp = inp.to(DEVICE)
     n_blocks = ceil_divide(inp.size(0), block_size)
@@ -88,7 +95,8 @@ def simple_sum_segments(inp: torch.Tensor) -> torch.Tensor:
 def shfl_reduce(inp: torch.Tensor,
                 block_size: int = 512,
                 max_grid: int = 1024) -> torch.Tensor:
-    assert len(inp.size()) == 1
+    check_inp(inp)
+
     inp = inp.to(DEVICE)
     n_blocks = min(ceil_divide(inp.size(0), block_size), max_grid)
 
@@ -128,7 +136,7 @@ def test_tensors(block_size: int = 512) -> List[torch.Tensor]:
     ]
 
 
-def check_reducer(reducer, block_size: int = 512):
+def check_reducer(reducer, block_size: int = 512) -> None:
     for tensor in test_tensors(block_size=block_size):
         assert torch.isclose(tensor.sum(), reducer(tensor))
 
@@ -160,7 +168,7 @@ def all_benchmarks(reducer,
 
 
 def torch_block_reduce(inp: torch.Tensor, block_size: int) -> torch.Tensor:
-    assert len(inp.size()) == 1
+    check_inp(inp)
 
     padding_size = ceil_divide(inp.size(0),
                                block_size) * block_size - inp.size(0)
