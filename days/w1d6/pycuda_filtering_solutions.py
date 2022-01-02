@@ -8,9 +8,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from days.pycuda_utils import Holder, ceil_divide
+from days.w1d6.pycuda_utils import Holder, ceil_divide
 
-mod = SourceModule(open('days/pycuda_filtering_solutions.cu').read(),
+mod = SourceModule(open('days/w1d6/pycuda_filtering_solutions.cu').read(),
                    no_extern_c=True)
 
 filter_atomic_kernel = mod.get_function("filter_atomic_kernel")
@@ -134,7 +134,11 @@ if __name__ == "__main__":
     for thresh in tqdm(threshs):
         plot_benchs(filter_atomic, 26, thresh, f"atomic {thresh}")
         plot_benchs(filter_pytorch, 26, thresh, f"pytorch {thresh}")
-        plot_benchs(filter_pytorch, 18, thresh, f"pytorch cpu {thresh}", cpu=True)
+        plot_benchs(filter_pytorch,
+                    18,
+                    thresh,
+                    f"pytorch cpu {thresh}",
+                    cpu=True)
 
     plt.ylabel("floats/sec")
     plt.legend()

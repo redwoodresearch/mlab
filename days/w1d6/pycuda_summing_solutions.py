@@ -7,9 +7,9 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from days.pycuda_utils import Holder, ceil_divide
+from days.w1d6.pycuda_utils import Holder, ceil_divide
 
-mod = SourceModule(open('days/pycuda_summing_solutions.cu').read(),
+mod = SourceModule(open('days/w1d6/pycuda_summing_solutions.cu').read(),
                    no_extern_c=True)
 
 sum_atomic_kernel = mod.get_function("sum_atomic_kernel")

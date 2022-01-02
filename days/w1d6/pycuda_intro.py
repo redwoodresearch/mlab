@@ -20,6 +20,7 @@ zero_kernel = zero_mod.get_function("zero")
 
 # some glue for interfacing with pycuda
 class Holder(drv.PointerHolderBase):
+
     def __init__(self, t):
         super(Holder, self).__init__()
         self.t = t
@@ -61,7 +62,8 @@ print(dest)
 # for getting c++/cuda syntax highlighting and other nice things like that.
 # Here's an example of this:
 
-file_mod = SourceModule(open('days/cuda_load_from_file_example.cu').read())
+file_mod = SourceModule(
+    open('days/w1d6/cuda_load_from_file_example.cu').read())
 zero_kernel = file_mod.get_function("zero")
 one_kernel = file_mod.get_function("one")
 
@@ -76,32 +78,7 @@ one_kernel = file_mod.get_function("one")
 # Getting 'illegal memory access'? You might have forgotten to copy your
 # tensors to the gpu.
 
-# solution (not in student copy ofc):
-mul_add_mod = SourceModule("""
-__global__ void mul_add(float *dest, const float *a, const float *b,
-    const float *c)
-{
-  const int i = threadIdx.x;
-  dest[i] = a[i] * b[i] + c[i];
-}
-""")
-mul_add_kernel = mul_add_mod.get_function("mul_add")
-
-size = 128
-dest = torch.empty(size, dtype=torch.float32).cuda()
-a = torch.arange(size).to(torch.float32).cuda()
-b = torch.arange(0, 4 * size, 4).to(torch.float32).cuda()
-c = torch.arange(3, size + 3).to(torch.float32).cuda()
-mul_add_kernel(Holder(dest),
-               Holder(a),
-               Holder(b),
-               Holder(c),
-               block=(size, 1, 1),
-               grid=(1, 1))
-torch.cuda.synchronize()
-print(dest)
-
-#end solution
+# insert code here
 
 # Next we'll change our code and kernel invocation so that we can handle any
 # length with a fixed 1D block size (the lengths of the inputs should should
@@ -141,89 +118,12 @@ def ceil_divide(a, b):
     return (a + b - 1) // b
 
 
-# solution (not in student copy ofc):
-import numpy as np
-
-mul_add_mod = SourceModule("""
-__global__ void mul_add(float *dest, const float *a, const float *b,
-    const float *c, int64_t size)
-{
-  const int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
-  if (i >= size) return;
-  dest[i] = a[i] * b[i] + c[i];
-}
-""")
-mul_add_kernel = mul_add_mod.get_function("mul_add")
-
-
-def mul_add(a, b, c):
-    block_size = 512
-    dest = torch.empty(a.nelement(), dtype=torch.float32).cuda()
-    mul_add_kernel(Holder(dest),
-                   Holder(a),
-                   Holder(b),
-                   Holder(c),
-                   np.int64(a.nelement()),
-                   block=(block_size, 1, 1),
-                   grid=(ceil_divide(a.nelement(), block_size), 1))
-    torch.cuda.synchronize()
-
-    return dest
-
-
-a = torch.tensor(2.0).cuda()
-b = torch.tensor(7.0).cuda()
-c = torch.tensor(3.0).cuda()
-print(mul_add(a, b, c))
-
-size = 50000
-a = torch.arange(size).to(torch.float32).cuda()
-b = torch.arange(0, 4 * size, 4).to(torch.float32).cuda()
-c = torch.arange(3, size + 3).to(torch.float32).cuda()
-print(mul_add(a, b, c))
-#end solution
+# insert code here
 
 # If you remove the size check and run the kernel on a tensor of length 1,
 # what happens?
 
-# solution (not in student copy ofc):
-mul_add_no_size_check_mod = SourceModule("""
-__global__ void mul_add(float *dest, const float *a, const float *b,
-    const float *c, int64_t size)
-{
-  const int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
-  // if (i >= size) return;
-  dest[i] = a[i] * b[i] + c[i];
-}
-""")
-mul_add_no_size_check_kernel = mul_add_no_size_check_mod.get_function(
-    "mul_add")
-
-
-def mul_add_no_size_check(a, b, c):
-    block_size = 512
-    dest = torch.empty(a.nelement(), dtype=torch.float32).cuda()
-    mul_add_no_size_check_kernel(Holder(dest),
-                                 Holder(a),
-                                 Holder(b),
-                                 Holder(c),
-                                 np.int64(a.nelement()),
-                                 block=(block_size, 1, 1),
-                                 grid=(ceil_divide(a.nelement(),
-                                                   block_size), 1))
-    torch.cuda.synchronize()
-
-    return dest
-
-
-# despite out of bounds access, this doesn't crash!
-
-size = 1
-a = torch.randn(size).cuda()
-b = torch.randn(size).cuda()
-c = torch.randn(size).cuda()
-# print(mul_add_no_size_check(a, b, c))
-#end solution
+# insert code here
 
 # Now let's setup a kernel which indexes a 1d tensor by another 1d tensor.
 # Specifically we'll have out[i] = a[b[i]]. Note that the size of out and b
@@ -241,57 +141,7 @@ c = torch.randn(size).cuda()
 #
 # Make sure to test several cases, including out of bounds indexing.
 
-# solution (not in student copy ofc):
-import numpy as np
-
-index_mod = SourceModule("""
-__global__ void index(float *dest, const float *a, const int64_t *b,
-    int64_t size, int64_t a_size)
-{
-  const int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
-  if (i >= size) return;
-  if (b[i] >= a_size || b[i] < 0) {
-    printf("Index out of bounds %li for size %li\\n", b[i], a_size);
-    return;
-  }
-  dest[i] = a[b[i]];
-}
-""")
-index_kernel = index_mod.get_function("index")
-
-
-def index(a, b):
-    block_size = 512
-    dest = torch.empty(b.nelement(), dtype=torch.float32).cuda()
-    index_kernel(Holder(dest),
-                 Holder(a),
-                 Holder(b),
-                 np.int64(b.nelement()),
-                 np.int64(a.nelement()),
-                 block=(block_size, 1, 1),
-                 grid=(ceil_divide(b.nelement(), block_size), 1))
-    torch.cuda.synchronize()
-
-    return dest
-
-
-a = torch.arange(10).to(torch.float32).cuda()
-b = torch.tensor(2).to(torch.long).cuda()
-print(index(a, b))
-
-a = torch.arange(10).to(torch.float32).cuda()
-b = torch.tensor(83).to(torch.long).cuda()
-index(a, b)
-
-a = torch.arange(10).to(torch.float32).cuda()
-b = torch.tensor(-1).to(torch.long).cuda()
-index(a, b)
-
-size = 50000
-a = torch.arange(size).to(torch.float32).cuda()
-b = torch.arange(size).flip(0).cuda()
-print(index(a, b))
-#end solution
+# insert code here
 
 # Next, write a kernel which sums over the last dimension of a 2d tensor. For
 # simplicity, just sum over the last dimension at a given first dimension index
@@ -311,45 +161,4 @@ print(index(a, b))
 # This is the last task in this file, so after completing this look at the
 # instructions doc for next steps.
 
-# solution (not in student copy ofc):
-reduce_mod = SourceModule("""
-__global__ void reduce(float *dest, const float *inp,
-    int64_t dim0, int64_t dim1)
-{
-  const int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
-  if (i >= dim0) return;
-  float x = 0.f;
-  for(int64_t j = 0; j < dim1; ++j) {
-    x += inp[i * dim1 + j];
-  }
-  dest[i] = x;
-}
-""")
-reduce_kernel = reduce_mod.get_function("reduce")
-
-
-def reduce(inp):
-    block_size = 512
-    inp = inp.contiguous()
-    dest = torch.empty(inp.size(0), dtype=torch.float32).cuda()
-    reduce_kernel(Holder(dest),
-                  Holder(inp),
-                  np.int64(inp.size(0)),
-                  np.int64(inp.size(1)),
-                  block=(block_size, 1, 1),
-                  grid=(ceil_divide(inp.size(0), block_size), 1))
-    torch.cuda.synchronize()
-    return dest
-
-
-print(reduce(torch.tensor([[1., 6.]]).cuda()))
-print(reduce(torch.arange(8).to(torch.float32).reshape(4, 2).cuda()))
-print(reduce(torch.arange(100000).to(torch.float32).reshape(10000, -1).cuda()))
-print(
-    reduce(
-        torch.arange(100000).to(torch.float32).reshape(10000, -1).transpose(
-            0, 1).cuda()))
-
-# performance is poor when first dim is small and second dim is large:
-print(reduce(torch.arange(10000).to(torch.float32).reshape(10, -1).cuda()))
-#end solution
+# insert code here
