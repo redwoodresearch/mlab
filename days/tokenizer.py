@@ -67,10 +67,18 @@ class Tokenizer:
 
     def tokenize(self, texts, **kwargs):
         if isinstance(texts, str):
+            if 'pad_longest' in kwargs:
+                del kwargs['pad_longest']
             return self._pad_and_shit(self._tokenize(texts), **kwargs)
         results = []
+        maxlen = 0
         for text in texts:
-            results.append(self._pad_and_shit(self._tokenize(text), **kwargs))
+            seq_ids = self._tokenize(text)
+            maxlen = max(maxlen, len(seq_ids))
+            results.append(new_ids)
+        if kwargs.get('pad_longest'):                
+            results = [self._pad_and_shit(seq_ids, ends=kwargs.get('ends', False), pad_length=maxlen)
+                       for seq_ids in results]
         return results
 
     def from_corpus(texts, n=30000):
