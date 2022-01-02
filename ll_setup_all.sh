@@ -1,1 +1,1 @@
-while read in; do ./ll_remote_setup.sh "$in"; done < ./instance_ips
+parallel -a ./instance_ips ./ll_remote_setup.sh
