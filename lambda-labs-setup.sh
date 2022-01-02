@@ -11,10 +11,13 @@ code --install-extension ms-python.python
 code --install-extension ms-toolsai.jupyter
 mkdir ~/mlab_trial
 
-# http://{IP}:8890/lab?token=eacfafffeb
+# http://{IP}:8890/lab/tree/mlab_trial?token=eacfafffeb
+# http://104.171.200.{EXT}:8890/lab/tree/mlab_trial?token=eacfafffeb
 # if something goes wrong with process, use
 # ps aux | grep eacfafffeb
 # to kill existing process
+cd ~;
+pkill eacfafffeb;
 jupyter lab --collaborative --NotebookApp.token=eacfafffeb --port 8890 --ip 0.0.0.0 &
 
 python -c "import torch; import torchvision.models;import torchtext; import transformers; transformers.AutoModelForCausalLM.from_pretrained('gpt2');transformers.AutoModel.from_pretrained('bert-base-cased');torchvision.models.resnet34(pretrained=True);torchvision.models.resnet50(pretrained=True);torchtext.datasets.WikiText2(split='train');torchtext.datasets.WikiText103(split='train');torchtext.datasets.IMDB(split='train');" &

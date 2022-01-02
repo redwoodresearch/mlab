@@ -1,2 +1,2 @@
 command="$(<lambda-labs-setup.sh)"
-ssh -i ~/mlab_ssh $1 "$command"
+ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh $1 "$command"
