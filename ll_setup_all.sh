@@ -1,0 +1,1 @@
+while read in; do ./ll_remote_setup.sh "$in"; done < ./instance_ips
