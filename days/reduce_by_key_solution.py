@@ -1,8 +1,9 @@
 import pycuda.autoinit as _
-import pycuda.driver as drv
 from pycuda.compiler import SourceModule
 import torch
 import numpy as np
+
+from days.pycuda_utils import Holder, ceil_divide
 
 # must be called before using pycuda. (theoretically torch.cuda.init() is
 # supposed to work, but it doesn't)
@@ -23,22 +24,8 @@ reduce_by_key_kernel = reduce_by_key_mod.get_function(
     "reduce_by_key_atomic_kernel")
 
 
-def ceil_divide(a, b):
-    return (a + b - 1) // b
-
-
-# some glue for interfacing with pycuda
-class Holder(drv.PointerHolderBase):
-    def __init__(self, t):
-        super(Holder, self).__init__()
-        self.t = t
-        self.gpudata = t.data_ptr()
-
-    def get_pointer(self):
-        return self.t.data_ptr()
-
-
 class ReduceByKey(torch.autograd.Function):
+
     @staticmethod
     def forward(ctx, inp: torch.Tensor, keys: torch.Tensor) -> torch.Tensor:
         assert inp.is_cuda and keys.is_cuda
@@ -69,14 +56,14 @@ class ReduceByKey(torch.autograd.Function):
 
 
 if __name__ == "__main__":
-    device = torch.device("cuda:0")
+    DEVICE = torch.device("cuda:0")
 
-    inp = torch.tensor([1.7], device=device).cuda()
-    keys = torch.tensor([0], device=device).cuda()
+    inp = torch.tensor([1.7], device=DEVICE).cuda()
+    keys = torch.tensor([0], device=DEVICE).cuda()
     print(ReduceByKey.apply(inp, keys))
 
-    inp = torch.tensor([1.7], device=device, requires_grad=True)
-    keys = torch.tensor([3], device=device)
+    inp = torch.tensor([1.7], device=DEVICE, requires_grad=True)
+    keys = torch.tensor([3], device=DEVICE)
     out = ReduceByKey.apply(inp, keys)
     out[0].backward(retain_graph=True)
     print("grad:", inp.grad)
@@ -84,9 +71,9 @@ if __name__ == "__main__":
     print("grad actual index:", inp.grad)
 
     inp = torch.tensor([1.8, 12., -2.1, 4., 3., 9., 10.],
-                       device=device,
+                       device=DEVICE,
                        requires_grad=True)
-    keys = torch.tensor([0, 3, 3, 3, 3, 4, 8], device=device)
+    keys = torch.tensor([0, 3, 3, 3, 3, 4, 8], device=DEVICE)
     out = ReduceByKey.apply(inp, keys)
     print("output:", out)
     out[3].backward(retain_graph=True)
