@@ -2,6 +2,8 @@ conda deactivate
 cd ~;
 git clone https://github.com/taoroalin/mlab
 cd mlab
+git reset --hard HEAD
+git pull
 pip install -r requirements.txt
 pip install -e .
 pip install torch==1.10.1+cu113 torchvision==0.11.2+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
@@ -10,7 +12,7 @@ sudo apt-get install -y ffmpeg #snapd
 # sudo snap install code --classic
 # code --install-extension ms-python.python
 # code --install-extension ms-toolsai.jupyter
-mkdir ~/mlab_trial
+mkdir -f ~/mlab_trial
 
 # http://{IP}:8890/lab/tree/mlab_trial?token=eacfafffeb
 # http://104.171.200.{EXT}:8890/lab/tree/mlab_trial?token=eacfafffeb
