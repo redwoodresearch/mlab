@@ -21,6 +21,7 @@ mkdir -f ~/mlab_trial
 # to kill existing process
 cd ~;
 pkill eacfafffeb;
+jupyter nbextension enable --py widgetsnbextension
 jupyter lab --collaborative --NotebookApp.token=eacfafffeb --port 8890 --ip 0.0.0.0 &
 
 python -c "import torch; import torchvision.models;import torchtext; import transformers; transformers.AutoModelForCausalLM.from_pretrained('gpt2');transformers.AutoModel.from_pretrained('bert-base-cased');torchvision.models.resnet34(pretrained=True);torchvision.models.resnet50(pretrained=True);torchtext.datasets.WikiText2(split='train');torchtext.datasets.WikiText103(split='train');torchtext.datasets.IMDB(split='train');" &
