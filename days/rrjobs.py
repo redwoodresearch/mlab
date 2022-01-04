@@ -27,7 +27,7 @@ def rrjobs_submit(
         json={
             "token": "tao-1637427484-0-2c83023327cf2d6f68e492599ae49658",
             "kind": "submitJob",
-            "git_repo": "taoroalin/mlab",
+            "git_repo": "redwoodresearch/mlab",
             "git_commit": get_git_commit(),
             "name": name,
             "command": command,
