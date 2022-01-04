@@ -20,7 +20,7 @@ from minitorch.operators import (
 from hypothesis import given
 from hypothesis.strategies import lists
 
-from minitorch_sol.minitorch.operators import EPS
+from minitorch.operators import EPS
 from .strategies import small_floats, assert_close
 import pytest
 from minitorch import MathTest
