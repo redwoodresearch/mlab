@@ -115,7 +115,7 @@ def inv(x):
 def inv_back(x, d):
     r"If :math:`f(x) = 1/x` compute :math:`d \times f'(x)`"
     assert x != 0
-    return -1/(x ** 2)
+    return -d/(x ** 2)
 
 
 def relu_back(x, d):
