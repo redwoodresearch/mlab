@@ -300,11 +300,8 @@ def topological_sort(variable):
                     visited = visit(inp, visited)
         visited = [(v.unique_id, v)] + visited
         return visited
-
-    vars_with_ids = visit(variable, [])
-    #raise AssertionError(f" {type(vars_with_ids[0])}")
-    #raise AssertionError(f" {[var[1] for var in vars_with_ids]}")
-    #return [var[1] for var in vars_with_ids]
+    
+    #return [var[1] for var in visit(variable, [])]
     return visit(variable, [])
 
 
@@ -326,10 +323,10 @@ def backpropagate(variable, deriv):
     for v in vs:
         if not v.is_leaf():
             new_derivs = v.history.backprop_step(derivs[v.unique_id])
-            for i, di in new_derivs:
-                if i.unique_id not in derivs:
-                    derivs[i.unique_id] = 0.0
-                derivs[i.unique_id] += di
+            for x_i, dv_di in new_derivs:
+                if x_i.unique_id not in derivs:
+                    derivs[x_i.unique_id] = 0.0
+                derivs[x_i.unique_id] += dv_di
         else:
             v.accumulate_derivative(derivs[v.unique_id])
 
