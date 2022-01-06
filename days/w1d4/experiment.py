@@ -11,6 +11,9 @@ arthur_experiment_params = {
     'project_name': "general",
     'workspace': "arthurconmy",
 }
+
+import os
+os.system("pip install -r ../../requirements.txt")
 import sys
 
 if "--arthur" in sys.argv:
@@ -112,25 +115,15 @@ def trains(model, data_train, data_test, num_epochs):
         train(model=model, dataloader=data_train)
     return evaluate(model, data_train)
 
-config_space = []
-
-for lr in [1e-3, 1e-2]:
-    for H in [100, 150, 200, 250, 300]:
-        config = [
-            f"RaichuModel.H = {H}",
-            f"Adam.lr = {lr}"
-        ] 
-        config_space.append(config)
-
-for config in config_space:
-    with gin.unlock_config():
-        gin.parse_config_files_and_bindings(["config.gin"], bindings=config)
-        experiment = Experiment(**experiment_params)
-        log_lr = np.log10(gin.get_bindings(Adam)['lr'])
-        experiment.log_parameter('log_lr', log_lr)
-        hidden_size = gin.get_bindings(RaichuModel)['H']
-        experiment.log_parameter('hidden_size', hidden_size)
-        model = RaichuModel(P=2, K=3)
-        test_loss = trains(model, data_train, data_test)
-        experiment.log_metric('test_loss', test_loss)
-        experiment.end()
+with gin.unlock_config():
+    config = os.environ['gin_config'].split('\n')
+    gin.parse_config_files_and_bindings(["config.gin"], bindings=config)
+    experiment = Experiment(**experiment_params)
+    log_lr = np.log10(gin.get_bindings(Adam)['lr'])
+    experiment.log_parameter('log_lr', log_lr)
+    hidden_size = gin.get_bindings(RaichuModel)['H']
+    experiment.log_parameter('hidden_size', hidden_size)
+    model = RaichuModel(P=2, K=3)
+    test_loss = trains(model, data_train, data_test)
+    experiment.log_metric('test_loss', test_loss)
+    experiment.end()
