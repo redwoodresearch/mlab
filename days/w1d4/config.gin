@@ -1,0 +1,7 @@
+train.epochs = 50
+train.optimizer = "sgd"
+train.lr = 0.001
+train.weight_decay = 0.05
+train.momentum = 0.9
+train.dampening = 0
+model.hidden_size = 400
