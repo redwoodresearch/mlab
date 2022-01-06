@@ -196,11 +196,6 @@ def train(epochs, optimizer, learning_rate=None, lr=None, betas=None, eps=None, 
     for epoch in range(epochs):
         m = train_with_optimizer(optim, m, data_train)
 
-if __name__ == "__main__":
-    with gin.unlock_config():
-        gin.parse_config_file(config_file="config.gin")
-        train()  
-
 
 import numpy as np
 from itertools import product
