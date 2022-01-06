@@ -70,7 +70,6 @@ def create_json(gin_config, filename):
 
 if __name__ == "__main__":
     grid_values = {
-        "newtrain.image_name" : ["cat.jpg"],
         "newtrain.learning_rate" : np.geomspace(1e-1, 1e-3, 2),
         "newtrain.momentum" :  [0.9],
         "newtrain.epochs" : [16],
@@ -83,6 +82,8 @@ if __name__ == "__main__":
     for config in grid:
         js = job_str(config)
         json = create_json(config, "picture_learning.py")
-        print(json)
-        #requests.post("https://jobs.redwoodresearchcompute.com:10101/api", json=json)
+        print("sending job", json)
+        response = requests.post("https://jobs.redwoodresearchcompute.com:10101/api", json=json)
+        print(response)
+        print("\n----------------------\n")
     

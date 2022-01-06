@@ -131,9 +131,10 @@ class Adam():
         
     
 @gin.configurable
-def newtrain(image_name, learning_rate, momentum, epochs, optimizer, loss, hidden_size, weight_decay):
+def newtrain(learning_rate, momentum, epochs, optimizer, loss, hidden_size, weight_decay):
+    IMAGE_NAME = "cat.jpg"
     model = MLP(2, hidden_size, 3)
-    data_train, data_test =  w1d4_tests.load_image(image_name)
+    data_train, data_test =  w1d4_tests.load_image(IMAGE_NAME)
     if optimizer == "adam":
         optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     elif optimizer == "rmsprop":
