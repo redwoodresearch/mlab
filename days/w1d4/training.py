@@ -196,6 +196,11 @@ def train(epochs, optimizer, learning_rate=None, lr=None, betas=None, eps=None, 
     for epoch in range(epochs):
         m = train_with_optimizer(optim, m, data_train)
 
+if __name__ == "__main__":
+    with gin.unlock_config():
+        gin.parse_config_file(config_file="config.gin")
+        train()  
+
 
 import numpy as np
 from itertools import product
@@ -204,17 +209,14 @@ def make_grid(possible_values):
     return list(map(dict, all_combinations))
 
 
-for i, hyper_params in enumerate(make_grid({'train.lr': np.geomspace(1e-2, 1e-4, 3), 'model.hidden_size': [768, 1024]})):
-    # Create an experiment with your api key
-    experiment = Experiment(
-        api_key="KSFWCUmnhYqYNp5i825EEdiQk",
-        project_name=f"hyperparameter_search",
-        workspace="alwin-peng",
-    )
-    with gin.unlock_config():
-        gin_hyper_params = [f"{key}={param}" for key, param in hyper_params.items()]
-        gin.parse_config_files_and_bindings([get_fullpath("config.gin")], gin_hyper_params)
-        train()  
+experiment = Experiment(
+    api_key="KSFWCUmnhYqYNp5i825EEdiQk",
+    project_name=f"hyperparameter_search",
+    workspace="alwin-peng",
+)
 
-    experiment.log_parameters(hyper_params)
+with gin.unlock_config():
+    gin.parse_config_files_and_bindings([get_fullpath("config.gin")], os.environ["GIN_CONFIG"])
+    experiment.log_parameters({"params": os.environ["GIN_CONFIG"]})
+    train()  
     experiment.end()
