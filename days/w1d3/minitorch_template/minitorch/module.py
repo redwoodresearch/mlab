@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from typing import Dict, List, Tuple
+
+
 class Module:
     """
     Modules form a tree that store parameters and other
@@ -11,9 +16,9 @@ class Module:
     """
 
     def __init__(self):
-        self._modules = {}
-        self._parameters = {}
-        self.training = True
+        self._modules: Dict[str, Module] = {}
+        self._parameters: Dict[str, Parameter] = {}
+        self.training: bool = True
 
     def modules(self):
         "Return the direct child modules of this module."
@@ -21,28 +26,38 @@ class Module:
 
     def train(self):
         "Set the mode of this module and all descendent modules to `train`."
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError('Need to implement for Task 0.4')
+        self.training = True
+        for mod in self._modules.values():
+            mod.train()
 
     def eval(self):
         "Set the mode of this module and all descendent modules to `eval`."
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError('Need to implement for Task 0.4')
+        self.training = False
+        for mod in self._modules.values():
+            mod.eval()
 
-    def named_parameters(self):
+    def named_parameters(self) -> List[Tuple[str, Parameter]]:
         """
         Collect all the parameters of this module and its descendents.
 
         Returns:
             list of pairs: Contains the name and :class:`Parameter` of each ancestor parameter.
         """
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError('Need to implement for Task 0.4')
+        params = [(k, v) for k, v in self._parameters.items()]
+        for mod_name, mod in self._modules.items():
+            params.extend(
+                [(mod_name + "." + p_name, p) for (p_name, p) in mod.named_parameters()]
+            )
 
-    def parameters(self):
+        return params
+
+    def parameters(self) -> List[Parameter]:
         "Enumerate over all the parameters of this module and its descendents."
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError('Need to implement for Task 0.4')
+        params = list(self._parameters.values())
+        for mod in self._modules.values():
+            params.extend(mod.parameters())
+
+        return params
 
     def add_parameter(self, k, v):
         """

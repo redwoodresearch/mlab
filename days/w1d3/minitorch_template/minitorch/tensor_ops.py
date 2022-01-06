@@ -1,14 +1,19 @@
+from typing import Callable, Optional, Tuple
+
 import numpy as np
+
+from . import operators
 from .tensor_data import (
     to_index,
     index_to_position,
     broadcast_index,
     shape_broadcast,
     MAX_DIMS,
+    TensorData,
 )
 
 
-def tensor_map(fn):
+def tensor_map(fn: Callable[[float], float]):
     """
     Low-level implementation of tensor map between
     tensors with *possibly different strides*.
@@ -27,10 +32,10 @@ def tensor_map(fn):
 
     Args:
         fn: function from float-to-float to apply
-        out (array): storage for out tensor
+        out (1d array): storage for out tensor
         out_shape (array): shape for out tensor
         out_strides (array): strides for out tensor
-        in_storage (array): storage for in tensor
+        in_storage (1d array): storage for in tensor
         in_shape (array): shape for in tensor
         in_strides (array): strides for in tensor
 
@@ -38,14 +43,30 @@ def tensor_map(fn):
         None : Fills in `out`
     """
 
-    def _map(out, out_shape, out_strides, in_storage, in_shape, in_strides):
-        # TODO: Implement for Task 2.2.
-        raise NotImplementedError('Need to implement for Task 2.2')
+    def _map(
+        out: np.ndarray,
+        out_shape,
+        out_strides,
+        in_storage: np.ndarray,
+        in_shape,
+        in_strides,
+    ):
+        out_size = operators.prod_int(out_shape)
+        out_index = np.array(out_shape)
+        in_index = np.array(in_shape)
+        for i in range(out_size):
+            to_index(i, out_shape, out_index)
+            out_pos = index_to_position(out_index, out_strides)
+
+            broadcast_index(out_index, out_shape, in_shape, in_index)
+            in_pos = index_to_position(in_index, in_strides)
+
+            out[out_pos] = fn(in_storage[in_pos])
 
     return _map
 
 
-def map(fn):
+def map(fn: Callable[[float], float]):
     """
     Higher-order tensor map function ::
 
@@ -77,7 +98,7 @@ def map(fn):
 
     f = tensor_map(fn)
 
-    def ret(a, out=None):
+    def ret(a: TensorData, out: Optional[TensorData] = None) -> TensorData:
         if out is None:
             out = a.zeros(a.shape)
         f(*out.tuple(), *a.tuple())
@@ -86,7 +107,7 @@ def map(fn):
     return ret
 
 
-def tensor_zip(fn):
+def tensor_zip(fn: Callable[[float, float], float]):
     """
     Low-level implementation of tensor zip between
     tensors with *possibly different strides*.
@@ -120,23 +141,36 @@ def tensor_zip(fn):
     """
 
     def _zip(
-        out,
+        out: np.ndarray,
         out_shape,
         out_strides,
-        a_storage,
+        a_storage: np.ndarray,
         a_shape,
         a_strides,
-        b_storage,
+        b_storage: np.ndarray,
         b_shape,
         b_strides,
     ):
-        # TODO: Implement for Task 2.2.
-        raise NotImplementedError('Need to implement for Task 2.2')
+        out_size = operators.prod_int(out_shape)
+        out_index = np.array(out_shape)
+        a_index = np.array(a_shape)
+        b_index = np.array(b_shape)
+        for i in range(out_size):
+            to_index(i, out_shape, out_index)
+            out_pos = index_to_position(out_index, out_strides)
+
+            broadcast_index(out_index, out_shape, a_shape, a_index)
+            a_pos = index_to_position(a_index, a_strides)
+
+            broadcast_index(out_index, out_shape, b_shape, b_index)
+            b_pos = index_to_position(b_index, b_strides)
+
+            out[out_pos] = fn(a_storage[a_pos], b_storage[b_pos])
 
     return _zip
 
 
-def zip(fn):
+def zip(fn: Callable[[float, float], float]):
     """
     Higher-order tensor zip function ::
 
@@ -167,7 +201,7 @@ def zip(fn):
 
     f = tensor_zip(fn)
 
-    def ret(a, b):
+    def ret(a: TensorData, b: TensorData) -> TensorData:
         if a.shape != b.shape:
             c_shape = shape_broadcast(a.shape, b.shape)
         else:
@@ -179,7 +213,7 @@ def zip(fn):
     return ret
 
 
-def tensor_reduce(fn):
+def tensor_reduce(fn: Callable[[float, float], float]):
     """
     Low-level implementation of tensor reduce.
 
@@ -200,14 +234,32 @@ def tensor_reduce(fn):
         None : Fills in `out`
     """
 
-    def _reduce(out, out_shape, out_strides, a_storage, a_shape, a_strides, reduce_dim):
-        # TODO: Implement for Task 2.2.
-        raise NotImplementedError('Need to implement for Task 2.2')
+    def _reduce(
+        out: np.ndarray,
+        out_shape,
+        out_strides,
+        a_storage: np.ndarray,
+        a_shape,
+        a_strides,
+        reduce_dim: int,
+    ):
+        a_size = operators.prod_int(a_shape)
+        a_index = np.array(a_shape)
+        out_index = np.array(out_shape)
+        for i in range(a_size):
+            to_index(i, a_shape, a_index)
+            a_pos = index_to_position(a_index, a_strides)
+
+            out_index = a_index.copy()
+            out_index[reduce_dim] = 0
+            out_pos = index_to_position(out_index, out_strides)
+
+            out[out_pos] = fn(out[out_pos], a_storage[a_pos])
 
     return _reduce
 
 
-def reduce(fn, start=0.0):
+def reduce(fn: Callable[[float, float], float], start: float = 0.0):
     """
     Higher-order tensor reduce function. ::
 
@@ -232,7 +284,7 @@ def reduce(fn, start=0.0):
     """
     f = tensor_reduce(fn)
 
-    def ret(a, dim):
+    def ret(a: TensorData, dim: int) -> TensorData:
         out_shape = list(a.shape)
         out_shape[dim] = 1
 

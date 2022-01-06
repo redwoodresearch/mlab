@@ -21,12 +21,15 @@ class Tensor(Variable):
         backend : backend object used to implement tensor math (see `tensor_functions.py`)
     """
 
-    def __init__(self, v, back=None, name=None, backend=None):
+    def __init__(self, v: TensorData, back=None, name=None, backend=None):
         assert isinstance(v, TensorData)
         assert backend is not None
         super().__init__(back, name=name)
         self._tensor = v
         self.backend = backend
+
+    def __hash__(self):
+        return id(self)
 
     def to_numpy(self):
         """
@@ -188,7 +191,6 @@ class Tensor(Variable):
 
         Returns:
             Expanded version of `other` with the right derivatives
-
         """
 
         # Case 1: Both the same shape.

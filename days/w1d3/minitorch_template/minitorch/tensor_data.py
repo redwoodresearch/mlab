@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import random
+from typing import Tuple
+
 from .operators import prod
 from numpy import array, float64, ndarray
 import numba
@@ -23,9 +27,7 @@ def index_to_position(index, strides):
     Returns:
         int : position in storage
     """
-
-    # TODO: Implement for Task 2.1.
-    raise NotImplementedError('Need to implement for Task 2.1')
+    return sum([i * s for i, s in zip(index, strides)])
 
 
 def to_index(ordinal, shape, out_index):
@@ -42,10 +44,19 @@ def to_index(ordinal, shape, out_index):
 
     Returns:
       None : Fills in `out_index`.
-
     """
-    # TODO: Implement for Task 2.1.
-    raise NotImplementedError('Need to implement for Task 2.1')
+    # ordinal: 7
+    # shape: 2, 3, 4
+    # initially: out_index == [?, ?, ?]
+    # After to_index finishes running:
+    #            out_index == [0, 1, 3]
+
+    strides = strides_from_shape(shape)
+
+    remainder = ordinal
+    for i in range(len(shape)):
+        out_index[i] = remainder // strides[i]
+        remainder %= strides[i]
 
 
 def broadcast_index(big_index, big_shape, shape, out_index):
@@ -65,11 +76,21 @@ def broadcast_index(big_index, big_shape, shape, out_index):
     Returns:
         None : Fills in `out_index`.
     """
-    # TODO: Implement for Task 2.2.
-    raise NotImplementedError('Need to implement for Task 2.2')
+    # big_index = (0, 1, 2)
+    # big_shape = (2, 3, 4)
+    # shape     =    (3, 1,)
+    # out_index =    (1, 0,)
+    
+    offset = len(big_index) - len(out_index)
+    for i in range(len(out_index)):
+        assert big_shape[offset + i] >= shape[i], "bigness assumption broken"
+        if shape[i] == 1:
+            out_index[i] = 0
+        else:
+            out_index[i] = big_index[offset+i]
 
 
-def shape_broadcast(shape1, shape2):
+def shape_broadcast(shape1: Tuple[int], shape2: Tuple[int]):
     """
     Broadcast two shapes to create a new union shape.
 
@@ -83,9 +104,17 @@ def shape_broadcast(shape1, shape2):
     Raises:
         IndexingError : if cannot broadcast
     """
-    # TODO: Implement for Task 2.2.
-    raise NotImplementedError('Need to implement for Task 2.2')
+    if len(shape1) > len(shape2):
+        shape1, shape2 = shape2, shape1
+    shape1 = (1,)*(len(shape2)-len(shape1)) + shape1
 
+    out = []
+
+    for s1, s2 in zip(shape1,shape2):
+        if s1 > 1 and s2 > 1 and s1 != s2:
+            raise IndexingError
+        out.append(max(s1,s2))
+    return tuple(out)
 
 def strides_from_shape(shape):
     layout = [1]
@@ -177,7 +206,7 @@ class TensorData:
     def tuple(self):
         return (self._storage, self._shape, self._strides)
 
-    def permute(self, *order):
+    def permute(self, *order) -> TensorData:
         """
         Permute the dimensions of the tensor.
 
@@ -191,8 +220,11 @@ class TensorData:
             range(len(self.shape))
         ), f"Must give a position to each dimension. Shape: {self.shape} Order: {order}"
 
-        # TODO: Implement for Task 2.1.
-        raise NotImplementedError('Need to implement for Task 2.1')
+        return TensorData(
+            storage=self._storage,
+            shape=tuple(self.shape[i] for i in order),
+            strides=tuple(self.strides[i] for i in order),
+        )
 
     def to_string(self):
         s = ""

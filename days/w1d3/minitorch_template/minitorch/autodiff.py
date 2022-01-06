@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple
+
 variable_count = 1
 
 
@@ -20,7 +24,7 @@ class Variable:
         global variable_count
         assert history is None or isinstance(history, History), history
 
-        self.history = history
+        self.history: Optional[History] = history
         self._derivative = None
 
         # This is a bit simplistic, but make things easier.
@@ -172,13 +176,21 @@ class History:
         last_fn (:class:`FunctionBase`) : The last Function that was called.
         ctx (:class:`Context`): The context for that Function.
         inputs (list of inputs) : The inputs that were given when `last_fn.forward` was called.
-
     """
 
-    def __init__(self, last_fn=None, ctx=None, inputs=None):
+    def __init__(
+        self,
+        last_fn: Optional[FunctionBase] = None,
+        ctx: Optional[Context] = None,
+        inputs=None,
+    ):
         self.last_fn = last_fn
         self.ctx = ctx
         self.inputs = inputs
+
+    def chain_rule(self, d_output):
+        assert self.last_fn is not None
+        return self.last_fn.chain_rule(self.ctx, self.inputs, d_output)
 
     def backprop_step(self, d_output):
         """
@@ -191,7 +203,7 @@ class History:
             list of numbers : a derivative with respect to `inputs`
         """
         # TODO: Implement for Task 1.4.
-        raise NotImplementedError('Need to implement for Task 1.4')
+        raise NotImplementedError("Need to implement for Task 1.4")
 
 
 class FunctionBase:
@@ -200,7 +212,6 @@ class FunctionBase:
     produce a :class:`Variable` output, while tracking the internal history.
 
     Call by :func:`FunctionBase.apply`.
-
     """
 
     @staticmethod
@@ -226,7 +237,6 @@ class FunctionBase:
 
         Returns:
             `Variable` : The new variable produced
-
         """
         # Go through the variables to see if any needs grad.
         raw_vals = []
@@ -257,7 +267,9 @@ class FunctionBase:
         return cls.variable(cls.data(c), back)
 
     @classmethod
-    def chain_rule(cls, ctx, inputs, d_output):
+    def chain_rule(
+        cls, ctx: Context, inputs: List[Any], d_output: float,
+    ) -> List[Tuple[Variable, float]]:
         """
         Implement the derivative chain-rule.
 
@@ -269,12 +281,11 @@ class FunctionBase:
         Returns:
             list of (`Variable`, number) : A list of non-constant variables with their derivatives
             (see `is_constant` to remove unneeded variables)
-
         """
-        # Tip: Note when implementing this function that
-        # cls.backward may return either a value or a tuple.
-        # TODO: Implement for Task 1.3.
-        raise NotImplementedError('Need to implement for Task 1.3')
+        grads = cls.backward(ctx, d_output)
+        grads = grads if isinstance(grads, tuple) else (grads,)
+
+        return [(i, g) for g, i in zip(grads, inputs) if not is_constant(i)]
 
 
 # Algorithms for backpropagation
@@ -284,7 +295,7 @@ def is_constant(val):
     return not isinstance(val, Variable) or val.history is None
 
 
-def topological_sort(variable):
+def topological_sort(variable: Variable) -> List[Variable]:
     """
     Computes the topological order of the computation graph.
 
@@ -295,11 +306,51 @@ def topological_sort(variable):
         list of Variables : Non-constant Variables in topological order
                             starting from the right.
     """
+
+    out_degree: Dict[Variable, int] = dict()
+    vars_to_process: List[Variable] = [variable]
+
+    ret = []
+
+    while len(vars_to_process) != 0:
+        v = vars_to_process.pop()
+        ret.append(v)
+
+        if v.history is None or v.history.inputs is None:
+            continue
+
+        for inp in v.history.inputs:
+            if is_constant(inp):
+                continue
+
+            if inp in out_degree:
+                out_degree[inp] -= 1
+            else:
+                out_degree[inp] = inp.used - 1
+
+            if out_degree[inp] == 0:
+                vars_to_process.append(inp)
+
+    return ret
+
+    # visited: Set[Variable] = set()
+    # queue: List[Variable] = [variable]
+
+    # all_vars = set()
+
+    # ret: List[Variable] = [variable]
+    # for v in variable.history.inputs:
+    #     if is_constant(v):
+    #         continue
+
+    #     ret.extend(topological_sort(v))
+
+    # return ret
     # TODO: Implement for Task 1.4.
-    raise NotImplementedError('Need to implement for Task 1.4')
+    raise NotImplementedError("Need to implement for Task 1.4")
 
 
-def backpropagate(variable, deriv):
+def backpropagate(variable: Variable, deriv):
     """
     Runs backpropagation on the computation graph in order to
     compute derivatives for the leave nodes.
@@ -312,5 +363,28 @@ def backpropagate(variable, deriv):
 
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
-    # TODO: Implement for Task 1.4.
-    raise NotImplementedError('Need to implement for Task 1.4')
+
+    # 1. Get topological sort order
+    # 2. For each var in order:
+    #       - Call chain rule
+    #       - Push gradients to inputs and accumulate
+
+    temp_derivatives = {}
+    temp_derivatives[variable] = deriv
+
+    for v in topological_sort(variable):
+        if v.is_leaf():
+            continue
+
+        input_vars = v.history.chain_rule(temp_derivatives[v])
+        del temp_derivatives[v]
+
+        for input_var, grad in input_vars:
+            if input_var.is_leaf():
+                input_var.accumulate_derivative(grad)
+
+            elif input_var in temp_derivatives:
+                temp_derivatives[input_var] += grad
+
+            else:
+                temp_derivatives[input_var] = grad
