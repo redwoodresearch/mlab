@@ -1,0 +1,7 @@
+RaichuModel.H = 100
+train.optimizer_kind = "Adam"
+Adam.lr = 0.01
+Adam.betas = (0.9, 0.999)
+Adam.eps = 1e-8
+Adam.weight_decay = 0.0
+trains.num_epochs = 50
