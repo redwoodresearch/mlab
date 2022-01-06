@@ -1,0 +1,8 @@
+newtrain.image_name = "cat.jpg"
+newtrain.learning_rate = 0.001
+newtrain.momentum =  0.9
+newtrain.epochs = 16
+newtrain.optimizer = "adam"
+newtrain.loss = "mse"
+newtrain.hidden_size = 400
+newtrain.weight_decay = 0
