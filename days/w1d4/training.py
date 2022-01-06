@@ -219,7 +219,7 @@ train.dampening = 0
 model.hidden_size = 400""")
 
 with gin.unlock_config():
-    gin.parse_config_files_and_bindings([get_fullpath("config.gin")], gin_config])
+    gin.parse_config_files_and_bindings([get_fullpath("config.gin")], gin_config)
     experiment.log_parameters({"params": gin_config})
     train()  
     experiment.end()
