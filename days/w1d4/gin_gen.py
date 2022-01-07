@@ -13,10 +13,11 @@ def make_grid(possible_values):
 
 
 search_space = {
-    "train.lr": np.geomspace(1e-1, 1e-3, 2),
+    "train.lr": np.geomspace(1e-1, 1e-3, 3),
     # "run.hidden_size": [100, 400, 700, 1000]
+    # "run.hidden_size": [100, 200, 400],
     "run.hidden_size": [100, 200],
-    "train.epochs": [10],
+    "train.epochs": [80],
 }
 
 def make_request_dict(search_space):
@@ -57,11 +58,14 @@ def run_local(search_space):
     req = make_request_dict(search_space)
     for task in req["tasks"]:
         os.environ["PARAMS"] = str(task["parameters"])
-        subprocess.run(["python3", "w1d4.py"])
+        # print("in gingen", os.environ)
+        subprocess.run(["python3", "days/w1d4/w1d4.py"])
 
 
-requests.post(
+r = requests.post(
     "https://jobs.redwoodresearchcompute.com:10101/api",
     json=make_request_dict(search_space)
 )
+print(r.status_code)
+print(r.text)
 # run_local(search_space)
