@@ -5,6 +5,13 @@ experiment_params = {
     'project_name': "mlab",
     'workspace': "bmillwood",
 }
+
+arthur_experiment_params = Experiment(
+    api_key="cWQ5thtmlU2pZH62GZVFghchU",
+    project_name="general",
+    workspace="arthurconmy",
+)
+
 experiment = Experiment(**experiment_params)
 
 import torch as t
@@ -96,7 +103,7 @@ def evaluate(model, dataloader):
     return cumulative_loss / len(dataloader)
 
 def log_gin_parameter(configurable, name):
-    experiment.log_parameter(name, gin.get_bindings(configurable)['lr'])
+    experiment.log_parameter(name, gin.get_bindings(configurable)[name])
 
 @gin.configurable
 def trains(model, data_train, data_test, num_epochs):
@@ -104,6 +111,7 @@ def trains(model, data_train, data_test, num_epochs):
     for _ in range(num_epochs):
         train(model=model, dataloader=data_train)
     log_gin_parameter(Adam, 'lr')
+    log_gin_parameter(RaichuModel, 'H')
     experiment.log_metric('test_loss', evaluate(model, data_train))
 
 def plot_qualities():
