@@ -10,18 +10,50 @@ import sys
 
 if "--arthur" in sys.argv:
     experiment_params = arthur_experiment_params
-# else:
-    # experiment_params = ben_experiment_params
 
 import torch as t
+from PIL import Image
 import numpy as np
-import w1d4_tests
+import torchvision.transforms as transforms
+import einops
+import einops
+import matplotlib.pyplot as plt
+from PIL import Image
+import torch
+from torch import nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, TensorDataset
+import torchvision
+from torchvision import transforms
+from typing import Tuple 
+# import w1d4_tests
 import matplotlib.pyplot as plt
 import gin
 
-fname = "/home/ubuntu/mlab/days/w1d4/raichu.png"
+def load_image(fname, n_train=8192, batch_size=128):
+    img = Image.open(fname)
+    tensorize = transforms.ToTensor()
+    img = tensorize(img)
+    img = einops.rearrange(img, "c h w -> h w c")
+    height, width = img.shape[:2]
 
-data_train, data_test =  w1d4_tests.load_image(fname)
+    n_trn = n_train
+    n_tst = 1024
+    X1 = t.randint(0, height, (n_trn + n_tst,))
+    X2 = t.randint(0, width, (n_trn + n_tst,))
+    X = t.stack([X1.float() / height - 0.5, X2.float() / width - 0.5]).T
+    Y = img[X1, X2] - 0.5
+
+    Xtrn, Xtst = X[:n_trn], X[n_trn:]
+    Ytrn, Ytst = Y[:n_trn], Y[n_trn:]
+
+    dl_trn = DataLoader(TensorDataset(Xtrn, Ytrn), batch_size=batch_size, shuffle=True)
+    dl_tst = DataLoader(TensorDataset(Xtst, Ytst), batch_size=batch_size)
+    return dl_trn, dl_tst
+
+fname = "/home/arthur/Documents/ML/MLAB/mlab/days/w1d4/raichu.png"
+
+data_train, data_test = load_image(fname)
 
 from PIL import Image
 img = Image.open(fname)
@@ -31,14 +63,16 @@ img = tensorize(img)
 
 @gin.configurable
 class RaichuModel(t.nn.Module):
-    def __init__(self, P, H, K):
+    def __init__(self, P, hidden_layer_sizes, K):
         super().__init__()
-        self.layers = t.nn.Sequential(t.nn.Linear(P, H), 
-            t.nn.ReLU(),
-            t.nn.Linear(H, H),
-            t.nn.ReLU(),
-            t.nn.Linear(H, K),
-        )
+
+        sequential_list = [t.nn.Linear(P, hidden_layer_sizes[0]), t.nn.ReLU()]
+        for i in range(1, len(hidden_layer_sizes)):
+            sequential_list.append(t.nn.Linear(hidden_layer_sizes[i-1], hidden_layer_sizes[i]))
+            sequential_list.append(t.nn.ReLU())
+        sequential_list.append(t.nn.Linear(hidden_layer_sizes[-1], K))
+
+        self.layers = t.nn.Sequential(*sequential_list)
 
     def forward(self, x):
         return self.layers(x)
@@ -101,47 +135,51 @@ def evaluate(model, dataloader):
         cumulative_loss += loss.detach()
     return cumulative_loss / len(dataloader)
 
+from time import time
+
 @gin.configurable
 def trains(model, data_train, data_test, num_epochs):
-    for _ in tqdm(range(num_epochs)):
+    start_time = time()
+    while time() - start_time < 60:
         train(model=model, dataloader=data_train)
     return evaluate(model, data_train)
 
 config_space = []
 
-for lr in np.logspace(-4, -2, num=3):
-    for H in [50, 100, 150, 200]:
+for layers in range(1):
+    
+    divs = []
+    for d in range(2, 25):
+        if 100 % d == 0:
+            divs.append([100 // d for _ in range(d)])
+    print(divs)
+
+    for Hs in divs:
         config = [
-            f"RaichuModel.H = {H}",
-            f"Adam.lr = {lr}"
+            f"RaichuModel.hidden_layer_sizes = {Hs}",
         ] 
         config_space.append(config)
 
-# for config in config_space:
-#     with gin.unlock_config():
-#         gin.parse_config_files_and_bindings(["config.gin"], bindings=config)
-#         experiment = Experiment(**experiment_params)
-#         log_lr = np.log(gin.get_bindings(Adam)['lr'])
-#         experiment.log_parameter('log_lr', log_lr)
-#         hidden_size = gin.get_bindings(RaichuModel)['H']
-#         experiment.log_parameter('hidden_size', hidden_size)
-#         model = RaichuModel(P=2, K=3)
-#         test_loss = trains(model, data_train, data_test)
-#         experiment.log_metric('test_loss', test_loss)
-#         experiment.end()
+for config in config_space:
+    with gin.unlock_config():
+        print(f"Starting config {config}")
+        gin.parse_config_files_and_bindings(["config.gin"], bindings=config)
+        experiment = Experiment(**experiment_params)
+        # log_lr = np.log10(gin.get_bindings(Adam)['lr'])
+        # experiment.log_parameter('log_lr', log_lr)
+        # hidden_size = gin.get_bindings(RaichuModel)['H']
+        # experiment.log_parameter('hidden_size', hidden_size)
+        hidden_layer_sizes = gin.get_bindings(RaichuModel)['hidden_layer_sizes']
+        experiment.log_parameter('hidden_sizes', hidden_layer_sizes)
+        model = RaichuModel(P=2, K=3)
+        test_loss = trains(model, data_train, data_test)
+        print(f"TESTLOSS: {test_loss}")
+        experiment.log_metric('test_loss', test_loss)
+        experiment.end()
+input("ENNDD")
 
 from time import ctime
 start_time = ctime()
-
-# for config in config_space:
-#     with gin.unlock_config():
-#         arthur_experiment_params = {
-#             'api_key': "cWQ5thtmlU2pZH62GZVFghchU",
-#             'project_name': start_time,
-#             'workspace': "arthurconmy",
-#         }
-#         experiment_params = arthur_experiment_params
-#         experiment = Experiment(**experiment_params)
 
 def show_my_image(img, model):
     img_depth, img_height, img_width = img.shape
@@ -162,22 +200,9 @@ def show_my_image(img, model):
     )
     result = model(indices).detach()
     result += 0.5
-    
-    # plt.imshow(result)
-    # plt.draw()
-    # plt.show()
-    # print(result.shape)
-    # result = result.unsqueeze(-1)
-    print(result)
     result = result.unsqueeze(-1)
     plt.imsave("file5.png", result)
 
-tens = t.randn(1080, 1920, 3)
-tens = tens.unsqueeze(-1)
-print(tens.shape)
-plt.imsave("file3.png", tens)
-
-gin.parse_config_files_and_bindings(["arthurconfig.gin"], bindings=config)
+gin.parse_config_files_and_bindings(["config.gin"], bindings=config)
 model=RaichuModel(P=2, K=3)
 trains(model, data_train, data_test)
-show_my_image(img, model)
