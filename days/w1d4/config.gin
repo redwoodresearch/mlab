@@ -1,0 +1,19 @@
+train.n_train = 50000
+train.n_epochs = 5
+train.batch_size = 2048
+train.optimizer = @optim.Adam
+train.device = 'cuda'
+
+MyNet.P = 2
+MyNet.H = 4000
+MyNet.K = 3
+
+optim.SGD.lr = 5e-4
+optim.SGD.momentum = 0.9
+optim.SGD.dampening = 0
+optim.SGD.weight_decay = 0
+
+optim.Adam.lr = 1e-3
+optim.Adam.betas = (0.9, 0.999)
+optim.Adam.eps = 1e-8
+optim.Adam.weight_decay = 0
