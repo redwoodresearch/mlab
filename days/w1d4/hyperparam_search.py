@@ -1,5 +1,5 @@
 import os
-os.system('pip install -r ../../requirements.txt')
+os.system('pip install -r requirements.txt')
 
 import torch as t
 import torch
@@ -78,7 +78,7 @@ def train_and_plot(model, train_dataloader, test_dataloader, epochs, plot=True, 
 
 if __name__ == "__main__":
     print(os.listdir())
-    fname = "img.jpg"
+    fname = "days/w1d4/img.jpg"
     data_train, data_test = tests.load_image(fname)
 
     with gin.unlock_config():
