@@ -135,6 +135,7 @@ class Adam():
 def newtrain(learning_rate, momentum, epochs, optimizer, loss, hidden_size, weight_decay):
     IMAGE_NAME = "cat.jpg"
     model = MLP(2, hidden_size, 3)
+    print("w1d4_tests attributes", w1d4_tests.__dict__.keys())
     data_train, data_test =  w1d4_tests.load_image(IMAGE_NAME)
     if optimizer == "adam":
         optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
