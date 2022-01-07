@@ -5,11 +5,18 @@ import subprocess
 
 config_space = []
 
+sizes_to_try = [
+    [100],
+    [50] * 2,
+    [20] * 5,
+    [10] * 10,
+]
+
 for lr in [1e-2]:
-    for H in list(range(100, 501, 50)): ## [100, 150, 200, 250, 300]:
+    for sizes in sizes_to_try:
         config_space.append(
             '\n'.join([
-                f"RaichuModel.H = {H}",
+                f"RaichuModel.hidden_layer_sizes = {sizes}",
                 f"Adam.lr = {lr}",
             ])
         )

@@ -40,14 +40,16 @@ img = tensorize(img)
 
 @gin.configurable
 class RaichuModel(t.nn.Module):
-    def __init__(self, P, H, K):
+    def __init__(self, P, hidden_layer_sizes, K):
         super().__init__()
-        self.layers = t.nn.Sequential(t.nn.Linear(P, H), 
-            t.nn.ReLU(),
-            t.nn.Linear(H, H),
-            t.nn.ReLU(),
-            t.nn.Linear(H, K),
-        )
+
+        sequential_list = [t.nn.Linear(P, hidden_layer_sizes[0]), t.nn.ReLU()]
+        for i in range(1, len(hidden_layer_sizes)):
+            sequential_list.append(t.nn.Linear(hidden_layer_sizes[i-1], hidden_layer_sizes[i]))
+            sequential_list.append(t.nn.ReLU())
+        sequential_list.append(t.nn.Linear(hidden_layer_sizes[-1], K))
+
+        self.layers = t.nn.Sequential(*sequential_list)
 
     def forward(self, x):
         return self.layers(x)
@@ -130,8 +132,8 @@ with gin.unlock_config():
     experiment = Experiment(**experiment_params)
     log_lr = np.log10(gin.get_bindings(Adam)['lr'])
     experiment.log_parameter('log_lr', log_lr)
-    hidden_size = gin.get_bindings(RaichuModel)['H']
-    experiment.log_parameter('hidden_size', hidden_size)
+    hidden_layer_sizes = gin.get_bindings(RaichuModel)['hidden_layer_sizes']
+    experiment.log_parameter('hidden_layer_sizes', str(hidden_layer_sizes))
     model = RaichuModel(P=2, K=3)
     num_epochs_used, test_loss = trains(model, data_train, data_test)
     experiment.log_metric('num_epochs_used', num_epochs_used)
