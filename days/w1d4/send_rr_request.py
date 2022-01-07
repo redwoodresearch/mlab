@@ -49,7 +49,7 @@ def get_git_branch():
         .strip()
     )
 
-def create_json(gin_config, filename):
+def create_json(gin_configs, filename):
     commit = get_git_commit()
     branch = get_git_branch()
     return {
@@ -62,8 +62,8 @@ def create_json(gin_config, filename):
         "command": ["python", filename], 
         "tasks": [{
             "priority": 1,
-            "parameters": { "GIN_CONFIG": gin_config, }
-        }],
+            "parameters": { "GIN_CONFIG": job_str(config), }
+        } for config in gin_configs],
         "scheduling_requirements": {"schedulability": True, "resource_options": [["A100"], ["RTX3090"], ["V100"]]},
     }
 
@@ -79,13 +79,7 @@ if __name__ == "__main__":
         "newtrain.weight_decay" : [0],
     }
     grid = make_grid(grid_values)
-    for config in grid:
-        js = job_str(config)
-        json = create_json(js, "days/w1d4/picture_learning.py")
-        print("sending job", json)
-        response = requests.post("https://jobs.redwoodresearchcompute.com:10101/api", json=json)
-        print(response)
-        print("\n----------------------\n")
-        print("breaking early so we don't spam the API")
-        break
-    
+    json = create_json(grid, "days/w1d4/picture_learning.py")
+    print("sending job", json)
+    response = requests.post("https://jobs.redwoodresearchcompute.com:10101/api", json=json)
+    print(response)
