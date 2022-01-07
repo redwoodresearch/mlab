@@ -24,7 +24,7 @@ json = {
     "token": "tao-1637086550-0-0a7d7030fbb8e316da58c6afce7c6315",
     "kind": "submitJob",
     "name": "basic-search",
-    "git_commit": "9fd3d8347430d720f10d0121bb86e46c2b064bad", ## "bcd95c87f157bbc300287f0eaa182569c4e4b84b",
+    "git_commit": "3f2f3079bdc6f47080ed20edf606c962e533ac03", ## "bcd95c87f157bbc300287f0eaa182569c4e4b84b",
     "git_repo": 'redwoodresearch/mlab',
     "git_branch": "bmillwood",
     "command": ["python", "days/w1d4/experiment.py"], 

@@ -13,7 +13,7 @@ arthur_experiment_params = {
 }
 
 import os
-os.system("pip install -r requirements.txt")
+os.system("pip install -q -r requirements.txt")
 import sys
 
 if "--arthur" in sys.argv:
@@ -120,7 +120,7 @@ with gin.unlock_config():
     json_loaded = json.loads(os.environ['PARAMS'])
     print(json_loaded)
     config = json_loaded["gin_config"]
-    gin.parse_config_files_and_bindings(["config.gin"], bindings=config)
+    gin.parse_config_files_and_bindings(["days/w1d4/config.gin"], bindings=config)
     experiment = Experiment(**experiment_params)
     log_lr = np.log10(gin.get_bindings(Adam)['lr'])
     experiment.log_parameter('log_lr', log_lr)
