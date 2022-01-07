@@ -1,3 +1,4 @@
+import os
 from collections import OrderedDict
 import torch
 from torch import nn
@@ -80,5 +81,6 @@ def train(model, data_train, data_test, epochs, lr):
 
 if __name__ == "__main__":
     with gin.unlock_config():
-        gin.parse_config_file(config_file="config.gin")
+        # gin.parse_config_file(config_file="config.gin")
+        gin.parse_config(eval(os.environ["PARAMS"])["gin_config"])
         run()
