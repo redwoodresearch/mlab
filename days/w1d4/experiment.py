@@ -1,10 +1,11 @@
 from comet_ml import Experiment
 
-experiment = Experiment(
-    api_key="absncaDYNLt6jpNh1Ez0OIVTe",
-    project_name="mlab",
-    workspace="bmillwood",
-)
+experiment_params = {
+    'api_key': "absncaDYNLt6jpNh1Ez0OIVTe",
+    'project_name': "mlab",
+    'workspace': "bmillwood",
+}
+experiment = Experiment(**experiment_params)
 
 import torch as t
 import numpy as np
@@ -94,12 +95,16 @@ def evaluate(model, dataloader):
         cumulative_loss += loss.detach()
     return cumulative_loss / len(dataloader)
 
+def log_gin_parameter(configurable, name):
+    experiment.log_parameter(name, gin.get_bindings(configurable)['lr'])
+
 @gin.configurable
 def trains(model, data_train, data_test, num_epochs):
     results = []
     for _ in range(num_epochs):
         train(model=model, dataloader=data_train)
-    return evaluate(model, data_train)
+    log_gin_parameter(Adam, 'lr')
+    experiment.log_metric('test_loss', evaluate(model, data_train))
 
 def plot_qualities():
     qualities = trains(model=model, data_train=data_train, data_test=data_test)
