@@ -1,3 +1,4 @@
+import json
 import sys
 import requests
 import subprocess
@@ -48,4 +49,6 @@ response = requests.post(
     json=json
 )
 
-print(response.content)
+resp_json = json.loads(response.content)
+print(resp_json)
+print f'https://jobs.redwoodresearchcompute.com/jobs/j{resp_json["job_id"]}'
