@@ -1,0 +1,7 @@
+# train.opt_str = "SGD"
+train.epochs = 5
+train.lr = 0.001
+# train.loss = "mse"
+run.hidden_size = 200
+# model.hidden_size = 1024
+# evaluate.validation_batch_size = 16
