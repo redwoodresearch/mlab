@@ -10,6 +10,7 @@ import torchvision
 from torchvision import transforms
 from typing import Tuple
 import w1d4_tests as tests
+import gin
 
 
 class _MLP(nn.Module):
@@ -26,7 +27,7 @@ class _MLP(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-
+@gin.configurable
 def _train(model: nn.Module, dataloader: DataLoader, lr, momentum):
     opt = torch.optim.SGD(model.parameters(), lr, momentum)
     for X, y in dataloader:
