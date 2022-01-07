@@ -13,7 +13,7 @@ arthur_experiment_params = {
 }
 
 import os
-os.system("pip install -r ../../requirements.txt")
+os.system("pip install -r requirements.txt")
 import sys
 
 if "--arthur" in sys.argv:
@@ -27,7 +27,7 @@ import w1d4_tests
 import matplotlib.pyplot as plt
 import gin
 
-fname = "/home/ubuntu/mlab/days/w1d4/raichu.png"
+fname = "days/w1d4/raichu.png"
 
 data_train, data_test =  w1d4_tests.load_image(fname)
 
