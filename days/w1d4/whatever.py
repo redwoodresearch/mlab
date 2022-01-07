@@ -137,5 +137,5 @@ if __name__ == "__main__":
         project_name="image-memorizer",
         workspace="guillecosta",
     )
-    experiment.log_parameters(hyperparams)
+    experiment.log_parameters(parameters_without_config)
     gin_train(model, data_train, data_test, experiment)
