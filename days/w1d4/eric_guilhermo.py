@@ -109,7 +109,8 @@ possible_values = {
     "gin_train.betas": [(0.9, 0.999)]
 }
 
-print(os.system("echo $PARAMS")
+print(os.system("echo $PARAMS"))
+# this is a change to this file
 
 def hyperparam_search(possible_values):
     grid = make_grid(possible_values)
