@@ -15,7 +15,7 @@ json_dict = {
     "git_commit": get_git_commit(),
     "git_repo": "redwoodresearch/mlab",
     "git_branch": "eric_guilhermo",
-    "command": ["python", "days/w1d4/eric_guilhermo.py"], 
+    "command": ["python", "days/w1d4/whatever.py"], 
     "tasks": [{
         "priority": 1,
         "parameters": { # these are environment variables
