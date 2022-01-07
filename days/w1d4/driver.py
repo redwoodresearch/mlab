@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import json
 import sys
 import requests
@@ -36,7 +37,7 @@ def task(config):
         }
     }
 
-json = {
+query_json = {
     "token": "tao-1637086550-0-0a7d7030fbb8e316da58c6afce7c6315",
     "kind": "submitJob",
     "name": "basic-search",
@@ -53,9 +54,9 @@ json = {
 
 response = requests.post(
     'https://jobs.redwoodresearchcompute.com:10101/api',
-    json=json
+    json=query_json
 )
 
 resp_json = json.loads(response.content)
 print(resp_json)
-print f'https://jobs.redwoodresearchcompute.com/jobs/j{resp_json["job_id"]}'
+print(f'https://jobs.redwoodresearchcompute.com/jobs/j{resp_json["job_id"]}')
