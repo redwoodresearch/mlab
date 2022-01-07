@@ -79,6 +79,7 @@ def test_evaluate(evaluate):
     model = sol._train(model, dl, lr=0.1, momentum=0.5)
     _loss = sol._evaluate(model, dl)
     loss = evaluate(model, dl)
+    print(loss, _loss)
     _check_equal(torch.Tensor([_loss]), torch.Tensor([loss]))
 
 

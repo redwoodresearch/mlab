@@ -98,11 +98,11 @@ def run(hidden_size):
     experiment.log_parameter("hidden size", hidden_size)
     fname = "days/w1d4/mona.jpg"
     data_train, data_test = load_image(fname)
-    model_file = "days/w1d4/model.pt"
     model = Net(2, hidden_size, 3)
     train(model, data_train, data_test)
-    torch.save(model.state_dict(), model_file)
-    experiment.log_model("OurNet", model_file)
+    model_file = "days/w1d4/model.pt"
+    # torch.save(model.state_dict(), model_file)
+    # experiment.log_model("OurNet", model_file)
 
 
 @gin.configurable
@@ -120,6 +120,11 @@ def train(model, data_train, data_test, epochs, lr):
         experiment.log_metric("train epoch loss", epoch_loss, epoch=epoch)
         experiment.log_metric("test epoch loss", test_loss, epoch=epoch)
         print(f"{epoch}/{epochs}\t train loss={epoch_loss:.3f}\t test loss={test_loss:.3f}")
+
+        if epoch == 40:
+            torch.save(model.state_dict(), model_file)
+            experiment.log_model("OurNet", model_file, overwrite=True)
+
 
 if __name__ == "__main__":
     with gin.unlock_config():
