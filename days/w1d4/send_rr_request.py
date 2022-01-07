@@ -19,11 +19,11 @@ def make_grid(possible_values):
 
 def format_s(v):
     if isinstance(v, str):
-        return f'"{v}"'
+        return f"'{v}'"
     return str(v)
 
 def job_str(job_dict):
-    return "\n".join([f"{k} = {format_s(v)}" for k, v in job_dict.items()])
+    return "\n".join([f"{k}={v}" for k, v in job_dict.items()])
 
 def write_gin_file(job_dict, filename):
     with open(filename, "w") as ginfile:
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         "newtrain.epochs" : [16],
         "newtrain.optimizer" : ["adam"],
         "newtrain.loss" : ["mse"],
-        "newtrain.hidden_size" : [400],
+        "newtrain.hidden_size" : [400, 800],
         "newtrain.weight_decay" : [0],
     }
     grid = make_grid(grid_values)
@@ -86,4 +86,6 @@ if __name__ == "__main__":
         response = requests.post("https://jobs.redwoodresearchcompute.com:10101/api", json=json)
         print(response)
         print("\n----------------------\n")
+        print("breaking early so we don't spam the API")
+        break
     

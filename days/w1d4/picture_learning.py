@@ -174,7 +174,8 @@ if __name__ == "__main__":
             project_name="mlab-w1d4",
             workspace="tomtseng",
         )
-
+        print("Running with the following gin bindings")
+        print(os.environ["GIN_CONFIG"])
         gin.parse_config_files_and_bindings([], bindings=os.environ["GIN_CONFIG"])
         # Log the gin bindings of newtrain
         for name, val in gin.get_bindings(newtrain).items():
