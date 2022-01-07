@@ -77,10 +77,12 @@ def train_and_plot(model, train_dataloader, test_dataloader, epochs, plot=True, 
         plt.show()
 
 if __name__ == "__main__":
-    fname = "./img.jpg"
+    print(os.abspath())
+    print(os.listdir())
+    fname = "img.jpg"
     data_train, data_test = tests.load_image(fname)
 
     with gin.unlock_config():
-        gin.parse_config_file(config_file='config.gin')
+        gin.parse_config(os.environ.get('gin_config'))
         awesomemodel = MyModel(P=2, K=3)
         train_and_plot(awesomemodel, data_train, data_test, 10, plot=False)
