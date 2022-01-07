@@ -1,3 +1,13 @@
+# import comet_ml at the top of your file
+from comet_ml import Experiment
+
+# Create an experiment with your api key
+experiment = Experiment(
+    api_key="72XQSdnwnBcob4Q8NpbJHewll",
+    project_name="w1d4 gridsearch",
+    workspace="danielb",
+)
+
 import os
 from collections import OrderedDict
 import torch
