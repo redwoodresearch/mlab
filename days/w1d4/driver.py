@@ -32,6 +32,7 @@ json = {
     "kind": "submitJob",
     "name": "basic-search",
     "git_commit": get_git_commit(),
+    
     "git_repo": 'redwoodresearch/mlab',
     "git_branch": "bmillwood",
     "command": ["python", "days/w1d4/experiment.py"], 
