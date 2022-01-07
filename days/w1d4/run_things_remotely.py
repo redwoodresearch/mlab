@@ -15,11 +15,11 @@ def make_tasks(possible_values):
     return ls
 
 possible_values = {
-    "gin_train.lr": [0.01, 0.001],
+    "gin_train.lr": [0.001, 0.003, 0.01, 0.03],
     "Model.P": [2],
-    "Model.H": [100],
+    "Model.H": [50, 100, 200, 400],
     "Model.K": [3],
-    "gin_train.betas": [(0.9, 0.999)],
+    "gin_train.betas": [(0.9, 0.99), (0.9, 0.999)],
     "gin_config": ["days/w1d4/config.gin"]
 }
 
