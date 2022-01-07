@@ -10,3 +10,5 @@ image*
 infrastructure/.lambda_account.json
 .hypothesis
 launch.json
+datasets
+ml_bootcamp.egg-info
