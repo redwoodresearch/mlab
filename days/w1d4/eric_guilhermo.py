@@ -1,5 +1,5 @@
 import os
-os.system("pip install -r ../../requirements.txt")
+os.system("pip install -r requirements.txt")
 
 from comet_ml import Experiment
 from operator import mul
@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import w1d4_tests
 
-fname = "/home/ubuntu/mlab/days/w1d4/cherry.jpg"
+fname = "days/w1d4/cherry.jpg"
 data_train, data_test = w1d4_tests.load_image(fname)
 
 @gin.configurable
