@@ -200,6 +200,7 @@ def load_image(fname, n_train=8192, batch_size=128):
     X1 = torch.randint(0, height, (n_trn + n_tst,))
     X2 = torch.randint(0, width, (n_trn + n_tst,))
     X = torch.stack([X1.float() / height - 0.5, X2.float() / width - 0.5]).T
+    # Centers around zero
     Y = img[X1, X2] - 0.5
 
     Xtrn, Xtst = X[:n_trn], X[n_trn:]

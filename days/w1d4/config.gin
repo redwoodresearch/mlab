@@ -1,0 +1,10 @@
+train.model = @Model()
+train.num_epochs = 16
+train.lr = 0.001
+train.loss = "l1"
+train.alpha = 0.99
+train.momentum = 0.
+train.weight_decay = 0
+train.eps = 1e-8
+Model.input_size = 2
+Model.output_size = 3
