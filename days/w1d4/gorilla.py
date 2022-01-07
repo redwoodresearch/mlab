@@ -1,7 +1,10 @@
 import os
+import json
 
-if "RR_JOB" in os.environ:
-    os.system("pip install -r ../../requirements.txt")
+if "PARAMS" in os.environ:
+    print(os.environ["PARAMS"])
+    if "RR_JOBS" in json.loads(os.environ["PARAMS"]):
+        os.system("pip install -r ../../requirements.txt")
 from comet_ml import Experiment
 
 from typing import Callable, Dict, Iterable, Tuple, Any
@@ -163,8 +166,9 @@ def flatten_gin_config(
 
 if __name__ == "__main__":
     with gin.unlock_config():
+        params = json.loads(os.environ["PARAMS"])
         gin.parse_config_files_and_bindings(
-            config_files=["config.gin"], bindings=os.environ["GIN_CONFIG"]
+            config_files=["config.gin"], bindings=params['GIN_CONFIG']
         )
         EXPERIMENT.log_parameters(flatten_gin_config(gin.config._CONFIG))
         train()

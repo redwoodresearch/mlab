@@ -5,7 +5,7 @@ import numpy as np
 TOKEN = "tao-1637086550-0-0a7d7030fbb8e316da58c6afce7c6315"
 REPO_NAME = "redwoodresearch/mlab"
 PATH_TO_MY_FILE = "days/w1d4/gorilla.py"
-GIT_COMMIT = "df27e71724f32578c0921cfe8bc77ed2ec12b6df"
+GIT_COMMIT = "c567979ecba7133b693610c37cf4d8d039b68ca5"
 BRANCH_NAME = "tony"
 API_URL = "https://jobs.redwoodresearchcompute.com:10101/api"
 JOB_NAME = "mlab_w1d4_0_beth_tony"
@@ -58,7 +58,8 @@ def run(possible_values=example):
                 "priority": 1,
                 "parameters": {  # these are environment variables
                     "GIN_CONFIG": txt,
-                    "RR_JOB":'True',
+                    "RR_JOB": "True",
+                    "gin_config":''
                 },
             }
         )
