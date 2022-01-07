@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import subprocess
 import gin
 import os
+import json
 
 
 def get_git_commit():
@@ -207,6 +208,7 @@ def train(
     weight_decay=None,
     momentum=None,
     dampening=None,
+    alpha=None,
 ):
     opt_data = OPTIMIZERS[optimizer]
     print(locals())
@@ -232,18 +234,21 @@ experiment = Experiment(
 
 gin_config = os.getenv(
     "PARAMS",
-    """train.epochs = 50
-train.optimizer = "sgd"
+    json.dumps(
+        {
+            "GIN_CONFIG": """train.epochs = 50
+train.optimizer = "rmsprop"
 train.lr = 0.001
 train.weight_decay = 0.05
 train.momentum = 0.9
 train.dampening = 0
-model.hidden_size = 400""",
+model.hidden_size = 400"""
+        }
+    ),
 )
 
-import json
 
-params = json.loads(os.environ["PARAMS"])
+params = json.loads(gin_config)
 
 
 with gin.unlock_config():
