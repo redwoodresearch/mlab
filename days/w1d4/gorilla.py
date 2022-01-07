@@ -28,6 +28,7 @@ EXPERIMENT = Experiment(
     auto_metric_logging=False,
 )
 
+DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 @gin.configurable
 class MyNet(nn.Module):
@@ -119,7 +120,7 @@ def train(
 
     model = MyNet().to(device)
     data_train, data_test = w1d4_tests.load_image(
-        "gorilla.jpg",
+        os.path.join(DIR_PATH, "gorilla.jpg"),
         device=device,
         batch_size=batch_size,
         n_train=n_train,
@@ -167,8 +168,8 @@ def flatten_gin_config(
 if __name__ == "__main__":
     with gin.unlock_config():
         params = json.loads(os.environ.get("PARAMS", "{}"))
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        path = os.path.join(dir_path, 'config.gin' )
+
+        path = os.path.join(DIR_PATH, 'config.gin' )
 
         gin.parse_config_files_and_bindings(
             config_files=[path], bindings=params.get('GIN_CONFIG', None)
