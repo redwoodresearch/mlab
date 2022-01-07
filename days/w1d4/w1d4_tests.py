@@ -10,13 +10,14 @@ import torchvision
 from torchvision import transforms
 from typing import Tuple
 import w1d4_sol as sol
+from torch.utils.data.dataloader import default_collate
 
 
-def _get_moon_data(unsqueeze_y = False):
+def _get_moon_data(unsqueeze_y=False):
     X, y = make_moons(n_samples=512, noise=0.05, random_state=354)
     X = torch.tensor(X, dtype=torch.float32)
     y = torch.tensor(y, dtype=int)
-    if unsqueeze_y: # better when the training regimen uses l1 loss, rather than x-ent 
+    if unsqueeze_y:  # better when the training regimen uses l1 loss, rather than x-ent
         y = y.unsqueeze(-1)
     return DataLoader(TensorDataset(X, y), batch_size=128, shuffle=True)
 
@@ -29,6 +30,7 @@ def _check_equal(tensor1, tensor2):
 
 
 ############################################################################
+
 
 def test_mlp(MLP):
     x = torch.randn(128, 2)
@@ -60,14 +62,16 @@ def test_train(train):
     x = torch.randn(128, 2)
     _check_equal(trained_model(x), _trained_model(x))
 
+
 def test_accuracy(accuracy):
     dl = _get_moon_data(unsqueeze_y=True)
     model = sol._MLP(2, 32, 1)
-    
+
     model = sol._train(model, dl, lr=0.1, momentum=0.5)
     _acc = sol._accuracy(model, dl)
     acc = accuracy(model, dl)
     _check_equal(torch.Tensor([_acc]), torch.Tensor([acc]))
+
 
 def test_evaluate(evaluate):
     torch.manual_seed(928)
@@ -99,7 +103,7 @@ def test_rosenbrock(opt_rosenbrock):
         print("\nTesting configuration: ", opt_config)
         _check_equal(w_history, _w_history)
 
-    
+
 ############################################################################
 
 
@@ -135,7 +139,6 @@ def test_sgd(SGD):
 
         print("\nTesting configuration: ", opt_config)
         _check_equal(w0_correct, w0_submitted)
-
 
 
 def test_rmsprop(RMSprop):
@@ -188,7 +191,7 @@ def test_adam(Adam):
 ##################################################################################
 
 
-def load_image(fname, n_train=8192, batch_size=128):
+def load_image(fname, n_train=8192, batch_size=128, device="cpu"):
     img = Image.open(fname)
     tensorize = transforms.ToTensor()
     img = tensorize(img)
@@ -205,8 +208,17 @@ def load_image(fname, n_train=8192, batch_size=128):
     Xtrn, Xtst = X[:n_trn], X[n_trn:]
     Ytrn, Ytst = Y[:n_trn], Y[n_trn:]
 
-    dl_trn = DataLoader(TensorDataset(Xtrn, Ytrn), batch_size=batch_size, shuffle=True)
-    dl_tst = DataLoader(TensorDataset(Xtst, Ytst), batch_size=batch_size)
+    dl_trn = DataLoader(
+        TensorDataset(Xtrn, Ytrn),
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)),
+    )
+    dl_tst = DataLoader(
+        TensorDataset(Xtst, Ytst),
+        batch_size=batch_size,
+        collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)),
+    )
     return dl_trn, dl_tst
 
 
