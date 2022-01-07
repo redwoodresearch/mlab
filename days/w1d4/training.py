@@ -210,7 +210,7 @@ experiment = Experiment(
     workspace="alwin-peng",
 )
 
-gin_config = os.getenv("GIN_CONFIG", """train.epochs = 50
+gin_config = os.getenv("PARAMS", """train.epochs = 50
 train.optimizer = "sgd"
 train.lr = 0.001
 train.weight_decay = 0.05
@@ -218,8 +218,13 @@ train.momentum = 0.9
 train.dampening = 0
 model.hidden_size = 400""")
 
+import json
+params = json.loads(os.environ["PARAMS"])
+
+
+
 with gin.unlock_config():
-    gin.parse_config_files_and_bindings([get_fullpath("config.gin")], gin_config)
+    gin.parse_config_files_and_bindings([get_fullpath("config.gin")], params["GIN_CONFIG"])
     experiment.log_parameters({"params": gin_config})
     train()  
     experiment.end()
