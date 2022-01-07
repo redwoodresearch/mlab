@@ -6,6 +6,7 @@ from operator import mul
 from functools import reduce
 
 import gin
+import json
 import numpy as np
 import torch as t
 import torch.nn as nn
@@ -109,14 +110,13 @@ possible_values = {
     "gin_train.betas": [(0.9, 0.999)]
 }
 
-print(os.system("echo $PARAMS"))
-# this is a change to this file
+parameters = json.load(os.system("echo $PARAMS"))
 
 def hyperparam_search(possible_values):
     grid = make_grid(possible_values)
     for hyperparams in grid:
         with gin.unlock_config():
-            gin.parse_config_files_and_bindings(["config.gin"], stringify(hyperparams))
+            gin.parse_config_files_and_bindings([parameters["gin_config"]], stringify(hyperparams))
         model = Model()
         experiment = Experiment(
             api_key="OiNBEOeeT9IFDdHDHRLeEe5hb",
