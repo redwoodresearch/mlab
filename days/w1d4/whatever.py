@@ -110,7 +110,6 @@ possible_values = {
     "gin_train.betas": [(0.9, 0.999)]
 }
 
-parameters = json.loads(os.getenv("PARAMS"))
 
 def hyperparam_search(possible_values):
     grid = make_grid(possible_values)
@@ -127,4 +126,16 @@ def hyperparam_search(possible_values):
         gin_train(model, data_train, data_test, experiment)
 
 if __name__ == "__main__":
-    hyperparam_search(possible_values)
+    parameters_with_config = json.loads(os.getenv("PARAMS"))
+    parameters_without_config = json.loads(os.getenv("PARAMS"))
+    del parameters_without_config["gin_config"]
+    with gin.unlock_config():
+        gin.parse_config_files_and_bindings([parameters_with_config["gin_config"]], stringify(parameters_without_config))
+    model = Model()
+    experiment = Experiment(
+        api_key="OiNBEOeeT9IFDdHDHRLeEe5hb",
+        project_name="image-memorizer",
+        workspace="guillecosta",
+    )
+    experiment.log_parameters(hyperparams)
+    gin_train(model, data_train, data_test, experiment)
