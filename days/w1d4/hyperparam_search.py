@@ -83,5 +83,5 @@ if __name__ == "__main__":
 
     with gin.unlock_config():
         gin.parse_config(os.environ.get('gin_config'))
-        awesomemodel = MyModel(P=2, K=3)
+        awesomemodel = MyModel(P=2, H=768, K=3)
         train_and_plot(awesomemodel, data_train, data_test, 10, plot=False)
