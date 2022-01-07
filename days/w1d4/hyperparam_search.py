@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import w1d4_tests as tests
 import gin
 from typing import Dict, List, Any
+import json
 
 @gin.configurable
 class MyModel(t.nn.Module):
@@ -82,6 +83,8 @@ if __name__ == "__main__":
     data_train, data_test = tests.load_image(fname)
 
     with gin.unlock_config():
-        gin.parse_config(os.environ.get('gin_config'))
-        awesomemodel = MyModel(P=2, H=768, K=3)
-        train_and_plot(awesomemodel, data_train, data_test, 10, plot=False)
+        parameters = json.loads(os.environ.get("PARAMS"))
+        print(parameters)
+        gin.parse_config(parameters["gin_config"])
+    awesomemodel = MyModel(P=2, H=768, K=3)
+    train_and_plot(awesomemodel, data_train, data_test, 10, plot=False)
