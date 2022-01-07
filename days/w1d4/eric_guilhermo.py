@@ -110,7 +110,7 @@ possible_values = {
     "gin_train.betas": [(0.9, 0.999)]
 }
 
-parameters = json.load(os.system("echo $PARAMS"))
+parameters = json.load(os.getenv("PARAMS"))
 
 def hyperparam_search(possible_values):
     grid = make_grid(possible_values)
