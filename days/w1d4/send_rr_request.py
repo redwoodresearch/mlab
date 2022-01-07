@@ -62,7 +62,7 @@ def create_json(gin_configs, filename):
         "command": ["python", filename], 
         "tasks": [{
             "priority": 1,
-            "parameters": { "GIN_CONFIG": job_str(config), }
+            "parameters": { "gin_config": job_str(config), }
         } for config in gin_configs],
         "scheduling_requirements": {"schedulability": True, "resource_options": [["A100"], ["RTX3090"], ["V100"]]},
     }
@@ -70,12 +70,14 @@ def create_json(gin_configs, filename):
 
 if __name__ == "__main__":
     grid_values = {
-        "newtrain.learning_rate" : np.geomspace(1e-1, 1e-3, 2),
+        # "newtrain.learning_rate" : np.geomspace(1e-1, 1e-3, 2),
+        "newtrain.learning_rate" : [ 0.001 ] # don't spam the the job queue
         "newtrain.momentum" :  [0.9],
         "newtrain.epochs" : [16],
         "newtrain.optimizer" : ["adam"],
         "newtrain.loss" : ["mse"],
-        "newtrain.hidden_size" : [400, 800],
+        #"newtrain.hidden_size" : [400, 800],
+        "newtrain.hidden_size": [400] # "don't spam the job queue
         "newtrain.weight_decay" : [0],
     }
     grid = make_grid(grid_values)
