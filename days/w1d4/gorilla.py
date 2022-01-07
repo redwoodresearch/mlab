@@ -22,7 +22,7 @@ from optim import MLABOptim
 
 EXPERIMENT = Experiment(
     api_key="qjxcybqq2HsGHbEwATgNiqWgE",
-    project_name="mlab_w1d4_v2",
+    project_name="mlab_w1d4_v3",
     workspace="ttwang",
     auto_metric_logging=False,
 )
@@ -86,7 +86,6 @@ def train_epoch(
         loss = loss_fn(output, target)
         loss.backward()
         optimizer.step()
-        print("epoch!")
 
     return model
 
@@ -135,8 +134,8 @@ def train(
         train_loss = float(evaluate(model, data_train))
         test_loss = float(evaluate(model, data_test))
 
-        if epoch % 50 == 0:
-            print(f"{epoch=}; train={train_loss}; test={test_loss}")
+        #if epoch % 50 == 0:
+        print(f"{epoch=}; train={train_loss}; test={test_loss}")
             # print(model.device)
 
         EXPERIMENT.log_metric(name="train_loss", value=train_loss, step=epoch)
@@ -166,9 +165,12 @@ def flatten_gin_config(
 
 if __name__ == "__main__":
     with gin.unlock_config():
-        params = json.loads(os.environ["PARAMS"])
+        params = json.loads(os.environ.get("PARAMS", "{}"))
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        path = os.path.join(dir_path, 'config.gin' )
+
         gin.parse_config_files_and_bindings(
-            config_files=["config.gin"], bindings=params['GIN_CONFIG']
+            config_files=[path], bindings=params.get('GIN_CONFIG', None)
         )
         EXPERIMENT.log_parameters(flatten_gin_config(gin.config._CONFIG))
         train()

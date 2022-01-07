@@ -5,7 +5,7 @@ import numpy as np
 TOKEN = "tao-1637086550-0-0a7d7030fbb8e316da58c6afce7c6315"
 REPO_NAME = "redwoodresearch/mlab"
 PATH_TO_MY_FILE = "days/w1d4/gorilla.py"
-GIT_COMMIT = "c567979ecba7133b693610c37cf4d8d039b68ca5"
+GIT_COMMIT = "450ec3e0319aee3d0394187010679aa8a0f57ecf"
 BRANCH_NAME = "tony"
 API_URL = "https://jobs.redwoodresearchcompute.com:10101/api"
 JOB_NAME = "mlab_w1d4_0_beth_tony"
