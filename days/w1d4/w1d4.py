@@ -98,8 +98,11 @@ def run(hidden_size):
     experiment.log_parameter("hidden size", hidden_size)
     fname = "days/w1d4/mona.jpg"
     data_train, data_test = load_image(fname)
+    model_file = "days/w1d4/model.pt"
     model = Net(2, hidden_size, 3)
     train(model, data_train, data_test)
+    torch.save(model.state_dict(), model_file)
+    experiment.log_model("OurNet", model_file)
 
 
 @gin.configurable
