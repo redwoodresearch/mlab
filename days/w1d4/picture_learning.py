@@ -175,8 +175,8 @@ if __name__ == "__main__":
             workspace="tomtseng",
         )
         print("Running with the following gin bindings")
-        print(os.environ["GIN_CONFIG"])
-        gin.parse_config_files_and_bindings([], bindings=os.environ["GIN_CONFIG"])
+        print(os.environ["gin_config"])
+        gin.parse_config_files_and_bindings([], bindings=os.environ["gin_config"])
         # Log the gin bindings of newtrain
         for name, val in gin.get_bindings(newtrain).items():
             if type(val) in [str, int, float]:
