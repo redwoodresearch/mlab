@@ -110,9 +110,13 @@ def evaluate(model, dataloader):
         cumulative_loss += loss.detach()
     return cumulative_loss / len(dataloader)
 
+from time import time
+
 @gin.configurable
 def trains(model, data_train, data_test, num_epochs):
-    for _ in range(num_epochs):
+    start_time = time()
+    # for _ in range(num_epochs):
+    while time() - start_time < 60:
         train(model=model, dataloader=data_train)
     return evaluate(model, data_train)
 
