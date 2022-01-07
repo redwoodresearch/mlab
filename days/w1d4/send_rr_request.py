@@ -72,11 +72,11 @@ if __name__ == "__main__":
     grid_values = {
         "newtrain.learning_rate" : np.geomspace(1e-1, 1e-3, 3),
         "newtrain.momentum" :  [0.9],
-        "newtrain.epochs" : [16],
-        "newtrain.optimizer" : ["adam", "rmsprop", "sgd"],
+        "newtrain.epochs" : [25],
+        "newtrain.optimizer" : ["adam"],
         "newtrain.loss" : ["mse"],
-        "newtrain.hidden_size" : [400, 800],
-        "newtrain.weight_decay" : [0, 0.01],
+        "newtrain.hidden_size" : [400, 800, 1600],
+        "newtrain.weight_decay" : [0],
     }
     grid = make_grid(grid_values)
     json = create_json(grid, "days/w1d4/run_picture_learning.py")

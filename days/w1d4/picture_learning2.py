@@ -14,6 +14,14 @@ from PIL import Image
 from torchvision import transforms
 from torch.utils.data import DataLoader, TensorDataset
 
+def get_img_size(fname):
+    img = Image.open("days/w1d4/cat.jpg")
+    tensorize = transforms.ToTensor()
+    img = tensorize(img)
+    img = einops.rearrange(img, "c h w -> h w c")
+    height, width = img.shape[:2]
+    return height, width
+
 def load_image(fname, n_train=8192, batch_size=128):
     img = Image.open(fname)
     tensorize = transforms.ToTensor()
@@ -155,6 +163,21 @@ class Adam():
                 p_i -= self.lr * m_hat / (torch.sqrt(v_hat) + self.eps)
         self.t += 1
         
+def gen_pic(model, img):
+    height, width = get_img_size(img)
+    model.eval()
+    grid_x, grid_y = torch.meshgrid([torch.linspace(-0.5, 0.5, height), torch.linspace(-0.5, 0.5, width)], indexing='ij')
+    stacked_xy = torch.stack([grid_x, grid_y], dim=2)
+    torch.flatten(stacked_xy)
+    print(stacked_xy.reshape(height * width, 2))
+    inp = stacked_xy.reshape(height * width, 2)
+    with torch.no_grad():
+        out = model(inp)
+        out = ((out.reshape(height, width, 3) + .5) * 255).int()
+        return out
+        
+
+        
     
 @gin.configurable
 def newtrain(learning_rate, momentum, epochs, optimizer, loss, hidden_size, weight_decay):
@@ -190,11 +213,13 @@ def newtrain(learning_rate, momentum, epochs, optimizer, loss, hidden_size, weig
         experiment.log_metric("test loss", test_loss, epoch=epoch)
         test_losses.append(test_loss)  
         training_losses.append(sum(_training_losses) / len(_training_losses))
+    pic = gen_pic(model, IMAGE_NAME)
+    experiment.log_image(pic)
     return model, training_losses, test_losses
 
 
 if __name__ == "__main__":
-    with gin.unlock_config():
+    with gin.unlock_config():       
         experiment = Experiment(
             api_key="vaznwXsdK5Z3Hug3FKZCl9lGN",
             project_name="mlab-w1d4",
@@ -204,6 +229,10 @@ if __name__ == "__main__":
         print(os.environ["PARAMS"]) 
         env_params = json.loads(os.environ["PARAMS"])
         config = env_params["gin_config"]
+        
+        ## for local testing
+        #config = 'newtrain.learning_rate=0.01\nnewtrain.momentum=0.9\nnewtrain.epochs=16\nnewtrain.optimizer="adam"\nnewtrain.loss="mse"\nnewtrain.hidden_size=400\nnewtrain.weight_decay=0'
+        
         gin.parse_config_files_and_bindings([], bindings=config)
         # Log the gin bindings of newtrain
         for name, val in gin.get_bindings(newtrain).items():
