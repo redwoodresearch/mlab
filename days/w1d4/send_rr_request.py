@@ -71,13 +71,13 @@ def create_json(gin_configs, filename):
 if __name__ == "__main__":
     grid_values = {
         # "newtrain.learning_rate" : np.geomspace(1e-1, 1e-3, 2),
-        "newtrain.learning_rate" : [ 0.001 ] # don't spam the the job queue
+        "newtrain.learning_rate" : [0.001], # don't spam the the job queue
         "newtrain.momentum" :  [0.9],
         "newtrain.epochs" : [16],
         "newtrain.optimizer" : ["adam"],
         "newtrain.loss" : ["mse"],
         #"newtrain.hidden_size" : [400, 800],
-        "newtrain.hidden_size": [400] # "don't spam the job queue
+        "newtrain.hidden_size": [400], # "don't spam the job queue
         "newtrain.weight_decay" : [0],
     }
     grid = make_grid(grid_values)
