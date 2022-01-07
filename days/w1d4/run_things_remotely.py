@@ -1,5 +1,7 @@
 import subprocess
 import requests
+from functools import reduce
+from operator import mul
 
 def make_tasks(possible_values):
     size = reduce(mul, map(len, possible_values.values()))
