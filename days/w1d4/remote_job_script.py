@@ -108,7 +108,7 @@ if __name__ == "__main__":
         workspace="msimontaylor",
     )
     experiment.log_parameters({x.split('=')[0]: x.split('=')[1] for x in hyperparams_list})
-    
+    print(current)
     with gin.unlock_config():
-        gin.parse_config_files_and_bindings(["config.gin"], hyperparams_list)
+        gin.parse_config_files_and_bindings([os.path.join(current, "days/w1d4/config.gin")], hyperparams_list)
         model = train(train_dataloader=data_train, test_dataloader=data_test)  
