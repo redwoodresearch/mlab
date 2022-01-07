@@ -109,6 +109,8 @@ possible_values = {
     "gin_train.betas": [(0.9, 0.999)]
 }
 
+print(os.system("echo $PARAMS")
+
 def hyperparam_search(possible_values):
     grid = make_grid(possible_values)
     for hyperparams in grid:

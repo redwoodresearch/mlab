@@ -19,7 +19,7 @@ json_dict = {
     "tasks": [{
         "priority": 1,
         "parameters": { # these are environment variables
-        "gin_config": "days/w1d4/config.gin",
+            "gin_config": "days/w1d4/config.gin",
     }}],
     "scheduling_requirements": {"schedulability": True, "resource_options": [["A100"], ["RTX3090"], ["V100"]]},
 }
