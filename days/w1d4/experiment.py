@@ -115,10 +115,12 @@ from time import time
 @gin.configurable
 def trains(model, data_train, data_test, num_epochs):
     start_time = time()
+    num_epochs_used = 0
     # for _ in range(num_epochs):
     while time() - start_time < 60:
         train(model=model, dataloader=data_train)
-    return evaluate(model, data_train)
+        num_epochs_used += 1
+    return num_epochs_used, evaluate(model, data_train)
 
 with gin.unlock_config():
     json_loaded = json.loads(os.environ['PARAMS'])
@@ -131,6 +133,7 @@ with gin.unlock_config():
     hidden_size = gin.get_bindings(RaichuModel)['H']
     experiment.log_parameter('hidden_size', hidden_size)
     model = RaichuModel(P=2, K=3)
-    test_loss = trains(model, data_train, data_test)
+    num_epochs_used, test_loss = trains(model, data_train, data_test)
+    experiment.log_metric('num_epochs_used', num_epochs_used)
     experiment.log_metric('test_loss', test_loss)
     experiment.end()
