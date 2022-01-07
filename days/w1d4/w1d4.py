@@ -95,6 +95,7 @@ def evaluate(model, dataloader):
 
 @gin.configurable
 def run(hidden_size):
+    experiment.log_parameter("hidden size", hidden_size)
     fname = "days/w1d4/mona.jpg"
     data_train, data_test = load_image(fname)
     model = Net(2, hidden_size, 3)
@@ -109,9 +110,12 @@ def train(model, data_train, data_test, epochs, lr):
     # except KeyError:
     #     raise ValueError("This is not a valid optimiser")
     opt = Adam(params=model.parameters(), lr=lr)
+    experiment.log_parameter("lr", lr)
     for epoch in range(epochs):
         epoch_loss = train_epoch(model, data_train, opt)
         test_loss = evaluate(model, data_test)
+        experiment.log_metric("train epoch loss", epoch_loss, epoch=epoch)
+        experiment.log_metric("test epoch loss", test_loss, epoch=epoch)
         print(f"{epoch}/{epochs}\t train loss={epoch_loss:.3f}\t test loss={test_loss:.3f}")
 
 if __name__ == "__main__":
