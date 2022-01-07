@@ -1,6 +1,5 @@
 from comet_ml import Experiment
 import torch
-import w1d4_tests
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,6 +8,32 @@ import time
 import numpy as np
 import os
 import json
+
+import einops
+from PIL import Image
+from torchvision import transforms
+from torch.utils.data import DataLoader, TensorDataset
+
+def load_image(fname, n_train=8192, batch_size=128):
+    img = Image.open(fname)
+    tensorize = transforms.ToTensor()
+    img = tensorize(img)
+    img = einops.rearrange(img, "c h w -> h w c")
+    height, width = img.shape[:2]
+
+    n_trn = n_train
+    n_tst = 1024
+    X1 = torch.randint(0, height, (n_trn + n_tst,))
+    X2 = torch.randint(0, width, (n_trn + n_tst,))
+    X = torch.stack([X1.float() / height - 0.5, X2.float() / width - 0.5]).T
+    Y = img[X1, X2] - 0.5
+
+    Xtrn, Xtst = X[:n_trn], X[n_trn:]
+    Ytrn, Ytst = Y[:n_trn], Y[n_trn:]
+
+    dl_trn = DataLoader(TensorDataset(Xtrn, Ytrn), batch_size=batch_size, shuffle=True)
+    dl_tst = DataLoader(TensorDataset(Xtst, Ytst), batch_size=batch_size)
+    return dl_trn, dl_tst
 
 class MLP(nn.Module):
     def __init__(self, P, H, K):
@@ -135,8 +160,7 @@ class Adam():
 def newtrain(learning_rate, momentum, epochs, optimizer, loss, hidden_size, weight_decay):
     IMAGE_NAME = "cat.jpg"
     model = MLP(2, hidden_size, 3)
-    print("w1d4_tests attributes", w1d4_tests.__dict__.keys())
-    data_train, data_test =  w1d4_tests.load_image(IMAGE_NAME)
+    data_train, data_test =  load_image(IMAGE_NAME)
     if optimizer == "adam":
         optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     elif optimizer == "rmsprop":

@@ -8,6 +8,7 @@ import gin
 import time
 import numpy as np
 import os
+import json
 
 class MLP(nn.Module):
     def __init__(self, P, H, K):
@@ -175,8 +176,10 @@ if __name__ == "__main__":
             workspace="tomtseng",
         )
         print("Running with the following gin bindings")
-        print(os.environ["gin_config"])
-        gin.parse_config_files_and_bindings([], bindings=os.environ["gin_config"])
+        print(os.environ["PARAMS"]) 
+        env_params = json.loads(os.environ["PARAMS"])
+        config = env_params["gin_config"]
+        gin.parse_config_files_and_bindings([], bindings=config)
         # Log the gin bindings of newtrain
         for name, val in gin.get_bindings(newtrain).items():
             if type(val) in [str, int, float]:
