@@ -1,11 +1,12 @@
+import os
+
+os.system("pip install -r ../../requirements.txt")
+
 import gin
 from comet_ml import Experiment
 import torch
 import w1d4_tests
 import matplotlib.pyplot as plt
-import os
-
-os.system("pip install -r ../../requirements.txt")
 
 
 class MyModule(torch.nn.Module):
