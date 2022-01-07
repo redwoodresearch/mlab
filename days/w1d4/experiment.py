@@ -26,6 +26,7 @@ import numpy as np
 import w1d4_tests
 import matplotlib.pyplot as plt
 import gin
+import json
 
 fname = "days/w1d4/raichu.png"
 
@@ -116,7 +117,9 @@ def trains(model, data_train, data_test, num_epochs):
     return evaluate(model, data_train)
 
 with gin.unlock_config():
-    config = os.environ['gin_config'].split('\n')
+    json_loaded = json.loads(os.environ['PARAMS'])
+    print(json_loaded)
+    config = json_loaded["gin_config"]
     gin.parse_config_files_and_bindings(["config.gin"], bindings=config)
     experiment = Experiment(**experiment_params)
     log_lr = np.log10(gin.get_bindings(Adam)['lr'])
