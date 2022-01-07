@@ -1,4 +1,5 @@
 import os
+import json
 
 os.system("pip install -r ./requirements.txt")
 
@@ -64,7 +65,7 @@ def training_loop(data_train, data_test, lr, momentum, epochs, hidden_size):
 
 data_train, data_test = w1d4_tests.load_image("days/w1d4/pic.jpg")
 
-config = os.getenv("gin_config")
+config = json.loads(os.getenv("PARAMS"))["gin_config"]
 with gin.unlock_config():
     gin.parse_config(config)
     experiment = Experiment(
