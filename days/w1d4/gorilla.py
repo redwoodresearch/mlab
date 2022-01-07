@@ -23,7 +23,7 @@ from optim import MLABOptim
 
 EXPERIMENT = Experiment(
     api_key="qjxcybqq2HsGHbEwATgNiqWgE",
-    project_name="mlab_w1d4_v3",
+    project_name="mlab_w1d4_v4",
     workspace="ttwang",
     auto_metric_logging=False,
 )

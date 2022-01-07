@@ -5,10 +5,10 @@ import numpy as np
 TOKEN = "tao-1637086550-0-0a7d7030fbb8e316da58c6afce7c6315"
 REPO_NAME = "redwoodresearch/mlab"
 PATH_TO_MY_FILE = "days/w1d4/gorilla.py"
-GIT_COMMIT = "93318699f1c98312c26b6708ca5182e14e1fb67e"
+GIT_COMMIT = "b43b6f9c21e4d701be2957a6f953eecc75edb027"
 BRANCH_NAME = "tony"
 API_URL = "https://jobs.redwoodresearchcompute.com:10101/api"
-JOB_NAME = "mlab_w1d4_0_beth_tony"
+JOB_NAME = "mlab_w1d4_1_beth_tony"
 
 json_dict = {
     "token": TOKEN,
@@ -41,7 +41,10 @@ def make_grid(possible_values: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
 
 example = {
     "optim.Adam.lr": np.geomspace(1e-1, 1e-3, 3),
-    "MyNet.H": [768, 1024],
+    "MyNet.H": [100, 1000, 10000],
+    "optim.Adam.weight_decay": np.geomspace(1e-9, 1, 4),
+    "train.n_train": [5000, 50000],
+    "train.n_epochs": [5,50,500],
 }
 
 
