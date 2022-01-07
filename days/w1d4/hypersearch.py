@@ -62,7 +62,7 @@ def training_loop(data_train, data_test, lr, momentum, epochs, hidden_size):
         experiment.log_metric("test_loss", test_loss[i])
 
 
-data_train, data_test = w1d4_tests.load_image("pic.jpg")
+data_train, data_test = w1d4_tests.load_image("./pic.jpg")
 
 config = os.getenv("gin_config")
 with gin.unlock_config():
