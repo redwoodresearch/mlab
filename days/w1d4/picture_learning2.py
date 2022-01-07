@@ -158,7 +158,7 @@ class Adam():
     
 @gin.configurable
 def newtrain(learning_rate, momentum, epochs, optimizer, loss, hidden_size, weight_decay):
-    IMAGE_NAME = "cat.jpg"
+    IMAGE_NAME = "days/w1d4/cat.jpg"
     model = MLP(2, hidden_size, 3)
     data_train, data_test =  load_image(IMAGE_NAME)
     if optimizer == "adam":
