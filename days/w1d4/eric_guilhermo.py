@@ -1,3 +1,6 @@
+import os
+os.system("pip install -r ../../requirements.txt")
+
 from comet_ml import Experiment
 from operator import mul
 from functools import reduce
@@ -103,7 +106,7 @@ possible_values = {
     "Model.P": [2],
     "Model.H": [100],
     "Model.K": [3],
-    "gin_train.betas": [(0.9, 0.999)s]
+    "gin_train.betas": [(0.9, 0.999)]
 }
 
 def hyperparam_search(possible_values):
