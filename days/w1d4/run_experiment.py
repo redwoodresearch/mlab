@@ -13,7 +13,7 @@ import gin
 import os
 os.system("pip install -r ../../requirements.txt")
 
-data_train, data_test = w1d4_tests.load_image('pineapple.jpg')
+data_train, data_test = w1d4_tests.load_image('days/w1d4/pineapple.jpg')
 
 @gin.configurable
 def train(model: nn.Module, dataloader, lr, momentum, experiment=None, epochs=1):
