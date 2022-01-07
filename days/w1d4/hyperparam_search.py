@@ -77,7 +77,6 @@ def train_and_plot(model, train_dataloader, test_dataloader, epochs, plot=True, 
         plt.show()
 
 if __name__ == "__main__":
-    print(os.abspath())
     print(os.listdir())
     fname = "img.jpg"
     data_train, data_test = tests.load_image(fname)
