@@ -1,0 +1,6 @@
+_MLP.in_dim = 2
+_MLP.hidden_dim = 32
+_MLP.out_dim = 1
+
+_train.lr = 0.1
+_train.momentum = 0.9

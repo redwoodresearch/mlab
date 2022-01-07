@@ -76,7 +76,7 @@ def run_experiment(hyper_dict):
 
 
     with gin.unlock_config():
-        gin.parse_config_files_and_bindings(["/home/ubuntu/mlab/tmp_mary/config.gin"], 
+        gin.parse_config_files_and_bindings(["config.gin"], 
                                             bindings=[f"{k}={v}" for k, v in hyper_dict.items()])
 
         for name, val in gin.get_bindings(_MLP).items():
