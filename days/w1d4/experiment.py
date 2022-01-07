@@ -1,18 +1,22 @@
 from comet_ml import Experiment
 
-experiment_params = {
+ben_experiment_params = {
     'api_key': "absncaDYNLt6jpNh1Ez0OIVTe",
     'project_name': "mlab",
     'workspace': "bmillwood",
 }
 
-arthur_experiment_params = Experiment(
-    api_key="cWQ5thtmlU2pZH62GZVFghchU",
-    project_name="general",
-    workspace="arthurconmy",
-)
+arthur_experiment_params = {
+    'api_key': "cWQ5thtmlU2pZH62GZVFghchU",
+    'project_name': "general",
+    'workspace': "arthurconmy",
+}
+import sys
 
-experiment = Experiment(**experiment_params)
+if "--arthur" in sys.argv:
+    experiment_params = arthur_experiment_params
+else:
+    experiment_params = ben_experiment_params
 
 import torch as t
 import numpy as np
@@ -102,33 +106,16 @@ def evaluate(model, dataloader):
         cumulative_loss += loss.detach()
     return cumulative_loss / len(dataloader)
 
-def log_gin_parameter(configurable, name):
-    experiment.log_parameter(name, gin.get_bindings(configurable)[name])
-
 @gin.configurable
 def trains(model, data_train, data_test, num_epochs):
-    results = []
     for _ in range(num_epochs):
         train(model=model, dataloader=data_train)
-    log_gin_parameter(Adam, 'lr')
-    log_gin_parameter(RaichuModel, 'H')
-    experiment.log_metric('test_loss', evaluate(model, data_train))
-
-def plot_qualities():
-    qualities = trains(model=model, data_train=data_train, data_test=data_test)
-    train_qualities = list(map(lambda x: x[0], qualities))
-    test_qualities = list(map(lambda x: x[1], qualities))
-    plt.scatter(list(range(len(train_qualities))), train_qualities, label="train loss")
-    plt.scatter(list(range(len(test_qualities))), test_qualities, label="test loss")
-    plt.legend()
-    plt.show()
-    # fig = plt.figure()
-    # fig.savefig("lossy2.png")
+    return evaluate(model, data_train)
 
 config_space = []
 
-for lr in np.logspace(-4, 1, num=5):
-    for H in [50, 100, 150, 200]:
+for lr in [1e-3, 1e-2]:
+    for H in [100, 150, 200, 250, 300]:
         config = [
             f"RaichuModel.H = {H}",
             f"Adam.lr = {lr}"
@@ -138,5 +125,12 @@ for lr in np.logspace(-4, 1, num=5):
 for config in config_space:
     with gin.unlock_config():
         gin.parse_config_files_and_bindings(["config.gin"], bindings=config)
-        model=RaichuModel(P=2, K=3)
-        trains(model, data_train, data_test)
+        experiment = Experiment(**experiment_params)
+        log_lr = np.log10(gin.get_bindings(Adam)['lr'])
+        experiment.log_parameter('log_lr', log_lr)
+        hidden_size = gin.get_bindings(RaichuModel)['H']
+        experiment.log_parameter('hidden_size', hidden_size)
+        model = RaichuModel(P=2, K=3)
+        test_loss = trains(model, data_train, data_test)
+        experiment.log_metric('test_loss', test_loss)
+        experiment.end()
