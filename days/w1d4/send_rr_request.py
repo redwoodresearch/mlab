@@ -81,7 +81,7 @@ if __name__ == "__main__":
         "newtrain.weight_decay" : [0],
     }
     grid = make_grid(grid_values)
-    json = create_json(grid, "days/w1d4/picture_learning2.py")
+    json = create_json(grid, "days/w1d4/run_picture_learning.py")
     print("sending job", json)
     response = requests.post("https://jobs.redwoodresearchcompute.com:10101/api", json=json)
     print(response)
