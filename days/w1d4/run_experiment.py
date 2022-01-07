@@ -11,6 +11,7 @@ import w1d4_sol as sol
 import gin
 
 import os
+import json
 os.system("pip install -r ../../requirements.txt")
 
 data_train, data_test = w1d4_tests.load_image('days/w1d4/pineapple.jpg')
@@ -39,5 +40,6 @@ def run_experiment(params):
         train(m, data_train)
 
 
-run_experiment(os.environ['PARAMS']["gin_config"])
+print(os.environ['PARAMS'])
+run_experiment(json.loads(os.environ['PARAMS'])['gin_config'])
 # run_experiment('train.lr=.01\ntrain.epochs=1\ntrain.momentum=.9')
