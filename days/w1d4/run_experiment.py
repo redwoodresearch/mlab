@@ -37,8 +37,7 @@ def run_experiment(params):
         experiment.log_parameter('hyperparameters', params)
         m = sol._MLP(in_dim=2, hidden_dim=400, out_dim=3)
         train(m, data_train)
-        experiment.end()
 
 
-run_experiment(os.environ['PARAMS'].gin_config)
+run_experiment(os.environ['PARAMS']["gin_config"])
 # run_experiment('train.lr=.01\ntrain.epochs=1\ntrain.momentum=.9')
