@@ -4,7 +4,8 @@ import json
 if "PARAMS" in os.environ:
     print(os.environ["PARAMS"])
     if "RR_JOBS" in json.loads(os.environ["PARAMS"]):
-        os.system("pip install -r ../../requirements.txt")
+        print('Is RR job, pip installing')
+        os.system("pip install -r requirements.txt")
 from comet_ml import Experiment
 
 from typing import Callable, Dict, Iterable, Tuple, Any
