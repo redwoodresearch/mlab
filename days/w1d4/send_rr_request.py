@@ -81,7 +81,7 @@ if __name__ == "__main__":
     grid = make_grid(grid_values)
     for config in grid:
         js = job_str(config)
-        json = create_json(config, "days/w1d4/picture_learning.py")
+        json = create_json(js, "days/w1d4/picture_learning.py")
         print("sending job", json)
         response = requests.post("https://jobs.redwoodresearchcompute.com:10101/api", json=json)
         print(response)
