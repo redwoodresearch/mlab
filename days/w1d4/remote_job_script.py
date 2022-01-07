@@ -84,7 +84,8 @@ def make_grid(possible_values):
 
 
 if __name__ == "__main__":
-    fname = "/home/ubuntu/mlab/days/w1d4/hst-bw_orig.jpg"
+    current = os.getcwd()
+    fname = os.path.join(current,"days/w1d4/hst-bw_orig.jpg")
     height, width = 800, 800
     data_train, data_test =  w1d4_tests.load_image(fname)
 
