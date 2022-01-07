@@ -85,7 +85,7 @@ def evaluate(model, dataloader):
 
 @gin.configurable
 def run(hidden_size):
-    fname = "mona.jpg"
+    fname = "days/w1d4/mona.jpg"
     data_train, data_test = load_image(fname)
     model = Net(2, hidden_size, 3)
     train(model, data_train, data_test)
@@ -107,5 +107,6 @@ def train(model, data_train, data_test, epochs, lr):
 if __name__ == "__main__":
     with gin.unlock_config():
         # gin.parse_config_file(config_file="config.gin")
+        # print("in w1d4", os.environ)
         gin.parse_config(eval(os.environ["PARAMS"])["gin_config"])
         run()
