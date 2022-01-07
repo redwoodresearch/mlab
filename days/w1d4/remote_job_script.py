@@ -11,6 +11,7 @@ import itertools
 import numpy as np
 import requests
 import os
+import json
 
 """
 ThreeLayerNN
@@ -90,8 +91,13 @@ if __name__ == "__main__":
     data_train, data_test =  w1d4_tests.load_image(fname)
 
     # Extracting things from json_dict to run experiment
-    COMET_KEY = os.environ["COMET_KEY"]
-    HYPERPARAMS = os.environ["gin_config"]
+    PARAMS = os.environ["PARAMS"]
+    print(PARAMS)
+    params = json.loads(PARAMS)
+    print(params)
+
+    COMET_KEY = params["COMET_KEY"]
+    HYPERPARAMS = params["gin_config"]
 
     hyperparams_list = HYPERPARAMS.split('\n')
 
