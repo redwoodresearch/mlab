@@ -1,5 +1,6 @@
 import pycuda.autoinit as _
 import pycuda.driver as drv
+from pycuda.compiler import SourceModule
 import torch
 
 # must be called before using pycuda. (theoretically torch.cuda.init() is
@@ -20,3 +21,8 @@ class Holder(drv.PointerHolderBase):
 
 def ceil_divide(a, b):
     return (a + b - 1) // b
+
+
+def load_module(filename):
+    with open(filename) as f:
+        return SourceModule(f.read())

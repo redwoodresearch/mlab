@@ -17,6 +17,7 @@ __device__ void syncthreads() {
 template <int block_size>
 __device__ void simple_sum_block_overall(const float *inp, float *dest,
                                          int size) {
+  const int block_size = 512;                                             
   static __shared__ float data[block_size];
   assert(blockDim.x == block_size);
 
@@ -28,7 +29,6 @@ __device__ void simple_sum_block_overall(const float *inp, float *dest,
     data[tidx] = inp[idx];
   }
 
-#pragma unroll
   for (int chunk_size = block_size / 2; chunk_size > 0; chunk_size /= 2) {
     syncthreads();
     if (tidx < chunk_size) {
