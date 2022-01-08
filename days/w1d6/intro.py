@@ -9,8 +9,9 @@ from pycuda_utils import Holder, load_module
 mod = load_module('intro.cu')
 zero_kernel = mod.get_function('zero')
 one_kernel = mod.get_function('one')
+write_x_kernel = mod.get_function('WriteThreadX')
 dest = torch.ones(128, dtype=torch.float32).cuda()
-zero_kernel(Holder(dest), block=(64, 1, 1), grid=(1, 1))
+write_x_kernel(Holder(dest), block=(64, 1, 1), grid=(1, 1))
 
 # Kernels run async by default, so we call synchronize() before using values.
 torch.cuda.synchronize()
