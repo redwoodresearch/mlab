@@ -6,7 +6,7 @@ from pycuda.compiler import SourceModule
 
 from pycuda_utils import Holder, load_module
 
-mul_add_mod = SourceModule(open('chris_mul_add.cu').read())
+mul_add_mod = load_module('abc_soln.cu')
 mul_add_kernel = mul_add_mod.get_function("mul_add")
 
 size = 128
@@ -22,3 +22,5 @@ mul_add_kernel(Holder(dest),
                grid=(1, 1))
 torch.cuda.synchronize()
 print(dest)
+
+assert torch.allclose(dest, a * b + c)
