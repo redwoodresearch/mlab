@@ -18,3 +18,16 @@ __global__ void sum_shared(int32_t* in, int64_t size, int32_t* out) {
     out[blockIdx.x] = buf[0];
   }
 }
+
+__global__ void sum_block_shfl(int32_t* in, int64_t size, int32_t* out) { 
+  const size_t offset = BLOCK_SIZE * blockIdx.x;
+  const size_t i = threadIdx.x;
+  const size_t in_idx = offset + i;
+  int32_t val = in_idx < size ? in[in_idx] : 0;
+  for (size_t gap = BLOCK_SIZE / 2; gap > 0; gap /= 2) {
+    val += __shfl_down_sync(0xffffffff, val, gap);
+  }
+  if (i == 0) {
+    out[blockIdx.x] = val;
+  }
+}
