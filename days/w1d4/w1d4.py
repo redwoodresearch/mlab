@@ -72,6 +72,8 @@ def evaluate(model, dataloader):
     model.eval()
     tot_loss = 0
     for x, y in dataloader:
+        x = x.to(device)
+        y = y.to(device)
         pred = model(x)
         tot_loss += (pred-y).abs().mean()
     return (tot_loss / len(dataloader)).item()
