@@ -6,7 +6,7 @@ __global__ void index(
     int64_t bSize
 )
 {
-    int64_t i = threadIdx.x + blockIdx.x * blockDim.x;
+    int64_t i = threadIdx.x + static_cast<int64_t>(blockIdx.x) * blockDim.x;
     if(i >= bSize) {
         return;
     }
