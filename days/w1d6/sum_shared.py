@@ -12,23 +12,31 @@ DEVICE = torch.device('cuda:0')
 cuda_module = load_module("sum_shared.cu")
 kernel = cuda_module.get_function("sum_shared")
 
-def run_benchmark(input_size):
-    BLOCK_SIZE = 512
-    assert input_size % BLOCK_SIZE == 0
-    input_values = torch.randint(1, 3, (input_size,), dtype=torch.int32, device=DEVICE)
-    num_blocks = ceil_divide(input_size, BLOCK_SIZE)
-    def run_kernel():
-        dest = torch.empty(num_blocks, dtype=torch.int32, device=DEVICE)
-        kernel(Holder(input_values), Holder(dest), block=(BLOCK_SIZE, 1, 1), grid=(num_blocks, 1))
-        torch.cuda.synchronize()
-        return dest
-    time = benchmark(run_kernel, iters=1)
-    print("time", time)
+BLOCK_SIZE = 512
+TYPE = torch.int32
 
-    expected = input_values.sum()
-    result = run_kernel().sum()
-    print("result", result)
-    print("expected", expected)
+def block_sum(vals):
+    while True:
+        size = vals.shape[0]
+        if (size == 1):
+            return vals.item()
+        num_blocks = ceil_divide(size, BLOCK_SIZE)
+        dest = torch.empty(num_blocks, dtype=TYPE, device=DEVICE)
+        kernel(Holder(vals), np.int64(size), Holder(dest), 
+               block=(BLOCK_SIZE, 1, 1), grid=(num_blocks, 1))
+        vals = dest
+
+
+def run_benchmark(input_size):
+    vals = torch.randint(1, 3, (input_size,), dtype=TYPE, device=DEVICE)
+    time = benchmark(lambda: block_sum(vals), iters=3)
+    print(f"size={input_size} time={time}")
+
+    expected = vals.sum().item()
+    result = block_sum(vals)
+    # print("result", result)
+    # print("expected", expected)
     assert result == expected
 
-run_benchmark(5120)
+for size in [1000000, 100000000]:
+    run_benchmark(size)
