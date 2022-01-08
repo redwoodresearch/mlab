@@ -3,9 +3,9 @@ from comet_ml import Experiment
 
 # Create an experiment with your api key
 experiment = Experiment(
-    api_key="72XQSdnwnBcob4Q8NpbJHewll",
-    project_name="w1d4 gridsearch",
-    workspace="danielb",
+    api_key="EVwneUg4V62GWa4Vpu1JcjzpF",
+    project_name="mlab-w1d4",
+    workspace="nixgd",
 )
 
 import os
