@@ -90,7 +90,6 @@ def log_image(model, fname):
     vals = vals.reshape((height, width, 3))
     vals = torch.clip(vals + 0.5, 0, 1)
     experiment.log_image(vals.permute([1,0,2]))
-    return vals.detach().numpy()
 
 @gin.configurable
 def run(hidden_size):
