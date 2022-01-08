@@ -21,6 +21,7 @@ from torch.utils.data import DataLoader, TensorDataset
 import einops
 from optims import SGD, RMSProp, Adam
 
+os.system("pip install -r ../../requirements.txt")
 
 def load_image(fname, n_train=8192, batch_size=128):
     img = Image.open(fname)
@@ -78,20 +79,13 @@ def evaluate(model, dataloader):
         tot_loss += (pred-y).abs().mean()
     return (tot_loss / len(dataloader)).item()
 
-# epochs = 50
-# model = Net(2, 400, 3)
-# opt = Adam(model.parameters(), lr=0.01)
-
-# training_loss = []
-# eval_loss = []
-# for epoch in range(epochs):
-#     training_loss.append(train(model, data_train, opt=opt))
-#     eval_loss.append(evaluate(model, data_test))
-
-# plt.plot(training_loss, label="train")
-# plt.plot(eval_loss, label="eval")
-# plt.legend()
-# def setup_optim(opt_str, params, lr, )
+def log_image(model, fname):
+    size = Image.open(fname).size
+    coords = torch.tensor([(x,y) for x in torch.linspace(-0.5, 0.5, size[1]) for y in torch.linspace(-0.5, 0.5, size[0])], dtype=torch.float)
+    vals = model(coords)
+    vals_rearr = einops.rearrange(vals, '(x y) c -> x y c', x=size[1])
+    vals_rearr += 0.5
+    experiment.log_image(vals_rearr)
 
 @gin.configurable
 def run(hidden_size):
@@ -100,10 +94,12 @@ def run(hidden_size):
     data_train, data_test = load_image(fname)
     model = Net(2, hidden_size, 3)
     train(model, data_train, data_test)
-    model_file = "days/w1d4/model.pt"
-    # torch.save(model.state_dict(), model_file)
-    # experiment.log_model("OurNet", model_file)
 
+    model_file = "days/w1d4/model.pt"
+    torch.save(model.state_dict(), model_file)
+    experiment.log_model("OurNet", model_file)
+
+    log_image(model, fname)
 
 @gin.configurable
 # def train(model, dataloader, opt_str, epochs, learning_rate, loss):
@@ -121,9 +117,6 @@ def train(model, data_train, data_test, epochs, lr):
         experiment.log_metric("test epoch loss", test_loss, epoch=epoch)
         print(f"{epoch}/{epochs}\t train loss={epoch_loss:.3f}\t test loss={test_loss:.3f}")
 
-        if epoch == 40:
-            torch.save(model.state_dict(), model_file)
-            experiment.log_model("OurNet", model_file, overwrite=True)
 
 
 if __name__ == "__main__":
