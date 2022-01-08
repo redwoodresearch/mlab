@@ -12,23 +12,20 @@ import os
 from collections import OrderedDict
 import torch
 from torch import nn
-# import w1d4_tests
-import matplotlib.pyplot as plt
 import gin
 from PIL import Image
-from torchvision import transforms
 from torch.utils.data import DataLoader, TensorDataset
 import einops
 from optims import SGD, RMSProp, Adam
 
+print(os.system())
 os.system("pip install -r requirements.txt")
 
 def load_image(fname, n_train=8192, batch_size=128):
-    img = Image.open(fname)
-    tensorize = transforms.ToTensor()
-    img = tensorize(img)
-    img = einops.rearrange(img, "c h w -> h w c")
-    height, width = img.shape[:2]
+    pil_img = Image.open(fname)
+    height, width = pil_img.size[:2]
+    img = torch.tensor(pil_img.getdata())
+    img = einops.rearrange(img, "(h w) c -> h w c", h=height)
 
     n_trn = n_train
     n_tst = 1024
