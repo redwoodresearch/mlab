@@ -10,3 +10,6 @@ image*
 infrastructure/.lambda_account.json
 .hypothesis
 launch.json
+
+.*.swp
+.*.swo
