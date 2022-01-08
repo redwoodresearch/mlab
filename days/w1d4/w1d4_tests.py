@@ -1,7 +1,7 @@
 import einops
 import matplotlib.pyplot as plt
 from PIL import Image
-from sklearn.datasets import make_moons
+# from sklearn.datasets import make_moons
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -12,13 +12,13 @@ from typing import Tuple
 import w1d4_sol as sol
 
 
-def _get_moon_data(unsqueeze_y = False):
-    X, y = make_moons(n_samples=512, noise=0.05, random_state=354)
-    X = torch.tensor(X, dtype=torch.float32)
-    y = torch.tensor(y, dtype=int)
-    if unsqueeze_y: # better when the training regimen uses l1 loss, rather than x-ent 
-        y = y.unsqueeze(-1)
-    return DataLoader(TensorDataset(X, y), batch_size=128, shuffle=True)
+# def _get_moon_data(unsqueeze_y = False):
+#     X, y = make_moons(n_samples=512, noise=0.05, random_state=354)
+#     X = torch.tensor(X, dtype=torch.float32)
+#     y = torch.tensor(y, dtype=int)
+#     if unsqueeze_y: # better when the training regimen uses l1 loss, rather than x-ent 
+#         y = y.unsqueeze(-1)
+#     return DataLoader(TensorDataset(X, y), batch_size=128, shuffle=True)
 
 
 def _check_equal(tensor1, tensor2):

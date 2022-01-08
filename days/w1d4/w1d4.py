@@ -20,8 +20,8 @@ from optims import SGD, RMSProp, Adam
 def load_image(fname, n_train=8192, batch_size=128):
     pil_img = Image.open(fname)
     height, width = pil_img.size[:2]
-    img = torch.tensor(pil_img.getdata())
-    img = img.reshape((height, width, 3))
+    img = torch.tensor(pil_img.getdata()) / 255
+    img = img.reshape((width, height, 3)).permute((1,0,2))
 
     n_trn = n_train
     n_tst = 1024
@@ -73,13 +73,17 @@ def evaluate(model, dataloader):
     return (tot_loss / len(dataloader)).item()
 
 def log_image(model, fname):
-    height, width = Image.open(fname).size
+    model.eval()
+    o_height, o_width = Image.open(fname).size
+    res = 400
+    height, width = res, int(o_width*(res/o_height))
     coords = torch.tensor([(x,y) for x in torch.linspace(-0.5, 0.5, height) for y in torch.linspace(-0.5, 0.5, width)], dtype=torch.float)
     vals = model(coords)
     # einops.rearrange(vals, '(x y) c -> x y c', x=size[1])
-    vals_rearr = vals.reshape((height, width, 3))
-    vals_rearr += 0.5
-    experiment.log_image(vals_rearr)
+    vals = vals.reshape((height, width, 3))
+    vals = torch.clip(vals + 0.5, 0, 1)
+    experiment.log_image(vals.permute([1,0,2]))
+    return vals.detach().numpy()
 
 @gin.configurable
 def run(hidden_size):
