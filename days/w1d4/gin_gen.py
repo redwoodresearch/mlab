@@ -11,7 +11,6 @@ def make_grid(possible_values):
         for value_combo in value_combinations
     ]
 
-
 search_space = {
     "train.lr": np.geomspace(1e-1, 1e-3, 1),
     # "run.hidden_size": [100, 400, 700, 1000]
