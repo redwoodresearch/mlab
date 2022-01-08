@@ -330,3 +330,5 @@ def hpsearch(name, fn_path, base_config, search_spec):
     if action == "archive":
         rrjobs_connection.send({"kind": "archiveJobs", "jobs": [interface.job_id]})
     rrjobs_connection.close()
+
+def hpsearch_jupyter
