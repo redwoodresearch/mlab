@@ -89,7 +89,7 @@ def log_image(model, fname):
     # einops.rearrange(vals, '(x y) c -> x y c', x=size[1])
     vals = vals.reshape((height, width, 3))
     vals = torch.clip(vals + 0.5, 0, 1)
-    experiment.log_image(vals.permute([1,0,2]))
+    experiment.log_image(vals.permute([1,0,2]).to("cpu"))
 
 @gin.configurable
 def run(hidden_size):
