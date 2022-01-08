@@ -10,8 +10,8 @@ import uuid
 import math
 import traceback
 import sys
-import rrjobs.backend.rrjobs as rrjobs  # type: ignore
-
+import rrjobs  # type: ignore
+import itertools
 from itertools import chain, product, repeat
 from typing import Any, Callable, Iterable
 from dataclasses import dataclass
@@ -28,8 +28,9 @@ import gin
 
 from pathlib import Path
 
-from rrutils import remote
-from adversarial.utils import get_computer_name, import_object_from_qualified_name, to_jsonable
+from utils import (
+    import_object_from_qualified_name,
+)
 
 from typing import Optional, Union
 
@@ -161,7 +162,9 @@ class Interface:
             # Print the last few lines of stdout/stderr for this task.
             for line in self.tasks_last_few_lines[task_id].contents:
                 self.width_limiting_print(line)
-        self.width_limiting_print(f"\x1b[94m=====\x1b[0m https://jobs.redwoodresearchcompute.com/jobs/j{self.job_id}")
+        self.width_limiting_print(
+            f"\x1b[94m=====\x1b[0m https://jobs.redwoodresearchcompute.com/jobs/j{self.job_id}"
+        )
         self.width_limiting_print(
             "\x1b[94m=====\x1b[0m k cancel job | K cancel+archive job | q close, keep running | l show crash logs"
         )
@@ -169,13 +172,22 @@ class Interface:
     def on_submitted(self, row):
         self.job_id = row["data"]["job_id"]
         self.task_ids = row["data"]["task_ids"]
-        self.status_rows = {task_id: {"status": "???", "return_code": None} for task_id in self.task_ids}
+        self.status_rows = {
+            task_id: {"status": "???", "return_code": None} for task_id in self.task_ids
+        }
         # line_count is the number of lines of stdout/stderr we show for each task. I split up the height for each task evenly, and round down.
-        self.line_count = max(0, math.floor((self.term_height - 5 - len(self.task_ids)) / max(1, len(self.task_ids))))
+        self.line_count = max(
+            0,
+            math.floor(
+                (self.term_height - 5 - len(self.task_ids)) / max(1, len(self.task_ids))
+            ),
+        )
         # However, make sure that the very first task in the list always gets at least 5 lines of stdout/stderr shown.
         self.first_lines = max(5, self.line_count)
         self.tasks_last_few_lines = {
-            task_id: LineCollector(self.first_lines if task_id == self.task_ids[0] else self.line_count)
+            task_id: LineCollector(
+                self.first_lines if task_id == self.task_ids[0] else self.line_count
+            )
             for task_id in self.task_ids
         }
         self.scrapes = {task_id: {"comet_url": None} for task_id in self.task_ids}
@@ -208,11 +220,15 @@ class Interface:
                 )
                 return
             if k == b"k":
-                self.width_limiting_print("\x1b[91m==========\x1b[0m Exiting, cancelling the job")
+                self.width_limiting_print(
+                    "\x1b[91m==========\x1b[0m Exiting, cancelling the job"
+                )
                 self.is_running = False
                 return "cancel"
             if k == b"K":
-                self.width_limiting_print("\x1b[91m==========\x1b[0m Exiting, cancelling + archiving the job")
+                self.width_limiting_print(
+                    "\x1b[91m==========\x1b[0m Exiting, cancelling + archiving the job"
+                )
                 self.is_running = False
                 return "archive"
             if k == b"l":
@@ -221,10 +237,14 @@ class Interface:
                     self.erase()
                     for task_id, row in self.status_rows.items():
                         if row["status"] == "crashed":
-                            self.width_limiting_print("\x1b[91m⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓ BEGIN LOGS ⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓\x1b[0m")
+                            self.width_limiting_print(
+                                "\x1b[91m⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓ BEGIN LOGS ⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓\x1b[0m"
+                            )
                             for line in self.tasks_last_few_lines[task_id].all_lines:
                                 self.width_limiting_print(line)
-                            self.width_limiting_print("\x1b[91m⇑⇑⇑⇑⇑⇑⇑⇑⇑⇑ END LOGS ⇑⇑⇑⇑⇑⇑⇑⇑⇑⇑\x1b[0m")
+                            self.width_limiting_print(
+                                "\x1b[91m⇑⇑⇑⇑⇑⇑⇑⇑⇑⇑ END LOGS ⇑⇑⇑⇑⇑⇑⇑⇑⇑⇑\x1b[0m"
+                            )
                             self.width_limiting_print(
                                 f"\x1b[91m=====\x1b[0m Task {task_id} crashed with retcode {row['return_code']}"
                             )
@@ -233,7 +253,9 @@ class Interface:
                             )
                             break
                     else:
-                        self.width_limiting_print("\x1b[91m===== No job with a crash -- hit l again to exit\x1b[0m")
+                        self.width_limiting_print(
+                            "\x1b[91m===== No job with a crash -- hit l again to exit\x1b[0m"
+                        )
                 else:
                     self.repaint()
 
@@ -243,4 +265,68 @@ class Job:
     parameters: Dict[str, Any]
     gin_config: str
 
-def hpsearch(fn_path, gin_config):
+
+def make_grid(axes):
+    return [
+        {key: value for key, value in zip(axes.keys(), values_choice)}
+        for values_choice in itertools.product(*axes.values())
+    ]
+
+
+def hpsearch(name, fn_path, base_config, search_spec):
+    base_config = open(base_config).read()
+    init_anykey()
+    interface = Interface()
+    git_commit = (
+        subprocess.check_output("git rev-parse HEAD", shell=True)
+        .decode("utf-8")
+        .strip()
+    )
+    remote_branches_str = subprocess.check_output(
+        ["git", "branch", "-r", "--contains", git_commit]
+    )
+    if not remote_branches_str:
+        print(
+            f"\x1b[91mGit commit {git_commit} doesn't appear in remote -- did you forget to git push?\x1b[0m",
+            file=sys.stderr,
+        )
+        return
+    grid = make_grid(search_spec)
+    random.shuffle(grid)
+    config_strings = [
+        base_config + "\n".join([f"{k} = {repr(v)}" for k, v in task.items()])
+        for task in grid
+    ]
+    print(config_strings[0])
+    task_specs = [
+        {
+            "priority": 1,
+            "parameters": {
+                "fn_path": fn_path,  # FIX!!!!
+                "gin_config": config_string,
+            },
+        }
+        for config_string in config_strings
+    ]
+
+    def on_open():
+        print("search onopen")
+        rrjobs_connection.submit_task(
+            name=name,
+            git_commit=git_commit,
+            tasks=task_specs,
+            command=["python", "run_fn_with_config.py"],
+            on_task_output=interface.on_task_output,
+            on_task_status=interface.on_task_status,
+            on_output_scrape=interface.on_output_scrape,
+            callback=interface.on_submitted,
+        )
+
+    rrjobs_connection = rrjobs.RRJobsConnection(on_open=on_open)
+
+    action = interface.main()
+    if action in ("cancel", "archive") and interface.task_ids:
+        rrjobs_connection.send({"kind": "killTasks", "tasks": interface.task_ids})
+    if action == "archive":
+        rrjobs_connection.send({"kind": "archiveJobs", "jobs": [interface.job_id]})
+    rrjobs_connection.close()
