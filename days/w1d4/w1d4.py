@@ -15,17 +15,13 @@ from torch import nn
 import gin
 from PIL import Image
 from torch.utils.data import DataLoader, TensorDataset
-import einops
 from optims import SGD, RMSProp, Adam
-
-print(os.system())
-os.system("pip install -r requirements.txt")
 
 def load_image(fname, n_train=8192, batch_size=128):
     pil_img = Image.open(fname)
     height, width = pil_img.size[:2]
     img = torch.tensor(pil_img.getdata())
-    img = einops.rearrange(img, "(h w) c -> h w c", h=height)
+    img = img.reshape((height, width, 3))
 
     n_trn = n_train
     n_tst = 1024
@@ -77,10 +73,11 @@ def evaluate(model, dataloader):
     return (tot_loss / len(dataloader)).item()
 
 def log_image(model, fname):
-    size = Image.open(fname).size
-    coords = torch.tensor([(x,y) for x in torch.linspace(-0.5, 0.5, size[1]) for y in torch.linspace(-0.5, 0.5, size[0])], dtype=torch.float)
+    height, width = Image.open(fname).size
+    coords = torch.tensor([(x,y) for x in torch.linspace(-0.5, 0.5, height) for y in torch.linspace(-0.5, 0.5, width)], dtype=torch.float)
     vals = model(coords)
-    vals_rearr = einops.rearrange(vals, '(x y) c -> x y c', x=size[1])
+    # einops.rearrange(vals, '(x y) c -> x y c', x=size[1])
+    vals_rearr = vals.reshape((height, width, 3))
     vals_rearr += 0.5
     experiment.log_image(vals_rearr)
 
