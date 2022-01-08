@@ -17,6 +17,8 @@ from PIL import Image
 from torch.utils.data import DataLoader, TensorDataset
 from optims import SGD, RMSProp, Adam
 
+device = "cuda"
+
 def load_image(fname, n_train=8192, batch_size=128):
     pil_img = Image.open(fname)
     height, width = pil_img.size[:2]
@@ -33,8 +35,8 @@ def load_image(fname, n_train=8192, batch_size=128):
     Xtrn, Xtst = X[:n_trn], X[n_trn:]
     Ytrn, Ytst = Y[:n_trn], Y[n_trn:]
 
-    dl_trn = DataLoader(TensorDataset(Xtrn, Ytrn), batch_size=batch_size, shuffle=True)
-    dl_tst = DataLoader(TensorDataset(Xtst, Ytst), batch_size=batch_size)
+    dl_trn = DataLoader(TensorDataset(Xtrn, Ytrn), batch_size=batch_size, shuffle=True, pin_memory=True)
+    dl_tst = DataLoader(TensorDataset(Xtst, Ytst), batch_size=batch_size, pin_memory=True)
     return dl_trn, dl_tst
 
 
@@ -57,6 +59,8 @@ def train_epoch(model, dataloader, opt):
     acc_loss = 0
     for (x, y) in dataloader:
         model.zero_grad()
+        x = x.to(device)
+        y = y.to(device)
         pred = model(x)
         loss = torch.abs(y - pred).mean()
         loss.backward()
@@ -77,7 +81,8 @@ def log_image(model, fname):
     o_height, o_width = Image.open(fname).size
     res = 400
     height, width = res, int(o_width*(res/o_height))
-    coords = torch.tensor([(x,y) for x in torch.linspace(-0.5, 0.5, height) for y in torch.linspace(-0.5, 0.5, width)], dtype=torch.float)
+    coords_list = [(x,y) for x in torch.linspace(-0.5, 0.5, height) for y in torch.linspace(-0.5, 0.5, width)]
+    coords = torch.tensor(coords_list, dtype=torch.float).to(device)
     vals = model(coords)
     # einops.rearrange(vals, '(x y) c -> x y c', x=size[1])
     vals = vals.reshape((height, width, 3))
@@ -90,7 +95,7 @@ def run(hidden_size):
     experiment.log_parameter("hidden size", hidden_size)
     fname = "days/w1d4/mona.jpg"
     data_train, data_test = load_image(fname)
-    model = Net(2, hidden_size, 3)
+    model = Net(2, hidden_size, 3).to(device)
     train(model, data_train, data_test)
 
     model_file = "days/w1d4/model.pt"
