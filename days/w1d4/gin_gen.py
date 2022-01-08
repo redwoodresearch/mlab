@@ -13,7 +13,7 @@ def make_grid(possible_values):
 
 
 search_space = {
-    "train.lr": np.geomspace(1e-1, 1e-3, 3),
+    "train.lr": np.geomspace(1e-1, 1e-3, 1),
     # "run.hidden_size": [100, 400, 700, 1000]
     # "run.hidden_size": [100, 200, 400],
     "run.hidden_size": [100, 200],

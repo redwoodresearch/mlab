@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader, TensorDataset
 import einops
 from optims import SGD, RMSProp, Adam
 
-os.system("pip install -r ../../requirements.txt")
+os.system("pip install -r requirements.txt")
 
 def load_image(fname, n_train=8192, batch_size=128):
     img = Image.open(fname)
