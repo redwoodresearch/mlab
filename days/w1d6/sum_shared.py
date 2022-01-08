@@ -39,15 +39,17 @@ def sum_block_shfl(vals):
         vals = dest
 
 
-def run_benchmark(input_size):
-    vals = torch.randint(1, 3, (input_size,), dtype=TYPE, device=DEVICE)
-    time = benchmark(lambda: sum_block_shfl(vals), iters=3)
+def run_benchmark(input_size, iters=3):
+    f = sum_block_shfl
+
+    vals = torch.randint(1, 20, (input_size,), dtype=TYPE, device=DEVICE)
+    time = benchmark(lambda: f(vals), iters=iters)
     print(f"size={input_size} time={time}")
 
     expected = vals.sum().item()
-    result = block_sum(vals)
-    # print("result", result)
-    # print("expected", expected)
+    result = f(vals)
+    print("result", result)
+    print("expected", expected)
     assert result == expected
 
 for size in [1000000, 100000000]:
