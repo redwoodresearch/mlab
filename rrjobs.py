@@ -12,8 +12,6 @@ import traceback
 import time
 from typing import *
 
-parser = argparse.ArgumentParser(description="Submit jobs to Redwood Research")
-parser.add_argument("command", nargs="+", help="augh")
 
 token_path = os.path.expanduser("~/.rrjobs-auth-token")
 
@@ -22,12 +20,15 @@ API_SERVER_HOST = f"https://{API_URL}/api"
 
 
 def get_token() -> str:
+    return "tao-1637427484-0-2c83023327cf2d6f68e492599ae49658"
     with open(token_path) as f:
         return f.read().strip()
 
 
 def api_request(request):
-    return requests.post(API_SERVER_HOST, json={**request, "token": get_token()}).json()
+    reqbody = {**request, "token": get_token()}
+    print(json.dumps(reqbody))
+    return requests.post(API_SERVER_HOST, json=reqbody).json()
 
 
 def rrjobs_auth(token: str):
@@ -48,6 +49,7 @@ def rrjobs_submit(
             "kind": "submitJob",
             "name": name,
             "git_commit": git_commit,
+            "git_repo": "redwoodresearch/mlab",
             "command": command,
             "tasks": tasks,
             "scheduling_requirements": {
@@ -87,7 +89,7 @@ class RRJobsConnection:
         self.onscrapes = {}
         self.launch_id_to_task_id = {}
 
-        websocket.enableTrace(False)
+        # websocket.enableTrace(False)
         self.ws = websocket.WebSocketApp(
             f"wss://{API_URL}/ws-api",
             on_message=self.on_message,
@@ -96,6 +98,7 @@ class RRJobsConnection:
             on_open=self.on_open,
         )
         threading.Thread(target=self.ws.run_forever).start()
+        print("init")
 
     def close(self):
         self.ws.close()
@@ -143,22 +146,26 @@ class RRJobsConnection:
                     self.onscrapes[task_id] = [on_output_scrape]
             callback(task_output)
 
-        self.send(
-            {
-                "kind": "submitJob",
-                "name": name,
-                "git_commit": git_commit,
-                "command": command,
-                "tasks": tasks,
-                "scheduling_requirements": {
-                    "schedulability": schedulability,
-                    "resource_options": resource_options,
-                },
+        reqbody = {
+            "kind": "submitJob",
+            "name": name,
+            "git_commit": git_commit,
+            "git_repo": "redwoodresearch/mlab",
+            "command": command,
+            "tasks": tasks,
+            "scheduling_requirements": {
+                "schedulability": schedulability,
+                "resource_options": resource_options,
             },
+        }
+        print(reqbody)
+        self.send(
+            reqbody,
             callback_with_onoutput,
         )
 
     def on_message(self, ws, message):
+        print("got msg")
         message = json.loads(message)
         if self.client_on_message:
             self.client_on_message(message)
@@ -219,6 +226,7 @@ class RRJobsConnection:
         print(traceback.format_exc(), "\x1b[0m")
 
     def on_close(self, ws, close_status, close_message):
+        print("close")
         if close_status or close_message:
             raise AssertionError(
                 f"Orchestrator disconnected unexpectedly: status={close_status} message={close_message}"
