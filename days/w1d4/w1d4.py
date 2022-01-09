@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from optims import SGD, RMSProp, Adam
 
 device = "cuda"
-fname = "days/w1d4/snow_forest.jpg"
+fname = "days/w1d4/snow_forest.jpeg"
 
 def load_image(fname, n_train=8192, batch_size=128):
     pil_img = Image.open(fname)
