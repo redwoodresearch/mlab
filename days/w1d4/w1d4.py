@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from optims import SGD, RMSProp, Adam
 
 device = "cuda"
+fname = "days/w1d4/snow_forest.jpg"
 
 def load_image(fname, n_train=8192, batch_size=128):
     pil_img = Image.open(fname)
@@ -78,7 +79,7 @@ def evaluate(model, dataloader):
         tot_loss += (pred-y).abs().mean()
     return (tot_loss / len(dataloader)).item()
 
-def log_image(model, fname):
+def log_image(model):
     model.eval()
     o_height, o_width = Image.open(fname).size
     res = 400
@@ -94,7 +95,6 @@ def log_image(model, fname):
 @gin.configurable
 def run(hidden_size):
     experiment.log_parameter("hidden size", hidden_size)
-    fname = "days/w1d4/mona.jpg"
     data_train, data_test = load_image(fname)
     model = Net(2, hidden_size, 3).to(device)
     train(model, data_train, data_test)
@@ -103,15 +103,11 @@ def run(hidden_size):
     torch.save(model.state_dict(), model_file)
     experiment.log_model("OurNet", model_file)
 
-    log_image(model, fname)
+    log_image(model)
 
 @gin.configurable
 # def train(model, dataloader, opt_str, epochs, learning_rate, loss):
 def train(model, data_train, data_test, epochs, lr):
-    # try:
-    #     opt = globals()[opt_str]()
-    # except KeyError:
-    #     raise ValueError("This is not a valid optimiser")
     opt = Adam(params=model.parameters(), lr=lr)
     experiment.log_parameter("lr", lr)
     for epoch in range(epochs):
@@ -120,7 +116,8 @@ def train(model, data_train, data_test, epochs, lr):
         experiment.log_metric("train epoch loss", epoch_loss, epoch=epoch)
         experiment.log_metric("test epoch loss", test_loss, epoch=epoch)
         print(f"{epoch}/{epochs}\t train loss={epoch_loss:.3f}\t test loss={test_loss:.3f}")
-
+        if epoch%10 == 0:
+            log_image(model)
 
 
 if __name__ == "__main__":
