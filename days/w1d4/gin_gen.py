@@ -12,11 +12,11 @@ def make_grid(possible_values):
     ]
 
 search_space = {
-    "train.lr": np.geomspace(1e-1, 1e-3, 1),
-    # "run.hidden_size": [100, 400, 700, 1000]
+    "train.lr": np.geomspace(2e-1, 5e-4, 8),
+    "run.hidden_size": [100, 400, 700, 1000],
     # "run.hidden_size": [100, 200, 400],
-    "run.hidden_size": [100, 200],
-    "train.epochs": [80],
+    # "run.hidden_size": [100, 200],
+    "train.epochs": [200],
 }
 
 def make_request_dict(search_space):
