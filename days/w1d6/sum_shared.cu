@@ -9,7 +9,7 @@ __global__ void sumShared(float *dest, float *values) {
     for (int step = NUM_STEPS; step >= 0; --step) {
         int64_t size = 1 << step;
         if (idx >= size && idx < 2 * size) {
-            atomicAdd(&buffer[idx % size], buffer[idx]);
+            buffer[idx % size] += buffer[idx];
         }
         __syncthreads();
     }
