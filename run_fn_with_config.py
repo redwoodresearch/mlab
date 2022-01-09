@@ -8,8 +8,11 @@ import sys
 
 
 def run_fn_with_config(fnpath: str, config: str):
-    # given a function and a gin config, run it with the config
+    """given a function and a gin config, run it with the config"""
 
+    os.system(
+        "pip install -r requirements.txt"
+    )  # to remove when mlab deps are preinstalled
     temp_name = "TEMP_CONFIG.gin"
 
     fn = import_object_from_qualified_name(fnpath)
