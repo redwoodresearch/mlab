@@ -1,296 +1,233 @@
+import bert_tests
+from einops import rearrange, reduce, repeat
+import math
+import re
 import torch as t
-import numpy as np
-from torch.nn import (
-    Module,
-    Parameter,
-    Sequential,
-)  # not allowed to use other stuff from nn
-from transformers import AutoTokenizer
-
-# from days.modules import gelu, Embedding, Dropout, LayerNorm, softmax, Linear
-from torch.nn import Embedding, Dropout, LayerNorm, Linear
-from torch.nn.functional import gelu, softmax
-
-from einops import rearrange
-from utils import tpeek, copy_weight_bias
-from dataclasses import dataclass
-
-
-class BertEmbedding(Module):
-    def __init__(self, config):
-        super(BertEmbedding, self).__init__()
-        self.config = config
-        embedding_size = config["hidden_size"]
-        # this needs to be initialized as a bunch of normalized vector,
-        # as opposed to a linear layer, which is initialized to _produce_ normalized vectors
-        self.token_embedding = Embedding(config["vocab_size"], embedding_size)
-        self.position_embedding = Embedding(
-            config["max_position_embeddings"], embedding_size
-        )
-        self.token_type_embedding = Embedding(config["type_vocab_size"], embedding_size)
-
-        self.layer_norm = LayerNorm((embedding_size,))
-        self.dropout = Dropout(config["dropout"])
-
-    def embed(self, input_ids: t.LongTensor, token_type_ids):
-        seq_length = input_ids.shape[1]
-        token_embeddings = self.token_embedding(input_ids)
-        token_type_embeddings = self.token_type_embedding(token_type_ids)
-        position_embeddings = self.position_embedding(
-            t.arange(seq_length).to(next(self.parameters()).device)
-        )
-        embeddings = token_embeddings + token_type_embeddings + position_embeddings
-        embeddings = self.layer_norm(embeddings)
-        embeddings = self.dropout(embeddings)
-        return embeddings
-
-    def forward(self, **kwargs):
-        return self.embed(**kwargs)
-
-    def unembed(self, embeddings: t.Tensor):
-        return self.token_embedding.unembed(embeddings)
-
-
-def bert_mlp(token_activations, linear_1, linear_2, dropout):
-    return dropout(linear_2(gelu(linear_1(token_activations))))
-
-
-class NormedResidualLayer(Module):
-    def __init__(self, size, intermediate_size, dropout):
-        super(NormedResidualLayer, self).__init__()
-        self.mlp1 = Linear(size, intermediate_size, bias=True)
-        self.mlp2 = Linear(intermediate_size, size, bias=True)
-        self.layer_norm = LayerNorm((size,))
-        self.dropout = Dropout(dropout)
-
-    def forward(self, input):
-        intermediate = gelu(self.mlp1(input))
-        output = self.dropout(self.mlp2(intermediate)) + input
-        output = self.layer_norm(output)
-        return output
+from torch import einsum
+from torch.nn import functional as F
+from torch import nn
 
 
 def raw_attention_pattern(
-    token_activations, num_heads, project_query, project_key, attention_mask=None
-):
-    head_size = token_activations.shape[-1] // num_heads
-
-    query = project_query(token_activations)
-    query = rearrange(query, "b s (h c) -> b h s c", h=num_heads)
-
-    key = project_key(token_activations)
-    key = rearrange(key, "b s (h c) -> b h s c", h=num_heads)
-
-    # my attention raw has twice the mean and half the variance of theirs
-    attention_raw = t.einsum("bhtc,bhfc->bhft", query, key) / np.sqrt(head_size)
-    if attention_mask is not None:
-        attention_raw -= (1 - attention_mask) * 10000
-    return attention_raw
-
-
-def multi_head_self_attention(
-    token_activations, num_heads, attention_pattern, project_value, project_out, dropout
-):
-
-    # if attention_masks is not None:
-    #     attention_raw = attention_raw * attention_masks
-    attention_patterns = softmax(attention_pattern, dim=-2)
-    attention_patterns = dropout(attention_patterns)
-
-    value = project_value(token_activations)
-    value = rearrange(value, "b s (h c) -> b h s c", h=num_heads)
-
-    context_layer = t.einsum("bhft,bhfc->bhtc", attention_patterns, value)
-    attention_values = rearrange(context_layer, "b h s c -> b s (h c)")
-    attention_values = project_out(attention_values)
-    return attention_values
+    token_activations,  # Tensor[batch_size, seq_length, hidden_size(768)],
+    num_heads,
+    project_query,      # nn.Module, (Tensor[..., 768]) -> Tensor[..., 768],
+    project_key,        # nn.Module, (Tensor[..., 768]) -> Tensor[..., 768] 
+): # -> Tensor[batch_size, head_num, key_token: seq_length, query_token: seq_length]:
+    Q = project_query(token_activations)
+    Q = rearrange(Q, 'b seqlen (headnum headsize) -> b headnum seqlen headsize',
+                  headnum=num_heads)
+    K = project_key(token_activations)
+    K = rearrange(K, 'b seqlen (headnum headsize) -> b headnum seqlen headsize',
+                  headnum=num_heads)
+    headsize = K.shape[-1]
+    scores = einsum('bhql, bhkl -> bhkq', Q, K) / math.sqrt(headsize)
+    return scores
 
 
-class AttentionPattern(Module):
-    def __init__(self, config):
+bert_tests.test_attention_pattern_fn(raw_attention_pattern)
+    
+
+def bert_attention(
+    token_activations, #: Tensor[batch_size, seq_length, hidden_size (768)], 
+    num_heads: int, 
+    attention_pattern, #: Tensor[batch_size,num_heads, seq_length, seq_length], 
+    project_value, #: function( (Tensor[..., 768]) -> Tensor[..., 768] ), 
+    project_output, #: function( (Tensor[..., 768]) -> Tensor[..., 768] )
+): # -> Tensor[batch_size, seq_length, hidden_size]
+    softmaxed_attention = attention_pattern.softmax(dim=-2)
+    V = project_value(token_activations)
+    V = rearrange(V, 'b seqlen (headnum headsize) -> b headnum seqlen headsize',
+                  headnum=num_heads)
+    combined_values = einsum('bhkl, bhkq -> bhql', V, softmaxed_attention)
+    out = project_output(rearrange(combined_values, 'b h q l -> b q (h l)'))
+    return out
+
+
+bert_tests.test_attention_fn(bert_attention)
+
+
+class MultiHeadedSelfAttention(nn.Module):
+    def __init__(self, num_heads, hidden_size):
         super().__init__()
-        self.config = config
-        hidden_size = config["hidden_size"]
-        self.project_query = Linear(hidden_size, hidden_size, bias=True)
-        self.project_key = Linear(hidden_size, hidden_size, bias=True)
+        self.num_heads = num_heads
+        self.project_query = nn.Linear(hidden_size, hidden_size)
+        self.project_key = nn.Linear(hidden_size, hidden_size)
+        self.project_value = nn.Linear(hidden_size, hidden_size)
+        self.project_output = nn.Linear(hidden_size, hidden_size)
 
-    def forward(self, token_activations, attention_masks):
-        return raw_attention_pattern(
-            token_activations=token_activations,
-            num_heads=self.config["num_heads"],
-            project_key=self.project_key,
-            project_query=self.project_query,
-        )
+    def forward(self, input):  # b n l
+        attention_pattern = raw_attention_pattern(
+            input, self.num_heads, self.project_query, self.project_key)
+        return bert_attention(
+            input, self.num_heads, attention_pattern, self.project_value, self.project_output)
+    
 
-
-class SelfAttentionLayer(Module):
-    def __init__(self, config):
-        super(SelfAttentionLayer, self).__init__()
-        self.config = config
-        if config["hidden_size"] % config["num_heads"] != 0:
-            raise AssertionError("head num must divide hidden size")
-        hidden_size = config["hidden_size"]
-        self.pattern = AttentionPattern(config)
-        self.project_value = Linear(hidden_size, hidden_size, bias=True)
-        self.project_out = Linear(hidden_size, hidden_size, bias=True)
-        self.dropout = Dropout(config["dropout"])
-
-    def forward(self, token_activations, attention_masks=None):
-        return multi_head_self_attention(
-            token_activations,
-            # attention_masks,
-            self.config["num_heads"],
-            self.pattern(token_activations, attention_masks),
-            self.project_value,
-            self.project_out,
-            self.dropout,
-        )
+bert_tests.test_bert_attention(MultiHeadedSelfAttention)
 
 
-class BertBlock(Module):
-    def __init__(self, config):
-        super(BertBlock, self).__init__()
-
-        self.config = config
-        hidden_size = config["hidden_size"]
-        self.layer_norm = LayerNorm((hidden_size,))
-        self.dropout = Dropout()
-        self.attention = SelfAttentionLayer(config)
-
-        self.residual = NormedResidualLayer(
-            config["hidden_size"], config["intermediate_size"], config["dropout"]
-        )
-
-    def forward(self, token_activations, attention_masks=None):
-        attention_output = self.layer_norm(
-            token_activations
-            + self.dropout(self.attention(token_activations, attention_masks))
-        )
-
-        return self.residual(attention_output)
+def bert_mlp(token_activations, #: torch.Tensor[batch_size,seq_length,768],
+             linear_1: nn.Module, linear_2: nn.Module
+): #-> torch.Tensor[batch_size, seq_length, 768]
+    return linear_2(F.gelu(linear_1(token_activations)))
 
 
-class BertLMHead(Module):
-    def __init__(self, config):
-        super(BertLMHead, self).__init__()
-        hidden_size = config["hidden_size"]
-        self.mlp = Linear(hidden_size, hidden_size, bias=True)
-        self.unembedding = Linear(hidden_size, config["vocab_size"], bias=True)
-        self.layer_norm = LayerNorm((hidden_size,))
-
-    def forward(self, activations):
-        return self.unembedding(self.layer_norm(gelu(self.mlp(activations))))
+bert_tests.test_bert_mlp(bert_mlp)
 
 
-@dataclass
-class BertOutput:
-    logits: t.Tensor
-    encodings: t.Tensor
-    classification: t.Tensor
+class BertMLP(nn.Module):
+    def __init__(self, input_size: int, intermediate_size: int):
+        super().__init__()
+        self.lin1 = nn.Linear(input_size, intermediate_size)
+        self.lin2 = nn.Linear(intermediate_size, input_size)
+
+    def forward(self, input):
+        return bert_mlp(input, self.lin1, self.lin2)
 
 
-class Bert(Module):
-    def __init__(self, config, tokenizer=None):
-        super(Bert, self).__init__()
+class LayerNorm(nn.Module):
+    def __init__(self, normalized_dim: int):
+        super().__init__()
+        self.weight = nn.Parameter(t.ones(normalized_dim))
+        self.bias = nn.Parameter(t.zeros(normalized_dim))
 
-        default_config = {
-            "vocab_size": 28996,
-            "intermediate_size": 3072,
-            "hidden_size": 768,
-            "num_layers": 12,
-            "num_heads": 12,
-            "max_position_embeddings": 512,
-            "dropout": 0.1,
-            "type_vocab_size": 2,
-            "num_classes": 2,
-        }
-        config = {**default_config, **config}
-        self.tokenizer = tokenizer
-        self.config = config
-
-        self.embedding = BertEmbedding(self.config)
-        self.transformer = Sequential(
-            *[BertBlock(self.config) for _ in range(self.config["num_layers"])]
-        )
-        self.lm_head = BertLMHead(config)
-        self.classification_head = Linear(config["hidden_size"], config["num_classes"])
-        self.classification_dropout = Dropout(config["dropout"])
-
-    def forward(self, input_ids, token_type_ids=None):
-
-        if token_type_ids is None:
-            token_type_ids = t.zeros_like(input_ids).to(next(self.parameters()).device)
-
-        embeddings = self.embedding.embed(
-            input_ids=input_ids, token_type_ids=token_type_ids
-        )
-        encodings = self.transformer(embeddings)
-        logits = self.lm_head(encodings)
-        classification = self.classification_head(
-            self.classification_dropout(encodings[:, 0])
-        )
-        return BertOutput(
-            logits=logits, encodings=encodings, classification=classification
-        )
+    def forward(self, input):
+        input_m0 = input - input.mean(dim=-1, keepdim=True).detach()
+        input_m0v1 = input_m0 / input_m0.std(dim=-1, keepdim=True, unbiased=False).detach()
+        return input_m0v1 * self.weight + self.bias
 
 
-def my_bert_from_hf_weights(their_lm_bert=None, config={}):
-    import transformers
+bert_tests.test_layer_norm(LayerNorm)
 
-    if their_lm_bert is None:
-        their_lm_bert: transformers.models.bert.modeling_bert.BertModel = (
-            transformers.BertForMaskedLM.from_pretrained("bert-base-cased")
-        )
-    model = their_lm_bert.bert
-    tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
-    my_model = Bert({**their_lm_bert.config.to_dict(), **config}, tokenizer)
-    # copy embeddings
-    my_model.embedding.position_embedding.weight = (
-        model.embeddings.position_embeddings.weight
-    )
-    my_model.embedding.token_embedding.weight = model.embeddings.word_embeddings.weight
-    my_model.embedding.token_type_embedding.weight = (
-        model.embeddings.token_type_embeddings.weight
-    )
-    copy_weight_bias(my_model.embedding.layer_norm, model.embeddings.LayerNorm)
+    
+class BertBlock(nn.Module):
+    def __init__(self, hidden_size, intermediate_size, num_heads, dropout: float):
+        super().__init__()
+        self.attention = MultiHeadedSelfAttention(num_heads, hidden_size)
+        self.layernorm1 = nn.LayerNorm(hidden_size)
+        self.mlp = BertMLP(hidden_size, intermediate_size)
+        self.layernorm2 = nn.LayerNorm(hidden_size)
+        self.dropout = nn.Dropout(dropout)
 
-    my_layers = list(my_model.transformer)
-    official_layers = list(model.encoder.layer)
-    for my_layer, their_layer in zip(my_layers, official_layers):
-        my_layer: BertBlock
-
-        copy_weight_bias(
-            my_layer.attention.pattern.project_key, their_layer.attention.self.key
-        )
-        copy_weight_bias(
-            my_layer.attention.pattern.project_query, their_layer.attention.self.query
-        )
-        copy_weight_bias(
-            my_layer.attention.project_value, their_layer.attention.self.value
-        )
-
-        copy_weight_bias(
-            my_layer.attention.project_out, their_layer.attention.output.dense
-        )
-
-        copy_weight_bias(my_layer.layer_norm, their_layer.attention.output.LayerNorm)
-
-        copy_weight_bias(my_layer.residual.mlp1, their_layer.intermediate.dense)
-        copy_weight_bias(my_layer.residual.mlp2, their_layer.output.dense)
-        copy_weight_bias(my_layer.residual.layer_norm, their_layer.output.LayerNorm)
-
-    copy_weight_bias(
-        my_model.lm_head.mlp, their_lm_bert.cls.predictions.transform.dense
-    )
-    copy_weight_bias(
-        my_model.lm_head.layer_norm, their_lm_bert.cls.predictions.transform.LayerNorm
-    )
-
-    # bias is output_specific, weight is from embedding
-    my_model.lm_head.unembedding.bias = their_lm_bert.cls.predictions.decoder.bias
-    my_model.lm_head.unembedding.weight = model.embeddings.word_embeddings.weight
-    return my_model, their_lm_bert
+    def forward(self, input):
+        out = self.layernorm1(input + self.attention(input))
+        return self.layernorm2(self.dropout(self.mlp(out)) + out)
 
 
-if __name__ == "__main__":
-    my_bert_from_hf_weights()
+bert_tests.test_bert_block(BertBlock)    
+
+
+# import transformers
+# tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
+# print(tokenizer(['Hello, I am a sentence.']))
+
+class Embedding(nn.Module):
+    def __init__(self, vocab_size, embed_size):
+        super().__init__()
+        self.embedding_matrix = nn.Parameter(t.randn(vocab_size, embed_size))
+
+    def forward(self, input):
+        return self.embedding_matrix[input]
+
+
+bert_tests.test_embedding(Embedding)
+
+
+def bert_embedding(
+    input_ids, #: [batch, seqlen], 
+    token_type_ids, # [batch, seqlen], 
+    position_embedding, #: nn.Embedding,
+    token_embedding, #: nn.Embedding, 
+    token_type_embedding, #: nn.Embedding, 
+    layer_norm, #: nn.Module, 
+    dropout #: nn.Module
+):
+    position = t.arange(input_ids.shape[1]).to(input_ids.device)
+    position = repeat(position, 'n -> b n', b = input_ids.shape[0])
+    out = (token_embedding(input_ids) + token_type_embedding(token_type_ids) +
+           position_embedding(position))
+    return dropout(layer_norm(out))
+
+
+bert_tests.test_bert_embedding_fn(bert_embedding)
+
+
+class BertEmbedding(nn.Module):
+    def __init__(self, vocab_size, hidden_size, max_position_embeddings, type_vocab_size,
+                 dropout: float):
+        super().__init__()
+        self.token_embedding = nn.Embedding(vocab_size, hidden_size)
+        self.pos_embedding = nn.Embedding(max_position_embeddings, hidden_size)
+        self.token_type_embedding = nn.Embedding(type_vocab_size, hidden_size)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, input_ids, token_type_ids):
+        return bert_embedding(
+            input_ids, token_type_ids, self.pos_embedding, self.token_embedding,
+            self.token_type_embedding, self.layer_norm, self.dropout)
+
+
+bert_tests.test_bert_embedding(BertEmbedding)
+
+
+class Bert(nn.Module):
+    def __init__(self, vocab_size, hidden_size, max_position_embeddings, type_vocab_size,
+                 dropout, intermediate_size, num_heads, num_layers):
+        super().__init__()
+        self.embed = BertEmbedding(vocab_size, hidden_size, max_position_embeddings,
+                                   type_vocab_size, dropout)
+        self.blocks = nn.Sequential(*[
+            BertBlock(hidden_size, intermediate_size, num_heads, dropout)
+            for _ in range(num_layers)
+        ])
+        self.lin = nn.Linear(hidden_size, hidden_size)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.unembed = nn.Linear(hidden_size, vocab_size)
+
+    def forward(self, input_ids):
+        token_type_ids = t.zeros_like(input_ids, dtype=int)
+        emb = self.embed(input_ids, token_type_ids)
+        emb = self.lin(self.blocks(emb))
+        return self.unembed(self.layer_norm(F.gelu(emb)))
+
+
+bert_tests.test_bert(Bert)    
+
+
+my_bert = Bert(
+    vocab_size=28996, hidden_size=768, max_position_embeddings=512, 
+    type_vocab_size=2, dropout=0.1, intermediate_size=3072, 
+    num_heads=12, num_layers=12
+)
+pretrained_bert = bert_tests.get_pretrained_bert()
+
+
+def mapkey(key):
+    key = re.sub('^embedding\.', 'embed.', key)
+    key = re.sub('\.position_embedding\.', '.pos_embedding.', key)
+    key = re.sub('^lm_head\.mlp\.', 'lin.', key)
+    key = re.sub('^lm_head\.unembedding\.', 'unembed.', key)
+    key = re.sub('^lm_head\.layer_norm\.', 'layer_norm.', key)
+    key = re.sub('^transformer\.([0-9]+)\.layer_norm', 'blocks.\\1.layernorm1', key)
+    key = re.sub('^transformer\.([0-9]+)\.attention\.pattern\.',
+                 'blocks.\\1.attention.', key)
+    key = re.sub('^transformer\.([0-9]+)\.residual\.layer_norm\.',
+                 'blocks.\\1.layernorm2.', key)
+    
+    key = re.sub('^transformer\.', 'blocks.', key)
+    key = re.sub('\.project_out\.', '.project_output.', key)
+    key = re.sub('\.residual\.mlp', '.mlp.lin', key)
+    return key
+
+
+mapped_params = {mapkey(k): v for k, v in pretrained_bert.state_dict().items()
+                 if not k.startswith('classification_head')}
+
+
+my_bert.load_state_dict(mapped_params)
+bert_tests.test_same_output(my_bert, pretrained_bert)
+
+
+
+
