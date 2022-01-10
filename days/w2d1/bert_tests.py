@@ -3,6 +3,7 @@ import transformers
 import bert_sol as bert
 import torch.nn as nn
 import torch.nn.functional as F
+from utils import tpeek
 
 
 def allclose(my_out, their_out, name, tol=1e-5):
@@ -128,6 +129,13 @@ def test_bert_mlp(fn):
     )
 
 
+def test_layer_norm(LayerNorm):
+    ln1 = LayerNorm(10)
+    ln2 = nn.LayerNorm(10)
+    tensor = t.randn(20, 10)
+    allclose(ln1(tensor), ln2(tensor), "layer norm")
+    
+
 # TODO write this
 def test_bert(your_module):
     config = {
@@ -243,7 +251,7 @@ def test_bert_attention(your_module):
         "num_layers": 12,
         "num_heads": 12,
         "max_position_embeddings": 512,
-        "dropout": 0.1,
+        "dropout": 0.0,  # not testing dropout!!
         "type_vocab_size": 2,
     }
     t.random.manual_seed(0)
@@ -253,7 +261,7 @@ def test_bert_attention(your_module):
     theirs = your_module(
         hidden_size=config["hidden_size"],
         num_heads=config["num_heads"],
-        dropout=config["dropout"],
+        # dropout=config["dropout"],
     )
     theirs.eval()
     input_activations = t.rand((2, 3, 768))
