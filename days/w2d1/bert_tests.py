@@ -179,7 +179,7 @@ def test_bert_block(your_module):
         "num_layers": 12,
         "num_heads": 12,
         "max_position_embeddings": 512,
-        "dropout": 0.1,
+        "dropout": 0.0, # not testing dropout
         "type_vocab_size": 2,
     }
     t.random.manual_seed(0)
