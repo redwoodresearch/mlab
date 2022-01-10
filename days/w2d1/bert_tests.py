@@ -193,6 +193,15 @@ def test_bert_block(your_module):
     )
 
 
+def test_embedding(Embedding):
+    input = t.randint(0, 10, (2, 3))
+    t.manual_seed(1157)
+    emb1 = Embedding(10, 5)
+    t.manual_seed(1157)
+    emb2 = nn.Embedding(10, 5)
+    allclose(emb1(input), emb2(input), "embedding")
+
+    
 def test_bert_embedding_fn(your_fn):
     config = {
         "vocab_size": 28996,
