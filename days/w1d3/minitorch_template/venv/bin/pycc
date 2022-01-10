@@ -1,3 +1,0 @@
-#!/home/ubuntu/mlab/days/w1d5/venv/bin/python
-from numba.pycc import main
-main()
