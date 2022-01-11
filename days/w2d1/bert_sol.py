@@ -194,7 +194,7 @@ class Bert(nn.Module):
 
 class BertWithClassify(nn.Module):
     def __init__(self, vocab_size, hidden_size, max_position_embeddings, type_vocab_size,
-                 dropout, intermediate_size, num_heads, num_layers):
+                 dropout, intermediate_size, num_heads, num_layers, num_classes):
         super().__init__()
         self.embed = BertEmbedding(vocab_size, hidden_size, max_position_embeddings,
                                    type_vocab_size, dropout)
@@ -205,8 +205,6 @@ class BertWithClassify(nn.Module):
         self.lin = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.unembed = nn.Linear(hidden_size, vocab_size)
-
-        num_classes = 2
         self.classification_head = nn.Linear(hidden_size, num_classes)
         self.classification_dropout = nn.Dropout(dropout)
         

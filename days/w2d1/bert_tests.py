@@ -172,6 +172,7 @@ def test_bert_classification(your_module):
         "max_position_embeddings": 512,
         "dropout": 0.1,
         "type_vocab_size": 2,
+        "num_classes": 2,
     }
     t.random.manual_seed(0)
     reference = bert.Bert(config)
