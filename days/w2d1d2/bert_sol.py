@@ -1,4 +1,4 @@
-import bert_tests
+import days.w2d1.bert_tests as bert_tests
 from einops import rearrange, reduce, repeat
 import math
 import re
@@ -24,8 +24,8 @@ def raw_attention_pattern(
     scores = einsum('bhql, bhkl -> bhkq', Q, K) / math.sqrt(headsize)
     return scores
 
-
-bert_tests.test_attention_pattern_fn(raw_attention_pattern)
+if __name__ == "__main__":
+    bert_tests.test_attention_pattern_fn(raw_attention_pattern)
     
 
 def bert_attention(
@@ -43,8 +43,8 @@ def bert_attention(
     out = project_output(rearrange(combined_values, 'b h q l -> b q (h l)'))
     return out
 
-
-bert_tests.test_attention_fn(bert_attention)
+if __name__ == "__main__":
+    bert_tests.test_attention_fn(bert_attention)
 
 
 class MultiHeadedSelfAttention(nn.Module):
@@ -62,8 +62,8 @@ class MultiHeadedSelfAttention(nn.Module):
         return bert_attention(
             input, self.num_heads, attention_pattern, self.project_value, self.project_output)
     
-
-bert_tests.test_bert_attention(MultiHeadedSelfAttention)
+if __name__ == "__main__":
+    bert_tests.test_bert_attention(MultiHeadedSelfAttention)
 
 
 def bert_mlp(token_activations, #: torch.Tensor[batch_size,seq_length,768],
@@ -71,8 +71,8 @@ def bert_mlp(token_activations, #: torch.Tensor[batch_size,seq_length,768],
 ): #-> torch.Tensor[batch_size, seq_length, 768]
     return linear_2(F.gelu(linear_1(token_activations)))
 
-
-bert_tests.test_bert_mlp(bert_mlp)
+if __name__ == "__main__":
+    bert_tests.test_bert_mlp(bert_mlp)
 
 
 class BertMLP(nn.Module):
@@ -96,8 +96,8 @@ class LayerNorm(nn.Module):
         input_m0v1 = input_m0 / input_m0.std(dim=-1, keepdim=True, unbiased=False).detach()
         return input_m0v1 * self.weight + self.bias
 
-
-bert_tests.test_layer_norm(LayerNorm)
+if __name__ == "__main__":
+    bert_tests.test_layer_norm(LayerNorm)
 
     
 class BertBlock(nn.Module):
@@ -113,8 +113,8 @@ class BertBlock(nn.Module):
         out = self.layernorm1(input + self.attention(input))
         return self.layernorm2(self.dropout(self.mlp(out)) + out)
 
-
-bert_tests.test_bert_block(BertBlock)    
+if __name__ == "__main__":
+    bert_tests.test_bert_block(BertBlock)    
 
 
 # import transformers
@@ -129,8 +129,8 @@ class Embedding(nn.Module):
     def forward(self, input):
         return self.embedding_matrix[input]
 
-
-bert_tests.test_embedding(Embedding)
+if __name__ == "__main__":
+    bert_tests.test_embedding(Embedding)
 
 
 def bert_embedding(
@@ -148,8 +148,8 @@ def bert_embedding(
            position_embedding(position))
     return dropout(layer_norm(out))
 
-
-bert_tests.test_bert_embedding_fn(bert_embedding)
+if __name__ == "__main__":
+    bert_tests.test_bert_embedding_fn(bert_embedding)
 
 
 class BertEmbedding(nn.Module):
@@ -167,8 +167,8 @@ class BertEmbedding(nn.Module):
             input_ids, token_type_ids, self.pos_embedding, self.token_embedding,
             self.token_type_embedding, self.layer_norm, self.dropout)
 
-
-bert_tests.test_bert_embedding(BertEmbedding)
+if __name__ == "__main__":
+    bert_tests.test_bert_embedding(BertEmbedding)
 
 
 class Bert(nn.Module):
@@ -184,23 +184,37 @@ class Bert(nn.Module):
         self.lin = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.unembed = nn.Linear(hidden_size, vocab_size)
+        
 
     def forward(self, input_ids):
         token_type_ids = t.zeros_like(input_ids, dtype=int)
-        emb = self.embed(input_ids, token_type_ids)
-        emb = self.lin(self.blocks(emb))
-        return self.unembed(self.layer_norm(F.gelu(emb)))
+        emb = self.blocks(self.embed(input_ids, token_type_ids))
+        return self.unembed(self.layer_norm(F.gelu((self.lin(emb)))))
 
 
-bert_tests.test_bert(Bert)    
+class BertWithClassify(nn.Module):
+    def __init__(self, vocab_size, hidden_size, max_position_embeddings, type_vocab_size,
+                 dropout, intermediate_size, num_heads, num_layers, num_classes):
+        super().__init__()
+        self.embed = BertEmbedding(vocab_size, hidden_size, max_position_embeddings,
+                                   type_vocab_size, dropout)
+        self.blocks = nn.Sequential(*[
+            BertBlock(hidden_size, intermediate_size, num_heads, dropout)
+            for _ in range(num_layers)
+        ])
+        self.lin = nn.Linear(hidden_size, hidden_size)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.unembed = nn.Linear(hidden_size, vocab_size)
+        self.classification_head = nn.Linear(hidden_size, num_classes)
+        self.classification_dropout = nn.Dropout(dropout)
+        
 
-
-my_bert = Bert(
-    vocab_size=28996, hidden_size=768, max_position_embeddings=512, 
-    type_vocab_size=2, dropout=0.1, intermediate_size=3072, 
-    num_heads=12, num_layers=12
-)
-pretrained_bert = bert_tests.get_pretrained_bert()
+    def forward(self, input_ids):
+        token_type_ids = t.zeros_like(input_ids, dtype=int)
+        emb = self.blocks(self.embed(input_ids, token_type_ids))
+        logits = self.unembed(self.layer_norm(F.gelu((self.lin(emb)))))
+        classifs = self.classification_head(self.classification_dropout(emb[:, 0]))
+        return logits, classifs
 
 
 def mapkey(key):
@@ -220,13 +234,19 @@ def mapkey(key):
     key = re.sub('\.residual\.mlp', '.mlp.lin', key)
     return key
 
-
-mapped_params = {mapkey(k): v for k, v in pretrained_bert.state_dict().items()
-                 if not k.startswith('classification_head')}
-
-
-my_bert.load_state_dict(mapped_params)
-bert_tests.test_same_output(my_bert, pretrained_bert)
+if __name__ == "__main__":
+    bert_tests.test_bert(Bert)    
+    bert_tests.test_bert_classification(BertWithClassify) 
+    my_bert = Bert(
+        vocab_size=28996, hidden_size=768, max_position_embeddings=512, 
+        type_vocab_size=2, dropout=0.1, intermediate_size=3072, 
+        num_heads=12, num_layers=12
+    )
+    pretrained_bert = bert_tests.get_pretrained_bert()
+    mapped_params = {mapkey(k): v for k, v in pretrained_bert.state_dict().items()
+                    if not k.startswith('classification_head')}
+    my_bert.load_state_dict(mapped_params)
+    bert_tests.test_same_output(my_bert, pretrained_bert)
 
 
 
