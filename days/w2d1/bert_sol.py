@@ -173,9 +173,8 @@ if __name__ == "__main__":
 
 class Bert(nn.Module):
     def __init__(self, vocab_size, hidden_size, max_position_embeddings, type_vocab_size,
-                 dropout, intermediate_size, num_heads, num_layers, classify=False):
+                 dropout, intermediate_size, num_heads, num_layers):
         super().__init__()
-        self.classify = classify
         self.embed = BertEmbedding(vocab_size, hidden_size, max_position_embeddings,
                                    type_vocab_size, dropout)
         self.blocks = nn.Sequential(*[
@@ -185,6 +184,28 @@ class Bert(nn.Module):
         self.lin = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.unembed = nn.Linear(hidden_size, vocab_size)
+        
+
+    def forward(self, input_ids):
+        token_type_ids = t.zeros_like(input_ids, dtype=int)
+        emb = self.blocks(self.embed(input_ids, token_type_ids))
+        return self.unembed(self.layer_norm(F.gelu((self.lin(emb)))))
+
+
+class BertWithClassify(nn.Module):
+    def __init__(self, vocab_size, hidden_size, max_position_embeddings, type_vocab_size,
+                 dropout, intermediate_size, num_heads, num_layers):
+        super().__init__()
+        self.embed = BertEmbedding(vocab_size, hidden_size, max_position_embeddings,
+                                   type_vocab_size, dropout)
+        self.blocks = nn.Sequential(*[
+            BertBlock(hidden_size, intermediate_size, num_heads, dropout)
+            for _ in range(num_layers)
+        ])
+        self.lin = nn.Linear(hidden_size, hidden_size)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.unembed = nn.Linear(hidden_size, vocab_size)
+
         num_classes = 2
         self.classification_head = nn.Linear(hidden_size, num_classes)
         self.classification_dropout = nn.Dropout(dropout)
@@ -193,10 +214,10 @@ class Bert(nn.Module):
     def forward(self, input_ids):
         token_type_ids = t.zeros_like(input_ids, dtype=int)
         emb = self.blocks(self.embed(input_ids, token_type_ids))
-        if self.classify:
-            return self.classification_head(self.classification_dropout(emb[:, 0]))
-        else:
-            return self.unembed(self.layer_norm(F.gelu(self.lin(emb))))
+        logits = self.unembed(self.layer_norm(F.gelu((self.lin(emb)))))
+        classifs = self.classification_head(self.classification_dropout(emb[:, 0]))
+        return logits, classifs
+
 
 def mapkey(key):
     key = re.sub('^embedding\.', 'embed.', key)
@@ -217,6 +238,7 @@ def mapkey(key):
 
 if __name__ == "__main__":
     bert_tests.test_bert(Bert)    
+    bert_tests.test_bert_classification(BertWithClassify) 
     my_bert = Bert(
         vocab_size=28996, hidden_size=768, max_position_embeddings=512, 
         type_vocab_size=2, dropout=0.1, intermediate_size=3072, 

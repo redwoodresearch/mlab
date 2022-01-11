@@ -177,12 +177,19 @@ def test_bert_classification(your_module):
     reference = bert.Bert(config)
     reference.eval()
     t.random.manual_seed(0)
-    theirs = your_module(**config, classify=True)
+    theirs = your_module(**config)
     theirs.eval()
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
     input_ids = tokenizer("hello there", return_tensors="pt")["input_ids"]
+    logits, classifs = theirs(input_ids=input_ids)
     allclose(
-        theirs(input_ids=input_ids),
+        logits,
+        reference(input_ids=input_ids).logits,
+        "bert",
+    )
+
+    allclose(
+        classifs,
         reference(input_ids=input_ids).classification,
         "bert",
     )
