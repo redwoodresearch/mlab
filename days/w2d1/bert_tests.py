@@ -164,7 +164,7 @@ def test_bert(your_module):
 
 
 def test_same_output(your_bert, pretrained_bert):
-    vocab_size = your_bert.embed.token_embedding.weight.shape[0]
+    vocab_size = pretrained_bert.embedding.token_embedding.weight.shape[0]
     input_ids = t.randint(0, vocab_size, (10, 20))
     allclose(your_bert.eval()(input_ids),
              pretrained_bert.eval()(input_ids).logits,
@@ -179,7 +179,7 @@ def test_bert_block(your_module):
         "num_layers": 12,
         "num_heads": 12,
         "max_position_embeddings": 512,
-        "dropout": 0.1, # now testing dropout
+        "dropout": 0.1, 
         "type_vocab_size": 2,
     }
     t.random.manual_seed(0)
