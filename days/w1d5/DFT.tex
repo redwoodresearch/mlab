@@ -1,0 +1,87 @@
+\documentclass{article}
+\usepackage[a4paper, total={6in, 8in}]{geometry}
+
+\usepackage[utf8]{inputenc}
+\title{\textbf{CATAM Project 17.1}}
+\date{@TODO set date}
+
+\usepackage{natbib}
+% \usepackage{graphicx}
+\usepackage{float}
+\usepackage{amsmath} 
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{fancyvrb}
+\usepackage{breqn}
+\usepackage{lmodern}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+% \usepackage{slashbox}
+\usepackage{enumitem}
+\usepackage{mathtools}
+\usepackage{textcomp}
+% \usepackage{graphicx}
+% \usepackage{subcaption}
+% \usepackage[demo]{graphicx}
+\usepackage[super]{nth}
+% \usepackage{minted}
+% \usepackage[outputdir=build]{minted}
+\usepackage{minted}
+\usepackage{subcaption}
+
+\newenvironment{claim}[1]{\par\noindent\underline{Claim:}\space#1}{}
+\newenvironment{claimproof}[1]{\par\noindent\underline{Proof:}\space#1}{\hfill $\square$}
+
+\newtheorem{theorem}{Theorem}[section]
+% \newtheorem{corollary}{Corollary}[theorem]
+% \newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem*{definition}{Definition}
+\newtheorem*{corollary}{Corollary}
+\newtheorem{example}{Example}[section]
+
+\newcommand{\pow}{\text{POW}}
+\newcommand{\jac}[2]{\left( \frac{#1}{#2} \right)}
+\renewcommand{\vec}[1]{\mathbf{#1}}
+\renewcommand{\c}{\overline}
+\newcommand{\GG}{\mathcal{G}}
+\newcommand{\PP}[1]{\mathbb{P}\left( #1 \right)}
+\newcommand{\FF}{\mathcal{F}}
+\newcommand{\CC}{\mathbb{C}}
+\newcommand{\E}[1]{\mathbb{E}\left( #1 \right)}
+\newcommand{\Gnp}{\mathcal{G}(n,p)}
+\renewcommand{\t}[1]{\texttt{#1}}
+\newcommand{\floor}[1]{ \left\lfloor #1 \right\rfloor }
+\newcommand{\ceil}[1]{ \left\lceil #1 \right\rceil }
+\setcounter{secnumdepth}{0}
+
+\begin{document}
+
+\tableofcontents
+
+Let $\FF$ denote the discrete Fourier transform.
+
+[this is just a linear map $\CC^n \to \CC^n$ so it is matrix multiplication, by the matrix here: 
+
+\texttt{https://en.wikipedia.org/wiki/Discrete_Fourier_transform\#The_unitary_DFT}.] 
+
+Notably the matrix is invertible so the DFT is 1-to-1.
+
+\begin{claim}
+The image of $\mathbb{R}^n$ under $\FF$ is exactly the set of $x = (x_0, ... , x_{n-1}) \in \CC^n$ that satisfy 
+
+\begin{equation}
+    x_i = x_{-i}^*
+\end{equation}
+
+where the indices are taken modulo $n$.
+\end{claim}
+
+\begin{proof}
+    Good maths problem.
+\end{proof}
+
+Then this means that when we take $\FF^{-1}(x)$ and know that we're getting a real sequence out, it suffices to specify (complex numbers)) $x_0, x_1, ... , x_{n/2}$, as then we can determine $x_{n/2 + 1}, ... , x_{n-1}$ from these. However, the imaginary parts of $x_0$ and $x_{n/2}$ must be 0. This is the reason for the 113 in (1,3,224,113,2), since it specifies all the information required apply $\FF^{-1}$ and get a real sequence. Moreover, I guess the entries [:,:,:,0,1] and [:,:,:,112,1] are redundant, since as mentioned for DFT to return something real these imaginary parts need be 0.
+
+\end{document}
