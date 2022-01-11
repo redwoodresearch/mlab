@@ -1,6 +1,6 @@
 import torch as t
 import transformers
-import bert_tao as bert
+import days.w2d1.bert_tao as bert
 import torch.nn as nn
 import torch.nn.functional as F
 from utils import tpeek
@@ -159,6 +159,39 @@ def test_bert(your_module):
     allclose(
         theirs(input_ids=input_ids),
         reference(input_ids=input_ids).logits,
+        "bert",
+    )
+
+def test_bert_classification(your_module):
+    config = {
+        "vocab_size": 28996,
+        "intermediate_size": 3072,
+        "hidden_size": 768,
+        "num_layers": 12,
+        "num_heads": 12,
+        "max_position_embeddings": 512,
+        "dropout": 0.1,
+        "type_vocab_size": 2,
+        "num_classes": 2,
+    }
+    t.random.manual_seed(0)
+    reference = bert.Bert(config)
+    reference.eval()
+    t.random.manual_seed(0)
+    theirs = your_module(**config)
+    theirs.eval()
+    tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
+    input_ids = tokenizer("hello there", return_tensors="pt")["input_ids"]
+    logits, classifs = theirs(input_ids=input_ids)
+    allclose(
+        logits,
+        reference(input_ids=input_ids).logits,
+        "bert",
+    )
+
+    allclose(
+        classifs,
+        reference(input_ids=input_ids).classification,
         "bert",
     )
 
