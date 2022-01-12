@@ -14,7 +14,7 @@ from _gpt_sol import _UnidirectionalAttention, _GPT2Block, _GPT2
 
 
 def _check_equal(tensor1, tensor2):
-    assert torch.allclose(tensor1, tensor2, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(tensor1, tensor2, atol=1e-4, rtol=1e-4), f"Ours {tensor1} theirs {tensor2}"
     print("Congrats! You've passed the test!")
         
 
