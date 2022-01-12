@@ -188,8 +188,9 @@ class Bert(nn.Module):
     def forward(self, input_ids):
         token_type_ids = t.zeros_like(input_ids, dtype=int)
         emb = self.embed(input_ids, token_type_ids)
-        emb = self.lin(self.blocks(emb))
-        return self.unembed(self.layer_norm(F.gelu(emb)))
+        self._enc = enc = self.blocks(emb)
+        enc = self.lin(enc)
+        return self.unembed(self.layer_norm(F.gelu(enc)))
 
 
 bert_tests.test_bert(Bert)    
