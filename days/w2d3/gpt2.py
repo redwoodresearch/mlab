@@ -2,6 +2,7 @@ import torch as t
 import gpt_tests
 from einops import rearrange
 import torch.nn.functional as F
+import days.w2d1.bert_sol as bert_sol
 
 class UniModule(t.nn.Module):
     def __init__(self, hidden_size, num_heads):
@@ -89,3 +90,30 @@ class GPT2Module(t.nn.Module):
         return GPT2Output(logits, final_encoding)
 
 gpt_tests.test_gpt(GPT2Module)
+
+
+VOCAB_SIZE = 50257
+
+# Loading weights
+gpt = GPT2Module(num_layers=12, num_heads=12, vocab_size=VOCAB_SIZE, hidden_size=768, max_position_embeddings=1024, dropout=0.1, layer_norm_epsilon=1e-5)
+pretrained_gpt = gpt_tests.get_pretrained_gpt()
+gpt_keys = list(gpt.state_dict().keys())  # listifying this so that we can index into it
+pretrained_values = pretrained_gpt.state_dict().values()
+assert len(gpt_keys) == len(pretrained_values)
+
+state_dict = {}
+# assumes gpt.state_dict has same ordering as pretrained_gpt.state_dict
+for i, value in enumerate(pretrained_gpt.state_dict().values()):
+    state_dict[gpt_keys[i]] = value
+gpt.load_state_dict(state_dict)
+
+bert = bert_sol.Bert(
+    vocab_size=VOCAB_SIZE, 
+    hidden_size=768, 
+    max_position_embeddings=512,
+    type_vocab_size=2,
+    dropout=0.1, 
+    intermediate_size=3072, 
+    num_heads=12, 
+    num_layers=12,
+)
