@@ -14,7 +14,7 @@ from _gpt_sol import _UnidirectionalAttention, _GPT2Block, _GPT2
 
 
 def _check_equal(tensor1, tensor2):
-    assert torch.allclose(tensor1, tensor2, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(tensor1, tensor2, atol=1e-4, rtol=1e-4), (tensor1, tensor2)
     print("Congrats! You've passed the test!")
         
 
@@ -63,10 +63,19 @@ def test_gpt_block(GPT2Block):
     _out = _block(x)
     
     torch.manual_seed(710)
+
+    # new tests
+    # block = GPT2Block(**kwargs).cuda()
+    # out = block(x.cuda())
+
+    # old tests
     block = GPT2Block(**kwargs)
     out = block(x)
     
-    _check_equal(out, _out)
+    # for tens in [out, _out, out.cpu()-_out.cpu()]:
+        # print(torch.linalg.norm(tens))
+
+    _check_equal(out.cpu(), _out.cpu())
 
 
 def test_gpt(GPT2):
@@ -82,10 +91,10 @@ def test_gpt(GPT2):
     gpt = GPT2(**config)
     output = gpt(x)
     
-    print('Checking logits:')
-    _check_equal(_output.logits, output.logits)
     print('Checking final encodings:')
     _check_equal(_output.final_encoding, output.final_encoding)    
+    print('Checking logits:')
+    _check_equal(_output.logits, output.logits)
 
 
 def test_gpt_cache(GPT2):
