@@ -292,6 +292,11 @@ def hpsearch(name, fn_path, base_config, search_spec):
         )
         return
     grid = make_grid(search_spec)
+    if len(grid) > 40:
+        raise AssertionError(
+            f"During MLAB, let's only run 40 different hyperparameter combinations at once. You submitted {len(grid)}."
+        )
+
     random.shuffle(grid)
     config_strings = [
         base_config + "\n".join([f"{k} = {repr(v)}" for k, v in task.items()])
