@@ -118,6 +118,9 @@ if __name__ == "__main__":
     model = Bert(
         {"hidden_size": 256, "intermediate_size": 1024, "num_layers": 3, "num_heads": 8}
     )
+
+    
+
     model = my_bert_from_hf_weights()
     print(model)
     train_data_sentence_iterator = torchtext.datasets.WikiText2(split="valid")
