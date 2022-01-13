@@ -52,7 +52,7 @@ def train(experiment,
         "num_classes": 2
     }
     model, _ = my_bert_from_hf_weights(config=config)
-    model.to(device)
+    model = model.cuda()
     
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
     data_train, data_test = torchtext.datasets.IMDB(root=".data", split=("train", "test"))
@@ -66,12 +66,9 @@ def train(experiment,
     for epoch in range(num_epochs):
         for batch_inputs, batch_labels in zip(train_inputs, train_labels):
             
-            batch_inputs.to(device)
-            batch_labels.to(device)
+            out = model(batch_inputs.cuda()).classification
             
-            out = model(batch_inputs).classification
-            
-            loss = t.nn.functional.cross_entropy(out, batch_labels)
+            loss = t.nn.functional.cross_entropy(out, batch_labels.cuda())
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
