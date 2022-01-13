@@ -28,7 +28,7 @@ def preprocess_data(data, tokenizer, batch_size=8, max_seq_len=512):
     order = t.randperm(len(final_inputs))
     
     final_inputs = einops.rearrange(t.tensor(final_inputs[s:])[order,:], "(b k) w -> b k w", k = batch_size)
-    final_labels = einops.rearrange(t.tensor(final_labels[s:])[order,:], "(b k) -> b k", k = batch_size)
+    final_labels = einops.rearrange(t.tensor(final_labels[s:])[order], "(b k) -> b k", k = batch_size)
     
     return final_inputs, final_labels
 
