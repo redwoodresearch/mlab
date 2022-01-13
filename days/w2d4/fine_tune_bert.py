@@ -29,7 +29,8 @@ def preprocess_data(data, batch_size=8, max_seq_len=512):
 
 
 @gin.configurable
-def train(intermediate_size=3072, 
+def train(experiment,
+          intermediate_size=3072, 
           num_heads=12, 
           head_size=45, 
           context_length=512, 
