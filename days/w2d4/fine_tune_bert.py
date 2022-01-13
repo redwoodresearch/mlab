@@ -1,4 +1,4 @@
-from bert import my_bert_from_hf_weights
+from days.w2d4.bert import my_bert_from_hf_weights
 import transformers
 import gin
 import torchtext
