@@ -148,6 +148,15 @@ def einsum(string, *tensors):
     return wide.sum(dim=tuple(range(len(output), len(dim_order))))
 
 
+def allclose(my_out, their_out, name, tol=1e-5):
+
+    if not t.allclose(my_out, their_out, rtol=1e-4, atol=tol):
+        errstring = f'error in {name}\n{tpeek("", my_out, ret=True)} \n!=\n{tpeek("", their_out, ret=True)}'
+        raise AssertionError(errstring)
+    else:
+        tpeek(f"{name} MATCH!!!!!!!!\n", my_out)
+
+
 if __name__ == "__main__":
     i1, i2 = t.rand(10, 20, 40), t.rand(10, 40, 50)
     print(

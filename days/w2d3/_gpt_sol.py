@@ -29,7 +29,7 @@ class _UnidirectionalAttention(nn.Module):
         v = einops.rearrange(v, 'b n (h l) -> b h n l', h=self.n_heads)
         
         n = qkv.shape[1]
-        mask = (torch.arange(n).unsqueeze(1) <= torch.arange(n).unsqueeze(0))
+        mask = (torch.arange(n).unsqueeze(1) <= torch.arange(n).unsqueeze(0)).to(encodings.device)
         
         if return_key_values:
             new_key_values =  torch.cat([k, v], dim=-1)
@@ -39,7 +39,7 @@ class _UnidirectionalAttention(nn.Module):
             prev_k, prev_v = torch.split(past_key_values, self.head_size, dim=-1)
             k = torch.cat([prev_k.unsqueeze(0), k], dim=2)
             v = torch.cat([prev_v.unsqueeze(0), v], dim=2)
-            mask = torch.tensor([True])
+            mask = torch.tensor([True]).to(encodings.device)
 
         neg_inf = torch.tensor(-1e4).to(encodings.device)
         attn_scores = torch.einsum('bhki, bhqi -> bhkq', k, q) / math.sqrt(self.head_size)
@@ -160,7 +160,7 @@ class _GPT2(nn.Module):
         return GPT2Output(logits=logits[:, -1, :], final_encoding=x[:, -1, :])
 
     def next_token(self, input_ids, temperature, freq_penalty=2.0):
-        logits = self(input_ids.unsqueeze(0)).logits[0,-1]
+        logits = self(input_ids.unsqueeze(0)).logits[0]
         id_freqs = torch.bincount(input_ids, minlength=self.vocab_size)
         probs = (logits / temperature - id_freqs * freq_penalty).softmax(dim=-1)
         return torch.distributions.Categorical(probs).sample()
