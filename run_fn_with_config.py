@@ -1,6 +1,6 @@
 import os
 
-os.system("pip install scikit-learn torchtext pytest einops")
+os.system("pip install -r requirements2.txt")
 os.system("pip install -e .")
 
 from comet_ml import Experiment
@@ -21,6 +21,7 @@ def log_all_gin_parameters(experiment):
         configurable_ = gin.config._REGISTRY[selector]
         if configurable_.wrapped in (gin.config.macro, gin.config._retrieve_constant):
             continue
+        return
         minimal_selector = gin.config._minimal_selector(configurable_)
         scoped_selector = (scope + "/" if scope else "") + minimal_selector
         for arg, val in sorted(config.items()):
