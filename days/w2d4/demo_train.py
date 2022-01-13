@@ -15,6 +15,7 @@ class MyModel(nn.Module):
             *[nn.Linear(hidden_size, hidden_size) for _ in range(n_layers)],
             nn.Linear(hidden_size, output_size),
         )
+        self.hidden_size = hidden_size
 
     def forward(self, x):
         return self.mlps(x)
@@ -25,6 +26,12 @@ def train(experiment, batch_size, lr, num_epochs):
     model = MyModel()
     optimizer = t.optim.Adam(model.parameters(), lr)
     dataset = t.rand(1000, batch_size, 2, 2)
+    experiment.log_parameters({
+        "lr": lr,
+        "batch_size": batch_size,
+        "hidden_size": model.hidden_size,
+        "seed": t.initial_seed(),
+    })
     for epoch in range(num_epochs):
         for batch in dataset:
             loss = t.binary_cross_entropy_with_logits(model(batch[0]), batch[1]).mean()
