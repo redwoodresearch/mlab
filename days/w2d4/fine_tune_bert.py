@@ -57,7 +57,7 @@ def train(intermediate_size=3072,
     data_train = list(data_train)
     data_test = list(data_test)
     
-    train_inputs, train_labels = preprocess_data(data_train, batch_size=batch_size, max_seq_len=context_length):
+    train_inputs, train_labels = preprocess_data(data_train, batch_size=batch_size, max_seq_len=context_length)
     
     optimizer = t.optim.Adam(model.parameters(), lr)
     
