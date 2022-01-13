@@ -33,7 +33,7 @@ def preprocess_data(data, tokenizer, batch_size=8, max_seq_len=512):
 def train(experiment,
           intermediate_size=3072, 
           num_heads=12, 
-          head_size=54, 
+          head_size=64, 
           context_length=512, 
           num_layers=12,
           dropout=0.1,
@@ -51,6 +51,14 @@ def train(experiment,
         "type_vocab_size": 2,
         "num_classes": 2
     }
+    
+    for name, val in config.items():
+        experiment.log_parameter(name, val)
+            
+    experiment.log_parameter("lr", lr)
+    experiment.log_parameter("batch_size", batch_size)
+    experiment.log_parameter("num_epochs", num_epochs)
+        
     model, _ = my_bert_from_hf_weights(config=config)
     model = model.cuda()
     
