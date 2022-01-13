@@ -6,10 +6,10 @@ import einops
 import torch as t
 
 
-def tokenize_text(t, max_seq_len = 512):
+def tokenize_text(text, tokenizer, max_seq_len = 512):
     return tokenizer(text[0], truncation=True, padding='max_length', max_length=max_seq_len)["input_ids"]
     
-def preprocess_data(data, batch_size=8, max_seq_len=512):
+def preprocess_data(data, tokenizer, batch_size=8, max_seq_len=512):
     labels = [x[0] for x in data]
     text = [x[1] for x in data]
     final_inputs = []
@@ -18,7 +18,7 @@ def preprocess_data(data, batch_size=8, max_seq_len=512):
         if len(text[i].strip().split(" ")) < 10:
             continue
         else:
-            tokenized_text = tokenize_text(text[i], max_seq_len)
+            tokenized_text = tokenize_text(text[i], tokenizer, max_seq_len)
             final_inputs.append(tokenized_text)
             final_labels.append(0 if labels[i] == "neg" else 1)
             
@@ -58,7 +58,7 @@ def train(experiment,
     data_train = list(data_train)
     data_test = list(data_test)
     
-    train_inputs, train_labels = preprocess_data(data_train, batch_size=batch_size, max_seq_len=context_length)
+    train_inputs, train_labels = preprocess_data(data_train, tokenizer, batch_size=batch_size, max_seq_len=context_length)
     
     optimizer = t.optim.Adam(model.parameters(), lr)
     
