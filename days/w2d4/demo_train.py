@@ -24,10 +24,7 @@ class MyModel(nn.Module):
 def train(experiment, batch_size, lr, num_epochs):
     model = MyModel()
     optimizer = t.optim.Adam(model.parameters(), lr)
-    X, y = make_moons(n_samples=512, noise=0.05, random_state=354)
-    dataset = DataLoader(
-        TensorDataset(X, y[:, None]), batch_size=batch_size, shuffle=True
-    )
+    dataset = t.rand(1000, batch_size, 2, 2)
     for epoch in num_epochs:
         for batch in dataset:
             loss = t.binary_cross_entropy_with_logits(model(batch[0]), batch[1])
