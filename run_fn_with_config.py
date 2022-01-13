@@ -46,7 +46,7 @@ def run_fn_with_config(fnpath: str, config: str, name: str, comet_key: str):
     gin.add_config_file_search_path(gin_search_path)
     gin.parse_config_files_and_bindings(config_files=[temp_name], bindings=[])
 
-    experiment = Experiment(name, api_key=comet_key)
+    experiment = Experiment(project_name=name, api_key=comet_key)
     log_all_gin_parameters(experiment)
     set_random_seed()
     fn_return = fn(experiment=experiment)
