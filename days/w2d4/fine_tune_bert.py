@@ -24,8 +24,12 @@ def preprocess_data(data, tokenizer, batch_size=8, max_seq_len=512):
             final_labels.append(0 if labels[i] == "neg" else 1)
             
     s = len(final_inputs) % batch_size
-    final_inputs = einops.rearrange(t.tensor(final_inputs[s:]), "(b k) w -> b k w", k = batch_size)
-    final_labels = einops.rearrange(t.tensor(final_labels[s:]), "(b k) -> b k", k = batch_size)
+    
+    order = t.randperm(0, len(final_inputs))
+    
+    final_inputs = einops.rearrange(t.tensor(final_inputs[s:])[order,:], "(b k) w -> b k w", k = batch_size)
+    final_labels = einops.rearrange(t.tensor(final_labels[s:])[order,:], "(b k) -> b k", k = batch_size)
+    
     return final_inputs, final_labels
 
 
@@ -60,6 +64,7 @@ def train(experiment,
     experiment.log_parameter("num_epochs", num_epochs)
         
     model, _ = my_bert_from_hf_weights(config=config)
+    model.train()
     model = model.cuda()
     
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")

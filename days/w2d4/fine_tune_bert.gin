@@ -4,7 +4,6 @@ train.head_size = 64
 train.context_length = 512
 train.num_layers = 12
 train.dropout = 0.1
-train.lr = 0.01
 train.batch_size = 8
 train.num_epochs = 1
 
