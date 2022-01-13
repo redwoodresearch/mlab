@@ -14,6 +14,7 @@ days/pp_nominibatch.py
 days/rrjobs.py
 days/simple_policy_gradient.py
 days/torch_intro.py
+days/utils.py
 ml_bootcamp.egg-info/PKG-INFO
 ml_bootcamp.egg-info/SOURCES.txt
 ml_bootcamp.egg-info/dependency_links.txt

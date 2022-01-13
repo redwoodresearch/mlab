@@ -1,7 +1,7 @@
 import os
 
-os.system("pip install -r requirements.txt")
-os.system("pip install -e .")
+os.system("pip install -q -r requirements.txt")
+os.system("pip install -q -e .")
 
 from comet_ml import Experiment
 import torch

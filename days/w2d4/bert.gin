@@ -1,0 +1,12 @@
+BertWithClassify.vocab_size = 28996
+BertWithClassify.intermediate_size = 3072
+BertWithClassify.hidden_size = 768
+BertWithClassify.num_layers = 12
+BertWithClassify.num_heads = 12
+BertWithClassify.max_position_embeddings = 512
+BertWithClassify.dropout = 0.1
+BertWithClassify.type_vocab_size = 2
+BertWithClassify.num_classes = 2
+train.lr = 1e-4
+train.batch_size = 6
+train.num_epochs = 1
