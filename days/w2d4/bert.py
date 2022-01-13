@@ -290,5 +290,5 @@ def my_bert_from_hf_weights(their_lm_bert=None, config={}):
     return my_model, their_lm_bert
 
 
-# if __name__ == "__main__":
-#     my_bert_from_hf_weights()
+if __name__ == "__main__":
+    my_bert_from_hf_weights()

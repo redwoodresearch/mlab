@@ -50,7 +50,7 @@ def train(experiment,
         "type_vocab_size": 2,
         "num_classes": 2
     }
-    model, _ = my_bert_from_hf_weights(config)
+    model, _ = my_bert_from_hf_weights(config=config)
     model.to("cuda")
     
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
