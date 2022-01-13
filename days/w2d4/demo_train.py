@@ -25,9 +25,9 @@ def train(experiment, batch_size, lr, num_epochs):
     model = MyModel()
     optimizer = t.optim.Adam(model.parameters(), lr)
     dataset = t.rand(1000, batch_size, 2, 2)
-    for epoch in num_epochs:
+    for epoch in range(num_epochs):
         for batch in dataset:
-            loss = t.binary_cross_entropy_with_logits(model(batch[0]), batch[1])
+            loss = t.binary_cross_entropy_with_logits(model(batch[0]), batch[1]).mean()
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
