@@ -4,12 +4,25 @@ from __future__ import annotations
 
 import math
 import re
+from typing import Tuple
 
 import days.w2d1.bert_tests as bert_tests
 import torch as t
 from einops import rearrange, repeat
 from torch import einsum, nn
 from torch.nn import functional as F
+
+DEFAULT_CONFIG = {
+    "vocab_size": 28996,
+    "hidden_size": 768,
+    "max_position_embeddings": 512,
+    "type_vocab_size": 2,
+    "dropout": 0.1,
+    "intermediate_size": 3072,
+    "num_heads": 12,
+    "num_layers": 12,
+    "num_classes": 2,
+}
 
 
 def raw_attention_pattern(
@@ -324,7 +337,21 @@ class BertWithClassify(nn.Module):
         self.classification_head = nn.Linear(hidden_size, num_classes)
         self.classification_dropout = nn.Dropout(dropout)
 
-    def forward(self, input_ids):
+    @classmethod
+    def pretrained(cls):
+        bert = Bert.pretrained()
+        ret_bert = cls(**DEFAULT_CONFIG)
+        load_return = ret_bert.load_state_dict(bert.state_dict(), 
+        strict=False)
+        missing_keys = load_return.missing_keys
+        unexpected_keys = load_return.unexpected_keys
+        assert len(missing_keys) == 2, f"Missing keys is {missing_keys} not {['classification_head.weight', 'classification_head.bias']}"
+        for key in ['classification_head.weight', 'classification_head.bias']:
+            assert key in missing_keys
+        assert len(unexpected_keys) == 0, f"{unexpected_keys}"
+        return ret_bert
+
+    def forward(self, input_ids: t.Tensor) -> Tuple[t.Tensor, t.Tensor]:
         token_type_ids = t.zeros_like(input_ids, dtype=int)
         emb = self.blocks(self.embed(input_ids, token_type_ids))
         logits = self.unembed(self.layer_norm(F.gelu((self.lin(emb)))))
@@ -333,6 +360,8 @@ class BertWithClassify(nn.Module):
 
 
 if __name__ == "__main__":
+    BertWithClassify.pretrained()
+    print("Loaded")
     bert_tests.test_bert(Bert)
     bert_tests.test_bert_classification(BertWithClassify)
     pretrained_bert = bert_tests.get_pretrained_bert()
