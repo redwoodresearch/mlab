@@ -3,7 +3,7 @@ import numpy as np
 from modules import cross_entropy
 from einops import rearrange
 from days.bert import Bert, my_bert_from_hf_weights
-from utils import tpeek
+from days.utils import tpeek
 import transformers
 import torchtext
 import gin
@@ -118,8 +118,6 @@ if __name__ == "__main__":
     model = Bert(
         {"hidden_size": 256, "intermediate_size": 1024, "num_layers": 3, "num_heads": 8}
     )
-
-    
 
     model = my_bert_from_hf_weights()
     print(model)

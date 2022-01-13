@@ -4,11 +4,11 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import gin
 import sys
-from utils import import_object_from_qualified_name
+from days.utils import import_object_from_qualified_name
 import torch as t
 import numpy as np
 from sklearn.datasets import make_moons
-from utils import *
+from days.utils import *
 import os
 import signal
 
@@ -67,7 +67,9 @@ class DistributedDataLoader:
     def __iter__(self):
         if self.batches is not None:
             for mini_batches in self.batches:
-                dist.broadcast_object_list(mini_batches, src=0) # all processes must do this, else all wait forever
+                dist.broadcast_object_list(
+                    mini_batches, src=0
+                )  # all processes must do this, else all wait forever
                 my_batch = mini_batches[self.rank]
                 yield my_batch
         else:
@@ -107,7 +109,7 @@ def run(
 
     # If rank 0, loads data, splits things, keeps a minibatch
     # else, listen for a minibatch from rank 1
-    dataloader = DistributedDataLoader(rank=rank, size=size) 
+    dataloader = DistributedDataLoader(rank=rank, size=size)
     for batch_num, batch in enumerate(dataloader):
         # print("batch", batch)
         out = model(batch[0].to(DEVICE))
@@ -126,10 +128,12 @@ def run(
 
 
 @gin.configurable
-def init_process(rank, size, run, device, backend="gloo"): #gloo is algo for sharing gradients. nccl better?
+def init_process(
+    rank, size, run, device, backend="gloo"
+):  # gloo is algo for sharing gradients. nccl better?
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
-    os.environ["MASTER_PORT"] = "29500" #make the master available for mutual contact
+    os.environ["MASTER_PORT"] = "29500"  # make the master available for mutual contact
     if device == "cuda":
         global DEVICE
         DEVICE = "cuda:" + str(rank)
@@ -147,7 +151,7 @@ def create_processes(
     # raise AssertionError(":)")
     processes = []
     mp.set_start_method("spawn")
-    for rank in range(local_parallelism): #process index = rank
+    for rank in range(local_parallelism):  # process index = rank
         p = mp.Process(target=init_process, args=(rank, local_parallelism, run, device))
         p.start()
         processes.append(p)
@@ -155,7 +159,9 @@ def create_processes(
 
 
 if __name__ == "__main__":
-    local_parallelism = 2 if len(sys.argv) < 3 else int(sys.argv[2]) # number of processes in parallel
+    local_parallelism = (
+        2 if len(sys.argv) < 3 else int(sys.argv[2])
+    )  # number of processes in parallel
     device = "cpu" if sys.argv[3] == "cpu" else "cuda"
     if sys.argv[1] == "master":
         # gin.parse_config_file(sys.argv[2])

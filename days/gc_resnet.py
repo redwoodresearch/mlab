@@ -7,7 +7,7 @@ import torchvision
 # import gin
 import sys
 import torch as t
-from utils import *
+from days.utils import *
 import signal
 from tqdm import tqdm
 from days.gradient_compression import LowRankCompressionDistributedSGD
