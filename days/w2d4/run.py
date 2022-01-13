@@ -1,6 +1,6 @@
-import search
+import hpsearch
 
-search.hpsearch(
+hpsearch.hpsearch(
     "mlps_without_activations",
     "days.w2d4.demo_train.train",
     "days/w2d4/demo_train.gin",
