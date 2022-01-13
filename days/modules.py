@@ -4,7 +4,7 @@ import torch as t
 import numpy as np
 from torch.nn import Module, Parameter
 
-from utils import tpeek
+from days.utils import tpeek
 
 
 def log_softmax(tensor: t.Tensor, dim: int = 0):
@@ -46,7 +46,9 @@ class ReLU(Module):
 
 
 def layer_norm(x, weight, bias):
-    x = (x - x.mean(-1, keepdim=True).detach()) / t.sqrt(x.var(-1, keepdim=True).detach() + 1e-5)
+    x = (x - x.mean(-1, keepdim=True).detach()) / t.sqrt(
+        x.var(-1, keepdim=True).detach() + 1e-5
+    )
     x = x * weight + bias
     return x
 
@@ -87,7 +89,9 @@ class Linear(Module):
     def __init__(self, x, y, bias=True):
         super(Linear, self).__init__()
         weight_bound = 1 / np.sqrt(x)
-        self.weight = Parameter(t.FloatTensor(y, x).uniform_(-weight_bound, weight_bound))
+        self.weight = Parameter(
+            t.FloatTensor(y, x).uniform_(-weight_bound, weight_bound)
+        )
         if bias:
             bias_bound = 1 / np.sqrt(y)
             self.bias = Parameter(t.FloatTensor(y).uniform_(-bias_bound, bias_bound))
@@ -113,7 +117,9 @@ class Embedding(Module):
 
     def unembed(self, embeddings):
         # because the weight initialization is meant for embedding, we need to scale it when we matmul
-        return t.einsum("...j,kj->...k", embeddings, self.weight) / np.sqrt(self.embedding_size)
+        return t.einsum("...j,kj->...k", embeddings, self.weight) / np.sqrt(
+            self.embedding_size
+        )
 
 
 def cross_entropy(input, target, ignore_index=None, max=1e12):
@@ -183,15 +189,17 @@ class Conv2d(Module):
         oW = (iW + 2 * pW - kW) // sW + 1
 
         from torch.nn.functional import pad
-        padded_x = pad(x, [pW, pW, pH, pH])
 
+        padded_x = pad(x, [pW, pW, pH, pH])
 
         conv_size = (B, iC, oH, oW, kH, kW)
         bs, cs, hs, ws = padded_x.stride()
-        conv_stride = (bs, cs, hs*sH, ws*sW, hs, ws)
+        conv_stride = (bs, cs, hs * sH, ws * sW, hs, ws)
         strided_x = t.as_strided(padded_x, size=conv_size, stride=conv_stride)
 
-        return t.einsum('bcxyij,ocij->boxy', strided_x, self.weight) + self.bias.reshape(1, -1, 1, 1)
+        return t.einsum(
+            "bcxyij,ocij->boxy", strided_x, self.weight
+        ) + self.bias.reshape(1, -1, 1, 1)
 
 
 class MaxPool2d(Module):
@@ -220,11 +228,12 @@ class MaxPool2d(Module):
         oW = (iW + 2 * pW - kW) // sW + 1
 
         from torch.nn.functional import pad
-        padded_x = pad(x, [pW, pW, pH, pH], value=-float('inf'))
+
+        padded_x = pad(x, [pW, pW, pH, pH], value=-float("inf"))
 
         conv_size = (B, iC, oH, oW, kH, kW)
         bs, cs, hs, ws = padded_x.stride()
-        conv_stride = (bs, cs, hs*sH, ws*sW, hs, ws)
+        conv_stride = (bs, cs, hs * sH, ws * sW, hs, ws)
         strided_x = t.as_strided(padded_x, size=conv_size, stride=conv_stride)
 
         return strided_x.amax((-2, -1))
@@ -270,7 +279,9 @@ class BatchNorm2d(Module):
             var = self.running_var
 
         rs = lambda u: u.reshape(1, -1, 1, 1)
-        return rs(self.weight) * (x - rs(mean)) / t.sqrt(rs(var) + self.eps) + rs(self.bias)
+        return rs(self.weight) * (x - rs(mean)) / t.sqrt(rs(var) + self.eps) + rs(
+            self.bias
+        )
 
 
 class AdaptiveAvgPool2d(Module):
@@ -281,7 +292,10 @@ class AdaptiveAvgPool2d(Module):
     def forward(self, x):
         def kernels(in_dim, out_dim):
             return [
-                slice(math.floor((i * in_dim) / out_dim), math.ceil(((i + 1) * in_dim) / out_dim))
+                slice(
+                    math.floor((i * in_dim) / out_dim),
+                    math.ceil(((i + 1) * in_dim) / out_dim),
+                )
                 for i in range(out_dim)
             ]
 

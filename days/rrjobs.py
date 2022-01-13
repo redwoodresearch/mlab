@@ -1,4 +1,4 @@
-from utils import import_object_from_qualified_name
+from days.utils import import_object_from_qualified_name
 import requests
 import os
 from typing import *

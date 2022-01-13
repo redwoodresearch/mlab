@@ -28,7 +28,7 @@ import gin
 
 from pathlib import Path
 
-from utils import (
+from days.utils import (
     import_object_from_qualified_name,
 )
 

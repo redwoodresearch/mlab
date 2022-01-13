@@ -10,7 +10,7 @@ from typing import *
 import gin
 import os
 import json
-from utils import import_object_from_qualified_name
+from days.utils import import_object_from_qualified_name
 
 
 def log_all_gin_parameters(experiment):

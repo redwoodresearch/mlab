@@ -3,7 +3,7 @@ import transformers
 import days.w2d1.bert_tao as bert
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import tpeek
+from days.utils import tpeek
 
 
 def allclose(my_out, their_out, name, tol=1e-5):
@@ -124,7 +124,12 @@ def test_bert_mlp(fn):
     dropout.eval()
     allclose(
         fn(token_activations=token_activations, linear_1=mlp_1, linear_2=mlp_2),
-        reference(token_activations=token_activations, linear_1=mlp_1, linear_2=mlp_2, dropout=dropout),
+        reference(
+            token_activations=token_activations,
+            linear_1=mlp_1,
+            linear_2=mlp_2,
+            dropout=dropout,
+        ),
         "bert mlp",
     )
 
@@ -134,7 +139,7 @@ def test_layer_norm(LayerNorm):
     ln2 = nn.LayerNorm(10)
     tensor = t.randn(20, 10)
     allclose(ln1(tensor), ln2(tensor), "layer norm")
-    
+
 
 # TODO write this
 def test_bert(your_module):
@@ -161,6 +166,7 @@ def test_bert(your_module):
         reference(input_ids=input_ids).logits,
         "bert",
     )
+
 
 def test_bert_classification(your_module):
     config = {
@@ -199,9 +205,12 @@ def test_bert_classification(your_module):
 def test_same_output(your_bert, pretrained_bert, tol=1e-4):
     vocab_size = pretrained_bert.embedding.token_embedding.weight.shape[0]
     input_ids = t.randint(0, vocab_size, (10, 20))
-    allclose(your_bert.eval()(input_ids),
-             pretrained_bert.eval()(input_ids).logits,
-             'comparing Berts', tol=tol)
+    allclose(
+        your_bert.eval()(input_ids),
+        pretrained_bert.eval()(input_ids).logits,
+        "comparing Berts",
+        tol=tol,
+    )
 
 
 def test_bert_block(your_module):
@@ -212,7 +221,7 @@ def test_bert_block(your_module):
         "num_layers": 12,
         "num_heads": 12,
         "max_position_embeddings": 512,
-        "dropout": 0.1, 
+        "dropout": 0.1,
         "type_vocab_size": 2,
     }
     t.random.manual_seed(0)
@@ -242,7 +251,7 @@ def test_embedding(Embedding):
     emb2 = nn.Embedding(10, 5)
     allclose(emb1(input), emb2(input), "embedding")
 
-    
+
 def test_bert_embedding_fn(your_fn):
     config = {
         "vocab_size": 28996,
