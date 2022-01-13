@@ -1,11 +1,16 @@
+import os
+
+os.system("pip install -r requirements.txt")
+os.system("pip install -e .")
+
 from comet_ml import Experiment
-import argparse
+import torch
+import numpy as np
 from typing import *
 import gin
 import os
 import json
 from utils import import_object_from_qualified_name
-import sys
 
 
 def log_all_gin_parameters(experiment):
@@ -22,12 +27,15 @@ def log_all_gin_parameters(experiment):
             experiment.log_parameter(f"{scoped_selector}.{arg}", str(val))
 
 
+@gin.configurable
+def set_random_seed(seed=0):
+    torch.manual_seed(seed)
+    # np.random.seed(seed)
+
+
 def run_fn_with_config(fnpath: str, config: str, name: str, comet_key: str):
     """given a function and a gin config, run it with the config"""
 
-    os.system(
-        "pip install -r requirements.txt"
-    )  # to remove when mlab deps are preinstalled
     temp_name = "TEMP_CONFIG.gin"
 
     fn = import_object_from_qualified_name(fnpath)
@@ -40,7 +48,12 @@ def run_fn_with_config(fnpath: str, config: str, name: str, comet_key: str):
 
     experiment = Experiment(name, api_key=comet_key)
     log_all_gin_parameters(experiment)
-    fn(experiment)
+    set_random_seed()
+    fn_return = fn(experiment=experiment)
+    if fn_return is not None:
+        fname = "tempmodel.pt"
+        torch.save(fn_return, fname)
+        experiment.log_model("model", fname)
 
 
 if __name__ == "__main__":
