@@ -1,6 +1,6 @@
 train.intermediate_size = 3072
 train.num_heads = 12
-train.head_size = 45
+train.head_size = 64
 train.context_length = 512
 train.num_layers = 12
 train.dropout = 0.1

@@ -33,7 +33,7 @@ def preprocess_data(data, tokenizer, batch_size=8, max_seq_len=512):
 def train(experiment,
           intermediate_size=3072, 
           num_heads=12, 
-          head_size=45, 
+          head_size=54, 
           context_length=512, 
           num_layers=12,
           dropout=0.1,
