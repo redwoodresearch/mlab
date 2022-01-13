@@ -1,4 +1,4 @@
-import days.w2d1.bert_tests as bert_tests
+import bert_tests as bert_tests
 from einops import rearrange, reduce, repeat
 import math
 import re

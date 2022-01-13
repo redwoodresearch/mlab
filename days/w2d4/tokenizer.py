@@ -1,9 +1,10 @@
+import os
 from typing import Counter
 import transformers
 import numpy as np
 import sentencepiece as spm
 from transformers.models.auto.tokenization_auto import AutoTokenizer
-from days.utils import Timer, getprops
+from mlab.days.utils import Timer, getprops
 import json
 import functools
 import torch as t
@@ -13,7 +14,7 @@ import itertools
 import re
 from pathlib import Path
 
-corpus = open(Path.home() / "mlab/shakespeare.txt").readlines()
+corpus = open(os.getcwd() + "/shakespeare.txt").readlines()
 minicorpus = corpus[5000:6000]
 
 
