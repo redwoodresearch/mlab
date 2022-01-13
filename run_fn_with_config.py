@@ -1,6 +1,6 @@
 import os
 
-os.system("pip install -r requirements2.txt")
+os.system("pip install -r requirements.txt")
 os.system("pip install -e .")
 
 from comet_ml import Experiment
