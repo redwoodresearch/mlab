@@ -160,7 +160,7 @@ class _GPT2(nn.Module):
         return GPT2Output(logits=logits[:, -1, :], final_encoding=x[:, -1, :])
 
     def next_token(self, input_ids, temperature, freq_penalty=2.0):
-        logits = self(input_ids.unsqueeze(0)).logits[0,-1]
+        logits = self(input_ids.unsqueeze(0)).logits[0]
         id_freqs = torch.bincount(input_ids, minlength=self.vocab_size)
         probs = (logits / temperature - id_freqs * freq_penalty).softmax(dim=-1)
         return torch.distributions.Categorical(probs).sample()
