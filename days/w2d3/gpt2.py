@@ -8,6 +8,8 @@ import days.w2d1.bert_tests as bert_tests
 VOCAB_SIZE = 50257
 BERT_VOCAB_SIZE = 28996
 
+DEVICE = t.device("cuda:0" if t.cuda.is_available() else "cpu")
+
 class UniModule(t.nn.Module):
     def __init__(self, hidden_size, num_heads):
         assert hidden_size % num_heads == 0
@@ -149,7 +151,7 @@ class GPT2Module(t.nn.Module):
 
         self.register_buffer('cache', t.zeros((num_layers, num_heads, 0, 2 * self.head_size)), persistent=False)
 
-        self.id_frequencies = t.zeros(self.vocab_size)
+        self.id_frequencies = t.zeros(self.vocab_size, device=DEVICE)
         self.tokenizer = None
 
     def forward(self, input_ids): # [batch, seq_len]
@@ -197,7 +199,7 @@ class GPT2Module(t.nn.Module):
         probability_dist = F.softmax(new_logits, dim=0)
 
         p = rearrange(probability_dist, '(d1 d2) -> d1 d2', d1=1)
-        p = t.cumsum(p, dim=1) - t.rand(1, 1)
+        p = t.cumsum(p, dim=1) - t.rand(1, 1, device=DEVICE)
         p = (p > 0).float()
         result = t.argmax(p, dim=1).item()
         return result
@@ -206,16 +208,16 @@ class GPT2Module(t.nn.Module):
         if self.tokenizer is None:
             self.tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")        
 
-        self.cache = t.zeros(self.num_layers, self.num_heads, 0, 2 * self.head_size)
-        self.id_frequencies = t.zeros(self.vocab_size)
-        tokens = t.tensor(self.tokenizer.encode(text)).long()
+        self.cache = t.zeros(self.num_layers, self.num_heads, 0, 2 * self.head_size, device=DEVICE)
+        self.id_frequencies = t.zeros(self.vocab_size, device=DEVICE)
+        tokens = t.tensor(self.tokenizer.encode(text), dtype=t.long, device=DEVICE)
 
         for token in tokens: 
             self.id_frequencies[token.item()] += 1
 
         while tokens.shape[0] < max_length and tokens[-1] != self.tokenizer.eos_token_id:
             next_token = self.next_token(tokens.unsqueeze(0), temperature=temperature, freq_penalty=freq_penalty)
-            new_tokens = t.zeros(tokens.shape[0] + 1).long()
+            new_tokens = t.zeros(tokens.shape[0] + 1, dtype=t.long, device=DEVICE)
             new_tokens[:-1] = tokens
             new_tokens[-1] = next_token
             tokens = new_tokens
@@ -296,12 +298,16 @@ def look_at_encodings():
     print("\n\nGPT ########################")
     print(gpt2_encodings[:,2])
 
+# print("USING UNTRAINED TINY MODEL")
 # config = dict(num_layers=2, num_heads=4, vocab_size=VOCAB_SIZE, hidden_size=64,
 #     max_position_embeddings=500, dropout=0.0, layer_norm_epsilon=1e-4)
 # gpt2 = GPT2Module(**config)
 
 gpt2 = load_gpt()
+gpt2.to(DEVICE)
+gpt2.eval()
 for _ in range(10):
     print("-------BEGIN GENERATION--------")
-    print(gpt2.generate('There was a young man named Martin with an offer to read history at Queen\'s college, Oxford', max_length=60, temperature=1.0))
+    # print(gpt2.generate('There was a young man named Martin with an offer to read history at Queen\'s college, Oxford', max_length=60, temperature=1.0))
+    print(gpt2.generate('This is a SQL query:', max_length=120, temperature=1.0))
     print("--------END GENERATION---------")
