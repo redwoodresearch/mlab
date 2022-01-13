@@ -5,7 +5,7 @@ import torchtext
 import einops
 import torch as t
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = t.device('cuda' if t.cuda.is_available() else 'cpu')
 
 def tokenize_text(text, tokenizer, max_seq_len = 512):
     return tokenizer(text[0], truncation=True, padding='max_length', max_length=max_seq_len)["input_ids"]

@@ -15,7 +15,7 @@ from einops import rearrange
 from days.utils import tpeek, copy_weight_bias
 from dataclasses import dataclass
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = t.device('cuda' if t.cuda.is_available() else 'cpu')
 
 
 class BertEmbedding(Module):
