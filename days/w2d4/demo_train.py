@@ -22,6 +22,7 @@ class MyModel(nn.Module):
 
 @gin.configurable
 def train(experiment, batch_size, lr, num_epochs):
+    print(experiment)
     model = MyModel()
     optimizer = t.optim.Adam(model.parameters(), lr)
     dataset = t.rand(1000, batch_size, 2, 2)

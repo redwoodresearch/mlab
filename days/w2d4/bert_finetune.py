@@ -59,8 +59,6 @@ def get_accuracy(
             _, out = bert.forward(x)
             preds = t.argmax(out, dim=-1)
 
-        print(y)
-
         num_correct += (preds == y).sum()
         num_total += len(y)
         pbar.set_description(f"acc={num_correct / num_total:.2}")
@@ -75,32 +73,34 @@ def train(
     test_batch_size: int,
     num_epochs: int,
     lr: float,
+    log_every: int,
 ) -> BertWithClassify:
     data_train_gen, data_test_gen = torchtext.datasets.IMDB(
         root=".data", split=("train", "test")
     )
     data_train = list(data_train_gen)
     data_test = list(data_test_gen)
-    indices = t.randint(0, len(data_train), size=(100,))
-    data_train = [data_train[i] for i in indices]
-    data_test = [data_test[i] for i in indices]
+
+    small_indices = t.randint(0, len(data_train), size=(256,))
+    small_train = [data_train[i] for i in small_indices]
+    small_test = [data_test[i] for i in small_indices]
     
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
     collate_fn = get_imdb_collate_fn(512, tokenizer, device="cuda")
 
-    # dl_train_small = DataLoader(
-    #     random.sample(data_train, k=train_batch_size),
-    #     batch_size=train_batch_size,
-    #     collate_fn=collate_fn,
-    #     shuffle=True,
-    # )
+    dl_train_small = DataLoader(
+        small_train,
+        batch_size=train_batch_size,
+        collate_fn=collate_fn,
+        shuffle=True,
+    )
 
-    # dl_test_small = DataLoader(
-    #     random.sample(data_test, k=test_batch_size),
-    #     batch_size=test_batch_size,
-    #     collate_fn=collate_fn,
-    #     shuffle=True,
-    # )
+    dl_test_small = DataLoader(
+        small_test,
+        batch_size=test_batch_size,
+        collate_fn=collate_fn,
+        shuffle=True,
+    )
 
     dl_train = DataLoader(
         data_train,
@@ -121,8 +121,9 @@ def train(
 
     bert.train()
     optimizer = optim.Adam(bert.parameters(), lr=lr)  # broken?
-    for epoch in range(num_epochs):
 
+    step = 0
+    for epoch in range(num_epochs):
         for x, y in tqdm(dl_train):
             optimizer.zero_grad()
             _, out = bert(x)
@@ -130,13 +131,15 @@ def train(
             loss.backward()
             optimizer.step()
 
-        bert.eval()
-        test_acc = get_accuracy(bert, dl_test)
-        train_acc = get_accuracy(bert, dl_train)
-        bert.train()
+            step += 1
+            if step % log_every == 0:
+                bert.eval()
+                small_test_acc = get_accuracy(bert, dl_test_small)
+                small_train_acc = get_accuracy(bert, dl_train_small)
+                bert.train()
 
-        experiment.log_metric(name="test_acc", value=test_acc, step=epoch)
-        experiment.log_metric(name="train_acc", value=train_acc, step=epoch)
+                experiment.log_metric(name="small_test_acc", value=small_test_acc, step=step, epoch=epoch)
+                experiment.log_metric(name="small_train_acc", value=small_train_acc, step=step, epoch=epoch)
 
     return bert
 

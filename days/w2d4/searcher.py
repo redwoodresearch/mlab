@@ -32,5 +32,5 @@ hpsearch.hpsearch(
     },
     # We provide an additional Gin-configurable function set_random_seed(seed). This means you can control it in your gin without writing the function yourself
     comet_key=API_KEY,
-    local=False,  # set to false after it works locally!
+    local=True,  # set to false after it works locally!
 )
