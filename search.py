@@ -273,7 +273,7 @@ def make_grid(axes):
     ]
 
 
-def hpsearch(name, fn_path, base_config, search_spec):
+def hpsearch(name, fn_path, base_config, search_spec, comet_key):
     base_config = open(base_config).read()
     init_anykey()
     interface = Interface()
@@ -309,6 +309,8 @@ def hpsearch(name, fn_path, base_config, search_spec):
             "parameters": {
                 "fn_path": fn_path,  # FIX!!!!
                 "gin_config": config_string,
+                "name": name,
+                "comet_key": comet_key,
             },
         }
         for config_string in config_strings

@@ -1,0 +1,7 @@
+# Class.x is how you say Class.__init__.x
+MyModel.hidden_size = 16
+MyModel.input_size = 2
+MyModel.output_size = 2
+
+train.lr = 1e-4
+train.batch_size = 6
