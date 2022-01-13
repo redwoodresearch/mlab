@@ -1,13 +1,15 @@
 """A slightly modified copy of days.w2d1.bert_sol."""
 
-import days.w2d1.bert_tests as bert_tests
-from einops import rearrange, reduce, repeat
+from __future__ import annotations
+
 import math
 import re
+
+import days.w2d1.bert_tests as bert_tests
 import torch as t
-from torch import einsum
+from einops import rearrange, repeat
+from torch import einsum, nn
 from torch.nn import functional as F
-from torch import nn
 
 
 def raw_attention_pattern(
@@ -244,6 +246,54 @@ class Bert(nn.Module):
         enc = self.lin(enc)
         return self.unembed(self.layer_norm(F.gelu(enc)))
 
+    @classmethod
+    def pretrained(cls) -> Bert:
+        def mapkey(key):
+            key = re.sub("^embedding\.", "embed.", key)
+            key = re.sub("\.position_embedding\.", ".pos_embedding.", key)
+            key = re.sub("^lm_head\.mlp\.", "lin.", key)
+            key = re.sub("^lm_head\.unembedding\.", "unembed.", key)
+            key = re.sub("^lm_head\.layer_norm\.", "layer_norm.", key)
+            key = re.sub(
+                "^transformer\.([0-9]+)\.layer_norm", "blocks.\\1.layernorm1", key
+            )
+            key = re.sub(
+                "^transformer\.([0-9]+)\.attention\.pattern\.",
+                "blocks.\\1.attention.",
+                key,
+            )
+            key = re.sub(
+                "^transformer\.([0-9]+)\.residual\.layer_norm\.",
+                "blocks.\\1.layernorm2.",
+                key,
+            )
+
+            key = re.sub("^transformer\.", "blocks.", key)
+            key = re.sub("\.project_out\.", ".project_output.", key)
+            key = re.sub("\.residual\.mlp", ".mlp.lin", key)
+            return key
+
+        pretrained_bert = bert_tests.get_pretrained_bert()
+        mapped_params = {
+            mapkey(k): v
+            for k, v in pretrained_bert.state_dict().items()
+            if not k.startswith("classification_head")
+        }
+
+        ret_bert = cls(
+            vocab_size=28996,
+            hidden_size=768,
+            max_position_embeddings=512,
+            type_vocab_size=2,
+            dropout=0.1,
+            intermediate_size=3072,
+            num_heads=12,
+            num_layers=12,
+        )
+        ret_bert.load_state_dict(mapped_params)
+
+        return ret_bert
+
 
 class BertWithClassify(nn.Module):
     def __init__(
@@ -282,44 +332,8 @@ class BertWithClassify(nn.Module):
         return logits, classifs
 
 
-def mapkey(key):
-    key = re.sub("^embedding\.", "embed.", key)
-    key = re.sub("\.position_embedding\.", ".pos_embedding.", key)
-    key = re.sub("^lm_head\.mlp\.", "lin.", key)
-    key = re.sub("^lm_head\.unembedding\.", "unembed.", key)
-    key = re.sub("^lm_head\.layer_norm\.", "layer_norm.", key)
-    key = re.sub("^transformer\.([0-9]+)\.layer_norm", "blocks.\\1.layernorm1", key)
-    key = re.sub(
-        "^transformer\.([0-9]+)\.attention\.pattern\.", "blocks.\\1.attention.", key
-    )
-    key = re.sub(
-        "^transformer\.([0-9]+)\.residual\.layer_norm\.", "blocks.\\1.layernorm2.", key
-    )
-
-    key = re.sub("^transformer\.", "blocks.", key)
-    key = re.sub("\.project_out\.", ".project_output.", key)
-    key = re.sub("\.residual\.mlp", ".mlp.lin", key)
-    return key
-
-
 if __name__ == "__main__":
     bert_tests.test_bert(Bert)
     bert_tests.test_bert_classification(BertWithClassify)
-    my_bert = Bert(
-        vocab_size=28996,
-        hidden_size=768,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        dropout=0.1,
-        intermediate_size=3072,
-        num_heads=12,
-        num_layers=12,
-    )
     pretrained_bert = bert_tests.get_pretrained_bert()
-    mapped_params = {
-        mapkey(k): v
-        for k, v in pretrained_bert.state_dict().items()
-        if not k.startswith("classification_head")
-    }
-    my_bert.load_state_dict(mapped_params)
-    bert_tests.test_same_output(my_bert, pretrained_bert)
+    bert_tests.test_same_output(Bert.pretrained(), pretrained_bert)
