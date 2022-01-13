@@ -15,6 +15,8 @@ from einops import rearrange
 from days.utils import tpeek, copy_weight_bias
 from dataclasses import dataclass
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 class BertEmbedding(Module):
     def __init__(self, config):
@@ -37,7 +39,7 @@ class BertEmbedding(Module):
         token_embeddings = self.token_embedding(input_ids)
         token_type_embeddings = self.token_type_embedding(token_type_ids)
         position_embeddings = self.position_embedding(
-            t.arange(seq_length).to(next(self.parameters()).device)
+            t.arange(seq_length).to(device)
         )
         embeddings = token_embeddings + token_type_embeddings + position_embeddings
         embeddings = self.layer_norm(embeddings)
