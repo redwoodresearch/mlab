@@ -165,7 +165,6 @@ class RRJobsConnection:
         )
 
     def on_message(self, ws, message):
-        print("got msg")
         message = json.loads(message)
         if self.client_on_message:
             self.client_on_message(message)
