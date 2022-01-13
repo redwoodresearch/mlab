@@ -1,6 +1,6 @@
 import os
 
-os.system("pip install scikit-learn torchtext pytest einops")
+os.system("pip install scikit-learn torchtext pytest einops torchtyping")
 os.system("pip install -e .")
 
 from comet_ml import Experiment
