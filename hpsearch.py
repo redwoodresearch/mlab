@@ -332,7 +332,7 @@ def hpsearch(name, fn_path, base_config, search_spec, comet_key, local=True):
     if local:
         print("LOCAL TRIAL RUN")
         my_env = {"PARAMS": json.dumps(task_specs[0]["parameters"]), **os.environ}
-        proc = subprocess.Popen(["python", "run_fn_with_config.py"], env=my_env)
+        proc = subprocess.Popen(["/usr/bin/python3", "run_fn_with_config.py"], env=my_env)
         outs, errs = proc.communicate()
         assert proc.returncode == 0
         return

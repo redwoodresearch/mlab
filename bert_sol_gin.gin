@@ -11,5 +11,3 @@ Bert.config = {
             "num_classes": 2}
 train.lr = 1e-5
 train.epochs = 3
-lr = 0.001
-set_random_seed.seed = 1
