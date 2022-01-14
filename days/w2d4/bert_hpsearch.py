@@ -71,7 +71,7 @@ def train(model, tokenizer, max_seq_len, lr, batch_size, num_epochs):
             loss.backward()
             optimizer.step()
 
-def main():
+def main(experiment):
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
     max_seq_len = 512
     model = configurable_bert(
