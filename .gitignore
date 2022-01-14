@@ -3,7 +3,7 @@
 build/
 crash-*
 **/__pycache__/
-mlab.egg-info/
+*.egg-info/
 scratch/
 .ipynb_checkpoints/
 image*
