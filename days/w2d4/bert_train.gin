@@ -1,0 +1,9 @@
+# Class.x is how you say Class.__init__.x
+configurable_bert.dropout = 0.1
+configurable_bert.hidden_size = 768
+configurable_bert.intermediate_size = 1536
+configurable_bert.num_heads = 12
+configurable_bert.num_layers = 2
+train.lr = 1e-4
+train.batch_size = 64
+train.num_epochs = 1
