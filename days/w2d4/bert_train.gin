@@ -1,0 +1,12 @@
+train.seed = 42
+train.epochs = 1
+train.lr = 1e-3
+train.vocab_size = 28996
+train.intermediate_size = 3072
+train.hidden_size = 768
+train.num_layers = 12
+train.num_heads = 12
+train.max_position_embeddings = 512
+train.dropout = 0.1
+train.type_vocab_size = 2
+train.num_classes = 2
