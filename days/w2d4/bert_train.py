@@ -1,21 +1,33 @@
 from comet_ml import Experiment
-import bert_sol
+from bert_sol import BertWithClassify
 import transformers
 import torch as t
+import gin
 from torchtext.datasets import IMDB
 from torch.utils.data import DataLoader
 
-tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
-DEVICE = "cuda"
-experiment = Experiment(
-    project_name="dane-beth-w2d4", api_key="CSKZCzO65mpEjuqILZVslr5BF"
-)
 
+@gin.configurable
+def train(seed, epochs, lr, **kwargs):
+    tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
+    DEVICE = "cuda"
+    experiment = Experiment(
+        project_name="dane-beth-w2d4", api_key="CSKZCzO65mpEjuqILZVslr5BF"
+    )
 
-def train(seed, epochs=1, **kwargs):
     t.manual_seed(seed)
-    model = bert_sol.BertWithClassify(**kwargs).to(DEVICE)
-    optimizer = t.optim.Adam(model.parameters(), lr=1e-3)
+    model = BertWithClassify(
+        vocab_size=kwargs["vocab_size"],
+        intermediate_size=kwargs["intermediate_size"],
+        hidden_size=kwargs["hidden_size"],
+        num_layers=kwargs["num_layers"],
+        num_heads=kwargs["num_heads"],
+        max_position_embeddings=kwargs["max_position_embeddings"],
+        dropout=kwargs["dropout"],
+        type_vocab_size=kwargs["type_vocab_size"],
+        num_classes=kwargs["num_classes"],
+    ).to(DEVICE)
+    optimizer = t.optim.Adam(model.parameters(), lr=lr)
     model.train()
 
     # get IMDB data from torchtext
@@ -25,8 +37,8 @@ def train(seed, epochs=1, **kwargs):
     train_dataloader = DataLoader(training_data, batch_size=8)
     test_dataloader = DataLoader(test_data, batch_size=64)
 
-    for epoch in range(epochs):
-        for y, x in list(train_dataloader):
+    for _ in range(epochs):
+        for y, x in list(train_dataloader)[:5]:
             labels = t.tensor([1 if label == "pos" else 0 for label in y]).to(DEVICE)
             tokens = tokenizer(
                 list(x),
@@ -44,18 +56,7 @@ def train(seed, epochs=1, **kwargs):
             experiment.log_metric("loss", loss.item())
 
 
-config = {
-    "vocab_size": 28996,
-    "intermediate_size": 3072,
-    "hidden_size": 768,
-    "num_layers": 12,
-    "num_heads": 12,
-    "max_position_embeddings": 512,
-    "dropout": 0.1,
-    "type_vocab_size": 2,
-    "num_classes": 2,
-}
-
-
 if __name__ == "__main__":
-    train(seed=42, **config)
+    with gin.unlock_config():
+        gin.parse_config_file(config_file="bert_train.gin")
+        train()
