@@ -80,8 +80,11 @@ def train(
     )
     data_train = list(data_train_gen)
     data_test = list(data_test_gen)
+    print("data_train length:", len(data_train))
+    print("data_test length:", len(data_train))
 
     small_indices = t.randint(0, len(data_train), size=(256,))
+    print(small_indices)
     small_train = [data_train[i] for i in small_indices]
     small_test = [data_test[i] for i in small_indices]
     

@@ -13,7 +13,7 @@ import itertools
 import re
 from pathlib import Path
 
-corpus = open(Path.home() / "mlab/shakespeare.txt").readlines()
+corpus = open(Path.home() / "mlab/days/w2d4/shakespeare.txt").readlines()
 minicorpus = corpus[5000:6000]
 
 
@@ -222,6 +222,7 @@ def test_tokenizer_from_corpus_fn(fn):
     reference = Tokenizer.from_corpus(minicorpus).vocab.keys()
     yours = fn(minicorpus)
     assert set(reference) == set(yours)
+    print("Correct!")
 
 
 def test_tokenizer(tokenizer):
@@ -230,6 +231,7 @@ def test_tokenizer(tokenizer):
     assert tuple(reference.tokenize("hello, my name is tom trundlewich")) == tuple(
         yours.tokenize("hello, my name is tom trundlewich")
     )
+    print("Correct!")
 
 
 def test_tokenizer_convenience(tokenizer):
