@@ -116,7 +116,7 @@ def run(experiment, batch_size, num_epochs, lr, seed):
     collate_fn = get_imdb_collate_fn(512, tokenizer, device)
     dl_train = DataLoader(
         data_train,
-        batch_size=16,
+        batch_size=batch_size,
         collate_fn=collate_fn,
         shuffle=True,
         # num_workers=0,
@@ -125,7 +125,7 @@ def run(experiment, batch_size, num_epochs, lr, seed):
     
     dl_test = DataLoader(
         data_test,
-        batch_size=16,
+        batch_size=batch_size,
         collate_fn=collate_fn,
         shuffle=True,
     )
