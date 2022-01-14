@@ -36,12 +36,23 @@ def train(experiment, batch_size, lr, num_epochs):
     load_weights(model)
     optimizer = t.optim.Adam(model.parameters(), lr)
     for epoch in range(num_epochs):
-        for batch in data_train:
+        for step, batch in enumerate(data_train):
             optimizer.zero_grad()
             labels, reviews = tensorify_batch(batch, tokenizer)
             labels, reviews = labels.cuda(), reviews.cuda()
             model.cuda()
+            
             logits, classifications = model(reviews)
             loss = F.cross_entropy(classifications, labels)
             loss.backward()
             optimizer.step()
+            
+            predictions = t.argmax(classifications.detach(), dim=1)
+            accuracy = t.eq(predictions, labels).float().mean()
+            experiment.log_metric("loss", loss)
+            experiment.log_metric("accuracy", accuracy)
+            
+            if step >= 2000: break
+    experiment.log_parameters("train.lr", lr)
+    t.save(model.state_dict(), "model.pt")
+    experiment.log_model("FINETUNED_BERT", "./model.pt")
