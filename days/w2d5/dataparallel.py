@@ -96,6 +96,15 @@ def alladd_grad(model):
         op.wait()
 
 
+def add_grad(buckets, rank):
+    reduce_ops = []
+    for i, bucket in enumerate(buckets):
+        for param in bucket:
+            reduce_ops.append(dist.reduce(param.grad, i, async_op=True))
+    for op in reduce_ops:
+        op.wait()
+
+
 def broadcast_updated_params(buckets, rank):
     reduce_ops = []
     for i, bucket in enumerate(buckets):
@@ -143,7 +152,10 @@ def run(
         out = model(batch[0].to(DEVICE))
         loss = t.nn.CrossEntropyLoss()(out[:-1], batch[0][1:])
         loss.backward()
-        alladd_grad(model, "grad")
+        if sharded_optimizer:
+            add_grad(param_buckets, rank)
+        else:
+            alladd_grad(model, "grad")
         optimizer.step()
         optimizer.zero_grad()
         if sharded_optimizer:
