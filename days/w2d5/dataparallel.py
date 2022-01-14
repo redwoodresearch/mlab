@@ -54,8 +54,8 @@ def load_data():
 def init_model():
     t.random.manual_seed(0)
     # storing model locally because huggingface throttles checking
-    if os.path.exists("gpt2.pt"):
-        return t.load("gpt2.pt")
+    if os.path.exists("/home/ubuntu/gpt2_copy.pt"):
+        return t.load("/home/ubuntu/gpt2_copy.pt")
     model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
     return model
 
