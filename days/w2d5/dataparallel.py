@@ -54,8 +54,9 @@ def load_data():
 def init_model():
     t.random.manual_seed(0)
     # storing model locally because huggingface throttles checking
-    # model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
-    model = t.load("gpt2.pt")
+    if os.path.exists("gpt2.pt"):
+        return t.load("gpt2.pt")
+    model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
     return model
 
 
@@ -114,7 +115,7 @@ class DistributedDataLoader:
                     self.mini_batch_size,
                     *self.data_size,
                     dtype=t.int64,
-                    device=DEVICE
+                    device=DEVICE,
                 )
                 dist.broadcast(mini_batches, src=0)
                 my_batch = mini_batches[self.rank]
@@ -183,7 +184,8 @@ def run(
     # else, listen for a minibatch from rank 1
     dataloader = DistributedDataLoader(rank=rank, size=size)
     dist.barrier()
-    for batch_num, batch in tqdm(enumerate(dataloader)):
+    pbar = tqdm(enumerate(dataloader))
+    for batch_num, batch in pbar:
         out = model(batch.to(DEVICE)).logits
         loss = t.nn.CrossEntropyLoss()(
             rearrange(out[:-1], "a b c -> (a b) c"),
@@ -200,6 +202,7 @@ def run(
             broadcast_updated_params(param_buckets, rank)
         # print(rank, "loss", loss.cpu().detach().numpy())
         print(rank, batch_num)
+        pbar.set_description(f"loss {loss.cpu().item()}")
     print(rank, "done training")
     dist.barrier()
 
@@ -209,7 +212,7 @@ def run(
 
 @gin.configurable
 def init_process(
-    rank, size, run, device, backend="gloo"
+    rank, size, run, device, backend="nccl"
 ):  # gloo is algo for sharing gradients. nccl better?
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
@@ -239,5 +242,5 @@ def create_processes(
 
 
 if __name__ == "__main__":
-    gin.parse_config_file(sys.argv[1])
+    # gin.parse_config_file(sys.argv[1])
     create_processes()
