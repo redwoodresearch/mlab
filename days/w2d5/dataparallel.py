@@ -44,7 +44,7 @@ class DistributedDataLoader:
         self,
         rank,
         size,
-        data_fn="days.dataparallel.load_data",
+        data_fn="days.w2d5.dataparallel.load_data",
         mini_batch_size=4,
         random_seed=0,
     ):
@@ -124,7 +124,7 @@ def killgroup():
 def run(
     rank,
     size,
-    model_init_fn_name="days.dataparallel.init_model",
+    model_init_fn_name="days.w2d5.dataparallel.init_model",
     sharded_optimizer=False,
 ):
     print("i'm rank", rank)
