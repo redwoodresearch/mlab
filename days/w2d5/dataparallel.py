@@ -13,6 +13,7 @@ import os
 import signal
 import transformers
 from einops import *
+import json
 
 DEVICE = "cpu"
 MAX_LEN = 512
@@ -22,7 +23,8 @@ def load_data():
     tensor_path = "/home/ubuntu/lw.pt"
     if os.path.exists(tensor_path):
         return t.load(tensor_path)
-    texts = open("/home/ubuntu/lw.txt").readlines()
+    lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
+    texts = [x["text"] for x in lw_json]
     largetext = "<|endoftext|>".join(texts)
     tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
     tokens = tokenizer(largetext, return_tensors="pt")["input_ids"]
@@ -201,16 +203,4 @@ def create_processes(
 
 
 if __name__ == "__main__":
-    local_parallelism = (
-        2 if len(sys.argv) < 3 else int(sys.argv[2])
-    )  # number of processes in parallel
-    device = "cpu" if sys.argv[3] == "cpu" else "cuda"
-    if sys.argv[1] == "master":
-        # gin.parse_config_file(sys.argv[2])
-        create_processes(local_parallelism, device)
-    else:
-        tmpfilename = ".ginny_weasly"
-        with open(tmpfilename, "w") as f:
-            f.write(sys.argv[1])
-        # gin.parse_config_file(tmpfilename)
-        init_process()
+    create_processes()
