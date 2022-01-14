@@ -86,12 +86,21 @@ class DistributedDataLoader:
                 yield my_batch
 
 
-def alladd_grad(model, prop="grad"):
+def alladd_grad(model):
 
     reduce_ops = [
-        dist.all_reduce(getattr(param, prop), op=dist.ReduceOp.SUM, async_op=True)
+        dist.all_reduce(prop.grad, op=dist.ReduceOp.SUM, async_op=True)
         for param in model.parameters()
     ]
+    for op in reduce_ops:
+        op.wait()
+
+
+def broadcast_updated_params(buckets, rank):
+    reduce_ops = []
+    for i, bucket in enumerate(buckets):
+        for param in bucket:
+            reduce_ops.append(dist.broadcast(param, i, async_op=True))
     for op in reduce_ops:
         op.wait()
 
@@ -118,7 +127,10 @@ def run(
         random.seed(0)
         random.shuffle(all_params)
         per_bucket = len(all_params) // size
-        params = all_params[rank * per_bucket : (rank + 1) * per_bucket]
+        param_buckets = [
+            all_params[i * per_bucket : (i + 1) * per_bucket] for i in range(rank)
+        ]
+        params = param_buckets[rank]
     else:
         params = model.parameters()
     optimizer = t.optim.Adam(params, lr=1e-4)
@@ -135,7 +147,7 @@ def run(
         optimizer.step()
         optimizer.zero_grad()
         if sharded_optimizer:
-            alladd_grad(model, prop="data")
+            broadcast_updated_params(param_buckets, rank)
         # print(rank, "loss", loss.cpu().detach().numpy())
         print(rank, batch_num)
     print(rank, "done training")
