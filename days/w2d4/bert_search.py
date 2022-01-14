@@ -10,5 +10,5 @@ hpsearch(
         "set_random_seed.seed": [0]
     },
     comet_key="vaznwXsdK5Z3Hug3FKZCl9lGN",
-    local = True # set to False after it works locally! 
+    local = False
 )
