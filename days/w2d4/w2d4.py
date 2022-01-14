@@ -8,7 +8,7 @@ os.chdir("../..")
 api_key = "OmfvOU0RmHbt4iMa2WIYGBjBf"
 
 hpsearch(
-    "inappropriate ioctl",
+    "appropriate ioctl",
     "days.w2d4.train.train",
     "days/w2d4/config.gin",
     {"train.lr": [1e-3, 1e-4, 1e-5, 1e-6], "set_random_seed.seed":[0,1,2,3]},

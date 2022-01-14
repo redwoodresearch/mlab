@@ -13,7 +13,7 @@ import itertools
 import re
 from pathlib import Path
 
-corpus = open(Path.home() / "mlab/shakespeare.txt").readlines()
+corpus = open(Path.home() / "mlab/days/w2d4/shakespeare.txt").readlines()
 minicorpus = corpus[5000:6000]
 
 
