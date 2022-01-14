@@ -14,22 +14,36 @@ import signal
 import transformers
 from einops import *
 import json
+from tqdm import tqdm
 
 DEVICE = "cpu"
-MAX_LEN = 512
+DEVICES = [0, 1, 2]
+MAX_LEN = 1024
 
 
 def load_data():
+    print("loading data")
     tensor_path = "/home/ubuntu/lw.pt"
     if os.path.exists(tensor_path):
-        return t.load(tensor_path)
-    lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
-    texts = [x["text"] for x in lw_json]
-    largetext = "<|endoftext|>".join(texts)
-    tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
-    tokens = tokenizer(largetext, return_tensors="pt")["input_ids"]
-    t.save(tokens, tensor_path)
-    return rearrange(tokens[: -tokens.shape[0] % MAX_LEN], "(b s) -> b s", s=512)
+        tokens = t.load(tensor_path)
+    else:
+        lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
+        print("have json")
+        texts = [x["text"] for x in lw_json]
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+        tokenizer = transformers.AutoTokenizer.from_pretrained(
+            "gpt2", TOKENIZERS_PARALLELISM=True
+        )
+        eot_id = 50256
+        eot_id = tokenizer("<|endoftext|>")["input_ids"][0]
+        tokens = tokenizer(texts)["input_ids"]
+        for seq in tokens:
+            seq.append(eot_id)
+        print("tokenized")
+        tokens = t.LongTensor(list(itertools.chain(*tokens)))
+
+        t.save(tokens, tensor_path)
+    return rearrange(tokens[: -(tokens.shape[0] % MAX_LEN)], "(b s) -> b s", s=MAX_LEN)
 
 
 def init_model():
@@ -44,30 +58,35 @@ class DistributedDataLoader:
         self,
         rank,
         size,
+        data_size,
         data_fn="days.w2d5.dataparallel.load_data",
         mini_batch_size=4,
         random_seed=0,
     ):
         self.rank = rank
         self.size = size
+        self.data_size = data_size
         if rank == 0:
             self.data_tensors = import_object_from_qualified_name(data_fn)()
             t.manual_seed(random_seed)
             perm = t.randperm(self.data_tensors[0].shape[0])
             self.data_tensors = self.data_tensors[perm]
 
-            self.batches = [
-                to_batches(batch, mini_batch_size, trim=True)
-                for batch in to_batches((self.data_tensors,), mini_batch_size * size)
-            ]
+            self.batches = rearrange(
+                self.data_tensors[
+                    : -(self.data_tensors.shape[0] % (mini_batch_size * size))
+                ],
+                "(batches minibatches ...) -> batches minibatches ...",
+            )
             self.len = len(self.batches)
         else:
             self.len = -1
             self.batches = None
-        blst = [self.len]
+        btsr = t.Tensor([self.len]).cuda()
         print("broadcast length from", self.rank)
-        dist.broadcast_object_list(blst, src=0)
-        self.len = blst[0]
+        dist.broadcast(btsr, src=0)
+        print("broadcast finished")
+        self.len = int(btsr.cpu().item())
 
     def __len__(self):
         return self.len
@@ -75,15 +94,18 @@ class DistributedDataLoader:
     def __iter__(self):
         if self.batches is not None:
             for mini_batches in self.batches:
-                dist.broadcast_object_list(
+                mini_batches = mini_batches.to(DEVICE)
+                dist.broadcast(
                     mini_batches, src=0
                 )  # all processes must do this, else all wait forever
                 my_batch = mini_batches[self.rank]
                 yield my_batch
         else:
             for _ in range(self.len):
-                mini_batches = [None for _ in range(self.size)]
-                dist.broadcast_object_list(mini_batches, src=0)
+                mini_batches = t.zeros(
+                    self.mini_batch_size, *self.data_size, dtype=t.int64, device=DEVICE
+                )
+                dist.broadcast(mini_batches, src=0)
                 my_batch = mini_batches[self.rank]
                 yield my_batch
 
@@ -149,15 +171,19 @@ def run(
     # If rank 0, loads data, splits things, keeps a minibatch
     # else, listen for a minibatch from rank 1
     dataloader = DistributedDataLoader(rank=rank, size=size)
-    for batch_num, batch in enumerate(dataloader):
+    dist.all_reduce(t.zeros(1), op=dist.ReduceOp.SUM)
+    for batch_num, batch in tqdm(enumerate(dataloader)):
         # print("batch", batch)
-        out = model(batch[0].to(DEVICE))
-        loss = t.nn.CrossEntropyLoss()(out[:-1], batch[0][1:])
+        out = model(batch.to(DEVICE)).logits
+        loss = t.nn.CrossEntropyLoss()(
+            rearrange(out[:-1], "a b c -> (a b) c"),
+            rearrange(batch[1:], "a b -> (a b)"),
+        )
         loss.backward()
         if sharded_optimizer:
             add_grad(param_buckets, rank)
         else:
-            alladd_grad(model, "grad")
+            alladd_grad(model)
         optimizer.step()
         optimizer.zero_grad()
         if sharded_optimizer:
@@ -180,7 +206,7 @@ def init_process(
     os.environ["MASTER_PORT"] = "29500"  # make the master available for mutual contact
     if device == "cuda":
         global DEVICE
-        DEVICE = "cuda:" + str(rank)
+        DEVICE = "cuda:" + DEVICES[rank]
     dist.init_process_group(backend, rank=rank, world_size=size)
     print("inited process group", rank)
 
@@ -203,4 +229,5 @@ def create_processes(
 
 
 if __name__ == "__main__":
+    gin.parse_config_file(sys.argv[1])
     create_processes()
