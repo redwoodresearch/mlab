@@ -29,6 +29,9 @@ def load_weights(model):
     
 @gin.configurable
 def train(experiment, batch_size, lr, num_epochs, max_len):
+    experiment.log_parameters("train.lr", lr)
+    experiment.log_parameters("train.max_len", max_len)
+    
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased", return_tensors="pt")
     data_train, data_test = torchtext.datasets.IMDB(root='.data', split=('train', 'test'))
     data_train = DataLoader(list(data_train), batch_size=batch_size, shuffle=True) 
@@ -53,6 +56,6 @@ def train(experiment, batch_size, lr, num_epochs, max_len):
             experiment.log_metric("accuracy", accuracy)
             
             if step >= 2000: break
-    experiment.log_parameters("train.lr", lr)
+
     t.save(model.state_dict(), "model.pt")
     experiment.log_model("FINETUNED_BERT", "./model.pt")
