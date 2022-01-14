@@ -26,6 +26,7 @@ def load_data():
     tensor_path = "/home/ubuntu/lw.pt"
     if os.path.exists(tensor_path):
         tokens = t.load(tensor_path)
+        print("tokens shape", tokens.shape)
     else:
         lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
         print("have json")
@@ -43,12 +44,18 @@ def load_data():
         tokens = t.LongTensor(list(itertools.chain(*tokens)))
 
         t.save(tokens, tensor_path)
-    return rearrange(tokens[: -(tokens.shape[0] % MAX_LEN)], "(b s) -> b s", s=MAX_LEN)
+    return rearrange(
+        tokens[: tokens.shape[0] - (tokens.shape[0] % MAX_LEN)],
+        "(b s) -> b s",
+        s=MAX_LEN,
+    )
 
 
 def init_model():
     t.random.manual_seed(0)
-    model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
+    # storing model locally because huggingface throttles checking
+    # model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
+    model = t.load("gpt2.pt")
     return model
 
 
@@ -58,34 +65,34 @@ class DistributedDataLoader:
         self,
         rank,
         size,
-        data_size,
+        data_size=(1024,),
         data_fn="days.w2d5.dataparallel.load_data",
-        mini_batch_size=4,
+        mini_batch_size=1,
         random_seed=0,
     ):
         self.rank = rank
         self.size = size
         self.data_size = data_size
+        self.mini_batch_size = mini_batch_size
         if rank == 0:
             self.data_tensors = import_object_from_qualified_name(data_fn)()
+            print("data tensors size", self.data_tensors.shape)
             t.manual_seed(random_seed)
-            perm = t.randperm(self.data_tensors[0].shape[0])
+            perm = t.randperm(self.data_tensors.shape[0])
             self.data_tensors = self.data_tensors[perm]
-
-            self.batches = rearrange(
-                self.data_tensors[
-                    : -(self.data_tensors.shape[0] % (mini_batch_size * size))
-                ],
-                "(batches minibatches ...) -> batches minibatches ...",
-            )
+            n_batches = self.data_tensors.shape[0] // (mini_batch_size * size)
+            self.batches = self.data_tensors[
+                : self.data_tensors.shape[0]
+                - (self.data_tensors.shape[0] % (mini_batch_size * size))
+            ]
+            self.batches = self.batches.reshape(-1, size, mini_batch_size, *data_size)
+            print("self batches shape", self.batches.shape)
             self.len = len(self.batches)
         else:
             self.len = -1
             self.batches = None
-        btsr = t.Tensor([self.len]).cuda()
-        print("broadcast length from", self.rank)
+        btsr = t.Tensor([self.len]).to(DEVICE)
         dist.broadcast(btsr, src=0)
-        print("broadcast finished")
         self.len = int(btsr.cpu().item())
 
     def __len__(self):
@@ -103,7 +110,11 @@ class DistributedDataLoader:
         else:
             for _ in range(self.len):
                 mini_batches = t.zeros(
-                    self.mini_batch_size, *self.data_size, dtype=t.int64, device=DEVICE
+                    self.size,
+                    self.mini_batch_size,
+                    *self.data_size,
+                    dtype=t.int64,
+                    device=DEVICE
                 )
                 dist.broadcast(mini_batches, src=0)
                 my_batch = mini_batches[self.rank]
@@ -165,15 +176,14 @@ def run(
         ]
         params = param_buckets[rank]
     else:
-        params = model.parameters()
+        params = list(model.parameters())
     optimizer = t.optim.Adam(params, lr=1e-4)
 
     # If rank 0, loads data, splits things, keeps a minibatch
     # else, listen for a minibatch from rank 1
     dataloader = DistributedDataLoader(rank=rank, size=size)
-    dist.all_reduce(t.zeros(1), op=dist.ReduceOp.SUM)
+    dist.barrier()
     for batch_num, batch in tqdm(enumerate(dataloader)):
-        # print("batch", batch)
         out = model(batch.to(DEVICE)).logits
         loss = t.nn.CrossEntropyLoss()(
             rearrange(out[:-1], "a b c -> (a b) c"),
@@ -191,7 +201,7 @@ def run(
         # print(rank, "loss", loss.cpu().detach().numpy())
         print(rank, batch_num)
     print(rank, "done training")
-    dist.all_reduce(t.zeros(1), op=dist.ReduceOp.SUM)
+    dist.barrier()
 
     if rank == 0:
         killgroup()
@@ -199,14 +209,14 @@ def run(
 
 @gin.configurable
 def init_process(
-    rank, size, run, device, backend="nccl"
+    rank, size, run, device, backend="gloo"
 ):  # gloo is algo for sharing gradients. nccl better?
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = "29500"  # make the master available for mutual contact
     if device == "cuda":
         global DEVICE
-        DEVICE = "cuda:" + DEVICES[rank]
+        DEVICE = "cuda:" + str(DEVICES[rank])
     dist.init_process_group(backend, rank=rank, world_size=size)
     print("inited process group", rank)
 
