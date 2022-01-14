@@ -8,17 +8,19 @@ def perform(spec):
         base_config="days/w2d4/bert_train.gin",
         search_spec=spec,
         comet_key="absncaDYNLt6jpNh1Ez0OIVTe",
-        local=False,
+        local=True,
     )
 
 def defang(spec):
-    for v in spec.values:
+    for v in spec.values():
         del v[1:]
     
 spec = {
-    "lr": [1e-3, 1e-4, 1e-5],
-    "MyModel.hidden_size": [32, 64],
+    "train.lr": [1e-3, 1e-4, 1e-5],
+    "train.batch_size": [32, 64],
     "set_random_seed.seed": [0, 1, 2, 3],
 }
 
-print(defang(spec))
+defang(spec)
+
+perform(spec=spec)
