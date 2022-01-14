@@ -56,11 +56,11 @@ def run_training_loop(model, tokenizer, dataloader, epochs, optimizer, loss_fn, 
             loss.backward()
             optimizer.step()
 
-            t += 1
-            if t % 100 == 0:
-                print(t, loss)
-                print("REMINDER: remove this code block before running on rrjobs")
-                break
+            # t += 1
+            # if t % 100 == 0:
+            #     print(t, loss)
+            #     print("REMINDER: remove this code block before running on rrjobs")
+            #     break
 
 def get_test_loss(model, dataloader, loss_fn):
     model.eval()
@@ -82,7 +82,7 @@ def get_test_loss(model, dataloader, loss_fn):
     return total_loss / num_items
 
 @gin.configurable
-def train(batch_size, epochs, optimizer, lr, max_seq_len):
+def train(experiment, batch_size, epochs, optimizer, lr, max_seq_len):
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
     bert = load_bert_without_classification_head_params()
     train_dataloader, test_dataloader = get_data(
