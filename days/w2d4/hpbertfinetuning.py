@@ -67,10 +67,11 @@ def test(model, dl_test, num_batches=math.inf):
     model.eval()
     n_accurate = 0
     n_total = 0
-    for i,(x,y) in zip(range(num_batches), dl_test):
-        _, out = model(x)
-        n_accurate += t.sum(t.argmax(out, dim=-1) == y)
-        n_total += x.shape[0]
+    with t.no_grad():
+        for i,(x,y) in zip(range(num_batches), dl_test):
+            _, out = model(x)
+            n_accurate += t.sum(t.argmax(out, dim=-1) == y)
+            n_total += x.shape[0]
     return n_accurate / n_total
         
 
@@ -119,15 +120,17 @@ def run(experiment, batch_size, num_epochs, lr, seed):
         batch_size=batch_size,
         collate_fn=collate_fn,
         shuffle=True,
-        # num_workers=0,
-        # pin_memory=True,
+        num_workers=2,
+        pin_memory=True,
     )
     
     dl_test = DataLoader(
         data_test,
-        batch_size=batch_size,
+        batch_size=batch_size*2,
         collate_fn=collate_fn,
         shuffle=True,
+        num_workers=2,
+        pin_memory=True,
     )
     
     train(experiment, model, dl_train, dl_test, num_epochs, lr)

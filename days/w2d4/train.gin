@@ -8,6 +8,6 @@
 # train.num_epochs = 1
 
 run.batch_size = 8
-run.num_epochs = 1
+run.num_epochs = 5
 run.lr = 1e-4
 run.seed = 42
