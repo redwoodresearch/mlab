@@ -89,7 +89,7 @@ class DistributedDataLoader:
 def alladd_grad(model):
 
     reduce_ops = [
-        dist.all_reduce(prop.grad, op=dist.ReduceOp.SUM, async_op=True)
+        dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, async_op=True)
         for param in model.parameters()
     ]
     for op in reduce_ops:
