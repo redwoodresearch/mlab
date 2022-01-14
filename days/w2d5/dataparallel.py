@@ -2,30 +2,37 @@ import os
 import random
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from torchtyping import tensor_type
 import gin
 import sys
 from days.utils import import_object_from_qualified_name
 import torch as t
 import numpy as np
-from sklearn.datasets import make_moons
 from days.utils import *
 import os
 import signal
+import transformers
+from einops import *
 
 DEVICE = "cpu"
+MAX_LEN = 512
 
 
 def load_data():
-    X, y = make_moons(n_samples=4 * 4 * 5, noise=0.1, random_state=354)
-    X = t.Tensor(X).float()
-    y = t.Tensor(y).float()
-    return X, y
+    tensor_path = "/home/ubuntu/lw.pt"
+    if os.path.exists(tensor_path):
+        return t.load(tensor_path)
+    texts = open("/home/ubuntu/lw.txt").readlines()
+    largetext = "<|endoftext|>".join(texts)
+    tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
+    tokens = tokenizer(largetext, return_tensors="pt")["input_ids"]
+    t.save(tokens, tensor_path)
+    return rearrange(tokens[: -tokens.shape[0] % MAX_LEN], "(b s) -> b s", s=512)
 
 
 def init_model():
     t.random.manual_seed(0)
-    model = t.nn.Sequential(t.nn.Linear(2, 20), t.nn.Linear(20, 1))
-    # model = t.nn.Linear(10, 10)
+    model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
     return model
 
 
@@ -42,15 +49,14 @@ class DistributedDataLoader:
         self.rank = rank
         self.size = size
         if rank == 0:
-            self.data_tensors = list(import_object_from_qualified_name(data_fn)())
+            self.data_tensors = import_object_from_qualified_name(data_fn)()
             t.manual_seed(random_seed)
             perm = t.randperm(self.data_tensors[0].shape[0])
-            for i, ten in enumerate(self.data_tensors):
-                self.data_tensors[i] = ten[perm]
+            self.data_tensors = self.data_tensors[perm]
 
             self.batches = [
                 to_batches(batch, mini_batch_size, trim=True)
-                for batch in to_batches(self.data_tensors, mini_batch_size * size)
+                for batch in to_batches((self.data_tensors,), mini_batch_size * size)
             ]
             self.len = len(self.batches)
         else:
@@ -80,10 +86,10 @@ class DistributedDataLoader:
                 yield my_batch
 
 
-def alladd_grad(model):
+def alladd_grad(model, prop="grad"):
 
     reduce_ops = [
-        dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, async_op=True)
+        dist.all_reduce(getattr(param, prop), op=dist.ReduceOp.SUM, async_op=True)
         for param in model.parameters()
     ]
     for op in reduce_ops:
@@ -99,13 +105,23 @@ def run(
     rank,
     size,
     model_init_fn_name="days.dataparallel.init_model",
+    sharded_optimizer=False,
 ):
     print("i'm rank", rank)
     # device = "cuda:" + str(rank)
     model = import_object_from_qualified_name(model_init_fn_name)()
     model.train()
     model.to(DEVICE)
-    optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
+    if sharded_optimizer:
+        # use naive random param split
+        all_params = list(model.parameters())
+        random.seed(0)
+        random.shuffle(all_params)
+        per_bucket = len(all_params) // size
+        params = all_params[rank * per_bucket : (rank + 1) * per_bucket]
+    else:
+        params = model.parameters()
+    optimizer = t.optim.Adam(params, lr=1e-4)
 
     # If rank 0, loads data, splits things, keeps a minibatch
     # else, listen for a minibatch from rank 1
@@ -113,15 +129,17 @@ def run(
     for batch_num, batch in enumerate(dataloader):
         # print("batch", batch)
         out = model(batch[0].to(DEVICE))
-        loss = t.sum((out - batch[1].to(DEVICE)) ** 2)
+        loss = t.nn.CrossEntropyLoss()(out[:-1], batch[0][1:])
         loss.backward()
-        alladd_grad(model)
+        alladd_grad(model, "grad")
         optimizer.step()
         optimizer.zero_grad()
+        if sharded_optimizer:
+            alladd_grad(model, prop="data")
         # print(rank, "loss", loss.cpu().detach().numpy())
         print(rank, batch_num)
     print(rank, "done training")
-    dist.all_reduce(t.zeros(2), op=dist.ReduceOp.SUM)
+    dist.all_reduce(t.zeros(1), op=dist.ReduceOp.SUM)
 
     if rank == 0:
         killgroup()
@@ -129,7 +147,7 @@ def run(
 
 @gin.configurable
 def init_process(
-    rank, size, run, device, backend="gloo"
+    rank, size, run, device, backend="nccl"
 ):  # gloo is algo for sharing gradients. nccl better?
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
