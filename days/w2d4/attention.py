@@ -32,7 +32,7 @@ def raw_attention_pattern(
     # Add a fake dimension t of size seq_len so that we can get all pairwise combinations of tokens in the sequence
     seq_len = token_activations.shape[1] 
     qs = repeat(qs, "b h s d -> b h s t d", t=seq_len)
-    ks = repeat(ks, "b h s d -> b h s t d", t=seq_len)
+    ks = repeat(ks, "b h s d -> b h s t d", t=seq_len)q
 
     qk = einsum("b h s t d, b h t s d -> b h t s", qs, ks) / t.sqrt(t.tensor(qs.shape[-1]))
 
@@ -70,14 +70,28 @@ def bert_attention(
 ) -> TensorType["batch", "seq_len", "hidden"]:
     sm = t.softmax(attention_pattern, dim= -2)
 
-    vs = project_value(token_activations)
+    vs = project_value(token_activations) # ["batch", "seq_len", "h_times_d"]
+    
+    vs = rearrange(vs, "b s (h d) -> b h s d", d = vs.shape[-1]//num_heads)
 
+    sm_v = einsum("b h s t, b h s d -> b h t d", sm, vs)
+    sm_v = rearrange(sm_v, "b h t d -> b t (h d)")
+    return project_output(sm_v)
 
-    sm = repeat(sm, "b h s t -> b (h d) s t", d = vs.shape[-1]//num_heads)
+    b, h, s, t_ = sm.shape
+    d = vs.shape[-1]//num_heads
+    sm = t.as_strided(
+        sm, size=[b, h, d, s, t_],
+        stride=list(sm.stride()[:2])+[0]+list(sm.stride()[2:])
+    )
+    # the above is a memory efficient version of:
+    # repeat(sm, "b h s t -> b h d s t", d = vs.shape[-1]//num_heads)
+    vs = rearrange(vs, "b s (h d) -> b h s d", d = vs.shape[-1]//num_heads)
+    o = einsum("b h d s t, b h s d -> b t h d", sm, vs)
+    o = rearrange(o, "b t h d -> b t (h d)")
 
-    o = einsum("b m t s, b t m -> b s m", sm, vs)
+    # o = einsum("b m t s, b t m -> b s m", sm, vs)
 
-    return project_output(o)
 
 
 class MultiHeadedSelfAttention(Module):

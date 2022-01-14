@@ -88,6 +88,7 @@ def train_batch(model, optimizer, loss_function, batch_tokens, batch_labels):
     print("token shape", tokens_cuda.shape)
 
     outputs = model(tokens_cuda)[1]
+        
     targets = t.tensor(batch_labels).cuda()
 
     print("target shape", targets.shape)
@@ -103,13 +104,14 @@ def train_batch(model, optimizer, loss_function, batch_tokens, batch_labels):
 
 @gin.configurable
 def train(experiment, tag, lr, batch_size, max_seq_len):
-    experiment.add_tag(tag)
+    if experiment is not None:
+        experiment.add_tag(tag)
 
-    experiment.log_parameters({
-        "lr": lr,
-        "batch_size": batch_size,
-        "seed": t.initial_seed(),
-    })
+        experiment.log_parameters({
+            "lr": lr,
+            "batch_size": batch_size,
+            "seed": t.initial_seed(),
+        })
 
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
 
@@ -144,4 +146,13 @@ def train(experiment, tag, lr, batch_size, max_seq_len):
         if count >= num_test_batches:
             break
     
-    experiment.log_metric("test_loss", total_loss/count)
+    if experiment is not None:
+        experiment.log_metric("test_loss", total_loss/count)
+
+
+if __name__ == "__main__":
+    gin.parse_config_file('days/w2d4/bert_finetuning.gin')
+    with gin.unlock_config():
+
+
+        train(experiment=None)
