@@ -7,9 +7,9 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import gin
 import sys
-from utils import import_object_from_qualified_name
+from days.utils import import_object_from_qualified_name
 import torch as t
-from utils import *
+from days.utils import *
 import transformers
 import torchtext
 from time import time

@@ -22,7 +22,7 @@ from torchtyping import TensorType
 
 # from torch.nn import LayerNorm
 # from torch.nn.functional import gelu, softmax
-from utils import getprops, tpeek, copy_weight_bias
+from days.utils import getprops, tpeek, copy_weight_bias
 from dataclasses import dataclass
 import transformers
 

@@ -7,7 +7,7 @@ from PIL import Image
 import torch
 from torchvision import models
 from torchvision import transforms
-from utils import tpeek
+from days.utils import tpeek
 import time
 import random
 

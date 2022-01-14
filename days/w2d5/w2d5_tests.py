@@ -2,7 +2,7 @@ import torch as t
 import transformers
 import numpy as np
 from IPython.core.display import HTML, display
-from utils import *
+from days.utils import *
 
 attention_only_model = t.load("ao2.pt", map_location=t.device("cpu"))
 print(attention_only_model)

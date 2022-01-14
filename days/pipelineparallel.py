@@ -7,9 +7,9 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import gin
 import sys
-from utils import import_object_from_qualified_name
+from days.utils import import_object_from_qualified_name
 import torch as t
-from utils import *
+from days.utils import *
 import transformers
 import torchtext
 from time import time
@@ -161,9 +161,7 @@ def pprun(
                     out = model(batch[0].long().to(device)).cpu()  # all the gpu action
                 out_tensors.append(out)
                 forward_sends.append(
-                    dist.isend(
-                        out, rank + 1, tag=TAGS["ACTIVATION"] + i
-                    )  
+                    dist.isend(out, rank + 1, tag=TAGS["ACTIVATION"] + i)
                 )
             grad_buffers = [t.zeros_like(out) for _ in range(pipe_width)]
             grad_recvs = [

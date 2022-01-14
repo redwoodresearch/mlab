@@ -47,7 +47,7 @@ import days.gpt2 as gpt2
 import days.old_resnet as old_resnet
 import pytest
 import transformers
-from utils import tpeek
+from days.utils import tpeek
 import days.dataparallel as dp
 
 

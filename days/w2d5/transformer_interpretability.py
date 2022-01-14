@@ -2,7 +2,7 @@ from einops import reduce, rearrange, repeat
 import days.gpt2 as gpt2
 import days.bert as bert
 import torch as t
-from utils import tpeek
+from days.utils import tpeek
 import matplotlib.pyplot as plt
 
 
@@ -26,7 +26,9 @@ def show_aggregate_attention(model, text):
     model(model.tokenizer(text, return_tensors="pt")["input_ids"])
     attention_vals = t.stack(attention_buffer, dim=0)
     tpeek("attention buffer", attention_vals)
-    attention_aggregate = reduce(attention_vals, "layer head from to -> from to", "mean")
+    attention_aggregate = reduce(
+        attention_vals, "layer head from to -> from to", "mean"
+    )
     plt.imshow(attention_aggregate.detach().numpy())
     plt.imshow(rearrange(attention_vals, "l h f t -> (l f) (h t)").detach().numpy())
 
