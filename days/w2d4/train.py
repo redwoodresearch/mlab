@@ -10,13 +10,13 @@ import torch as t
 import torch.nn as nn
 import torch.nn.functional as F
 
-def tensorify_batch(batch, tokenizer):
+def tensorify_batch(batch, tokenizer, max_len):
     labels, reviews = batch
     labels = t.tensor([label == 'pos' for label in labels]).long()
     reviews = t.tensor(tokenizer(
         [*reviews],
         padding='longest',
-        max_length=512,
+        max_length=max_len,
         truncation=True
     )['input_ids'])
     return (labels, reviews)
@@ -28,7 +28,7 @@ def load_weights(model):
     model.load_state_dict(mapped_params, strict=False)
     
 @gin.configurable
-def train(experiment, batch_size, lr, num_epochs):
+def train(experiment, batch_size, lr, num_epochs, max_len):
     tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased", return_tensors="pt")
     data_train, data_test = torchtext.datasets.IMDB(root='.data', split=('train', 'test'))
     data_train = DataLoader(list(data_train), batch_size=batch_size, shuffle=True) 
@@ -38,7 +38,7 @@ def train(experiment, batch_size, lr, num_epochs):
     for epoch in range(num_epochs):
         for step, batch in enumerate(data_train):
             optimizer.zero_grad()
-            labels, reviews = tensorify_batch(batch, tokenizer)
+            labels, reviews = tensorify_batch(batch, tokenizer, max_len)
             labels, reviews = labels.cuda(), reviews.cuda()
             model.cuda()
             

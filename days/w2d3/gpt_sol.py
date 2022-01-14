@@ -87,7 +87,6 @@ class GPT2Output:
     logits: TensorType["batch_size", "vocab_size"]
     final_encoding: TensorType["batch_size", "hidden_size"]
 
-
 class GPT2(nn.Module):
     def __init__(self, num_layers, num_heads, vocab_size, hidden_size, max_position_embeddings, dropout,
                  layer_norm_epsilon, use_cache=False):
