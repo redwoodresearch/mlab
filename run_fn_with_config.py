@@ -12,15 +12,27 @@ import os
 import json
 from days.utils import import_object_from_qualified_name
 
+import ast
 
-def log_all_gin_parameters(experiment):
+
+def attribute_to_str(attribute):
+    if hasattr(attribute, "id"):
+        return str(attribute.id)
+    return attribute_to_str(attribute.value) + "." + attribute.attr
+
+
+def gin_str_to_obj(string):
+    gin_ast = ast.parse(string)
+    smts = [(x.targets[0], x.value) for x in gin_ast.body]
+    obj = [(attribute_to_str(k), ast.literal_eval(v)) for k, v in smts]
+    return obj
+
+
+def log_all_gin_parameters(experiment, config):
     """
     This function is largely stolen from gin.config.config_str(), by the way
     """
-    opconfig = gin.operative_config_str()
-    print(opconfig)
-    linies = [(x[: x.index("=")], x[x.index("=") + 1 :]) for x in opconfig.splitlines()]
-    for k, v in linies:
+    for k, v in gin_str_to_obj(config):
         experiment.log_parameter(k, v)
 
 
@@ -41,10 +53,11 @@ def run_fn_with_config(fnpath: str, config: str, name: str, comet_key: str):
         text_file.write(config)
     gin_search_path = f"{os.getcwd()}"
     gin.add_config_file_search_path(gin_search_path)
-    gin.parse_config_files_and_bindings(config_files=[temp_name], bindings=[])
+    with gin.unlock_config():
+        gin.parse_config_files_and_bindings(config_files=[temp_name], bindings=[])
 
     experiment = Experiment(project_name=name, api_key=comet_key)
-    log_all_gin_parameters(experiment)
+    log_all_gin_parameters(experiment, config)
     set_random_seed()
     fn_return = fn(experiment=experiment)
     if fn_return is not None:
