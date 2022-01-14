@@ -1,6 +1,6 @@
 from hpsearch import hpsearch
 hpsearch(
-    "mlps_without_activations",
+    "tomtseng_bert_search",
     "days.w2d4.bert_train.train",
     "days/w2d4/bert_train.gin",
     {
