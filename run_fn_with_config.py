@@ -17,14 +17,11 @@ def log_all_gin_parameters(experiment):
     """
     This function is largely stolen from gin.config.config_str(), by the way
     """
-    for (scope, selector), config in gin.config._CONFIG.items():
-        configurable_ = gin.config._REGISTRY[selector]
-        if configurable_.wrapped in (gin.config.macro, gin.config._retrieve_constant):
-            continue
-        minimal_selector = gin.config._minimal_selector(configurable_)
-        scoped_selector = (scope + "/" if scope else "") + minimal_selector
-        for arg, val in sorted(config.items()):
-            experiment.log_parameter(f"{scoped_selector}.{arg}", str(val))
+    opconfig = gin.operative_config_str()
+    print(opconfig)
+    linies = [(x[: x.index("=")], x[x.index("=") + 1 :]) for x in opconfig.splitlines()]
+    for k, v in linies:
+        experiment.log_parameter(k, v)
 
 
 @gin.configurable

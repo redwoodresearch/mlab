@@ -1,0 +1,1248 @@
+# Class.x is how you say Class.__init__.x
+MyModel.hidden_size = 16
+MyModel.input_size = 2
+MyModel.output_size = 2
+MyModel.n_layers = 2
+train.lr = 1e-4
+train.batch_size = 6
+train.num_epochs = 1
+lr = 0.001
+MyModel.hidden_size = 64
+LOCAL TRIAL RUN
+Defaulting to user installation because normal site-packages is not writeable
+Collecting gin-config
+  Using cached gin_config-0.4.1-py3-none-any.whl
+Requirement already satisfied: jupyterlab==3.2.5 in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 1)) (3.2.5)
+Requirement already satisfied: torch in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 2)) (1.10.1+cu113)
+Requirement already satisfied: torchtyping in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 3)) (0.1.4)
+Requirement already satisfied: einops in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 4)) (0.3.2)
+Requirement already satisfied: torchvision in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 5)) (0.11.2+cu113)
+Requirement already satisfied: torchtext in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 6)) (0.11.1)
+Requirement already satisfied: numpy in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 7)) (1.19.1)
+Requirement already satisfied: transformers in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 8)) (4.15.0)
+Requirement already satisfied: sentencepiece in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 9)) (0.1.96)
+Requirement already satisfied: unidecode in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 10)) (1.3.2)
+Requirement already satisfied: jupyter_kernel_gateway in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 11)) (2.5.1)
+Requirement already satisfied: ipykernel in /usr/lib/python3/dist-packages (from -r requirements.txt (line 12)) (5.2.0)
+Requirement already satisfied: gin-config in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 13)) (0.4.1)
+Requirement already satisfied: pytest in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 14)) (6.0.1)
+Requirement already satisfied: matplotlib in /usr/local/lib/python3.8/dist-packages (from -r requirements.txt (line 15)) (3.5.0)
+Requirement already satisfied: plotly in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 16)) (5.5.0)
+Requirement already satisfied: sklearn in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 17)) (0.0)
+Requirement already satisfied: black in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 18)) (19.10b0)
+Requirement already satisfied: comet_ml in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 19)) (3.23.1)
+Requirement already satisfied: mediapy in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 20)) (1.0.3)
+Requirement already satisfied: numpy-stl in /home/ubuntu/.local/lib/python3.8/site-packages (from -r requirements.txt (line 21)) (2.16.3)
+Requirement already satisfied: jinja2>=2.1 in /usr/local/lib/python3.8/dist-packages (from jupyterlab==3.2.5->-r requirements.txt (line 1)) (3.0.3)
+Requirement already satisfied: tornado>=6.1.0 in /usr/local/lib/python3.8/dist-packages (from jupyterlab==3.2.5->-r requirements.txt (line 1)) (6.1)
+Requirement already satisfied: jupyter-server~=1.4 in /usr/local/lib/python3.8/dist-packages (from jupyterlab==3.2.5->-r requirements.txt (line 1)) (1.12.1)
+Requirement already satisfied: jupyter-core in /usr/lib/python3/dist-packages (from jupyterlab==3.2.5->-r requirements.txt (line 1)) (4.6.3)
+Requirement already satisfied: nbclassic~=0.2 in /usr/local/lib/python3.8/dist-packages (from jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.3.4)
+Requirement already satisfied: packaging in /home/ubuntu/.local/lib/python3.8/site-packages (from jupyterlab==3.2.5->-r requirements.txt (line 1)) (21.3)
+Requirement already satisfied: ipython in /usr/lib/python3/dist-packages (from jupyterlab==3.2.5->-r requirements.txt (line 1)) (7.13.0)
+Requirement already satisfied: jupyterlab-server~=2.3 in /usr/local/lib/python3.8/dist-packages (from jupyterlab==3.2.5->-r requirements.txt (line 1)) (2.8.2)
+Requirement already satisfied: typing-extensions in /usr/local/lib/python3.8/dist-packages (from torch->-r requirements.txt (line 2)) (4.0.1)
+Requirement already satisfied: typeguard>=2.11.1 in /home/ubuntu/.local/lib/python3.8/site-packages (from torchtyping->-r requirements.txt (line 3)) (2.13.3)
+Requirement already satisfied: pillow!=8.3.0,>=5.3.0 in /usr/lib/python3/dist-packages (from torchvision->-r requirements.txt (line 5)) (7.0.0)
+Requirement already satisfied: requests in /usr/local/lib/python3.8/dist-packages (from torchtext->-r requirements.txt (line 6)) (2.26.0)
+Requirement already satisfied: tqdm in /usr/local/lib/python3.8/dist-packages (from torchtext->-r requirements.txt (line 6)) (4.62.3)
+Requirement already satisfied: pyyaml>=5.1 in /usr/lib/python3/dist-packages (from transformers->-r requirements.txt (line 8)) (5.3.1)
+Requirement already satisfied: sacremoses in /home/ubuntu/.local/lib/python3.8/site-packages (from transformers->-r requirements.txt (line 8)) (0.0.46)
+Requirement already satisfied: huggingface-hub<1.0,>=0.1.0 in /home/ubuntu/.local/lib/python3.8/site-packages (from transformers->-r requirements.txt (line 8)) (0.2.1)
+Requirement already satisfied: tokenizers<0.11,>=0.10.1 in /home/ubuntu/.local/lib/python3.8/site-packages (from transformers->-r requirements.txt (line 8)) (0.10.3)
+Requirement already satisfied: regex!=2019.12.17 in /home/ubuntu/.local/lib/python3.8/site-packages (from transformers->-r requirements.txt (line 8)) (2021.11.10)
+Requirement already satisfied: filelock in /usr/lib/python3/dist-packages (from transformers->-r requirements.txt (line 8)) (3.0.12)
+Requirement already satisfied: jupyter-client>=5.2.0 in /usr/local/lib/python3.8/dist-packages (from jupyter_kernel_gateway->-r requirements.txt (line 11)) (7.1.0)
+Requirement already satisfied: traitlets>=4.2.0 in /usr/local/lib/python3.8/dist-packages (from jupyter_kernel_gateway->-r requirements.txt (line 11)) (5.1.1)
+Requirement already satisfied: notebook<7.0,>=5.7.6 in /usr/local/lib/python3.8/dist-packages (from jupyter_kernel_gateway->-r requirements.txt (line 11)) (6.4.6)
+Requirement already satisfied: pluggy<1.0,>=0.12 in /home/ubuntu/.local/lib/python3.8/site-packages (from pytest->-r requirements.txt (line 14)) (0.13.1)
+Requirement already satisfied: more-itertools>=4.0.0 in /usr/lib/python3/dist-packages (from pytest->-r requirements.txt (line 14)) (4.2.0)
+Requirement already satisfied: iniconfig in /home/ubuntu/.local/lib/python3.8/site-packages (from pytest->-r requirements.txt (line 14)) (1.1.1)
+Requirement already satisfied: toml in /home/ubuntu/.local/lib/python3.8/site-packages (from pytest->-r requirements.txt (line 14)) (0.10.2)
+Requirement already satisfied: attrs>=17.4.0 in /usr/lib/python3/dist-packages (from pytest->-r requirements.txt (line 14)) (19.3.0)
+Requirement already satisfied: py>=1.8.2 in /home/ubuntu/.local/lib/python3.8/site-packages (from pytest->-r requirements.txt (line 14)) (1.11.0)
+Requirement already satisfied: fonttools>=4.22.0 in /usr/local/lib/python3.8/dist-packages (from matplotlib->-r requirements.txt (line 15)) (4.28.3)
+Requirement already satisfied: cycler>=0.10 in /usr/lib/python3/dist-packages (from matplotlib->-r requirements.txt (line 15)) (0.10.0)
+Requirement already satisfied: setuptools-scm>=4 in /usr/local/lib/python3.8/dist-packages (from matplotlib->-r requirements.txt (line 15)) (6.3.2)
+Requirement already satisfied: kiwisolver>=1.0.1 in /usr/lib/python3/dist-packages (from matplotlib->-r requirements.txt (line 15)) (1.0.1)
+Requirement already satisfied: pyparsing>=2.2.1 in /usr/lib/python3/dist-packages (from matplotlib->-r requirements.txt (line 15)) (2.4.6)
+Requirement already satisfied: python-dateutil>=2.7 in /usr/lib/python3/dist-packages (from matplotlib->-r requirements.txt (line 15)) (2.7.3)
+Requirement already satisfied: six in /usr/lib/python3/dist-packages (from plotly->-r requirements.txt (line 16)) (1.14.0)
+Requirement already satisfied: tenacity>=6.2.0 in /home/ubuntu/.local/lib/python3.8/site-packages (from plotly->-r requirements.txt (line 16)) (8.0.1)
+Requirement already satisfied: scikit-learn in /usr/lib/python3/dist-packages (from sklearn->-r requirements.txt (line 17)) (0.22.2.post1)
+Requirement already satisfied: typed-ast>=1.4.0 in /home/ubuntu/.local/lib/python3.8/site-packages (from black->-r requirements.txt (line 18)) (1.5.1)
+Requirement already satisfied: pathspec<1,>=0.6 in /home/ubuntu/.local/lib/python3.8/site-packages (from black->-r requirements.txt (line 18)) (0.9.0)
+Requirement already satisfied: appdirs in /usr/lib/python3/dist-packages (from black->-r requirements.txt (line 18)) (1.4.3)
+Requirement already satisfied: click>=6.5 in /home/ubuntu/.local/lib/python3.8/site-packages (from black->-r requirements.txt (line 18)) (8.0.3)
+Requirement already satisfied: jsonschema!=3.1.0,>=2.6.0 in /usr/lib/python3/dist-packages (from comet_ml->-r requirements.txt (line 19)) (3.2.0)
+Requirement already satisfied: wurlitzer>=1.0.2 in /home/ubuntu/.local/lib/python3.8/site-packages (from comet_ml->-r requirements.txt (line 19)) (3.0.2)
+Requirement already satisfied: wrapt>=1.11.2 in /usr/lib/python3/dist-packages (from comet_ml->-r requirements.txt (line 19)) (1.11.2)
+Requirement already satisfied: everett[ini]>=1.0.1 in /home/ubuntu/.local/lib/python3.8/site-packages (from comet_ml->-r requirements.txt (line 19)) (2.0.1)
+Requirement already satisfied: websocket-client>=0.55.0 in /home/ubuntu/.local/lib/python3.8/site-packages (from comet_ml->-r requirements.txt (line 19)) (1.2.3)
+Requirement already satisfied: nvidia-ml-py3>=7.352.0 in /home/ubuntu/.local/lib/python3.8/site-packages (from comet_ml->-r requirements.txt (line 19)) (7.352.0)
+Requirement already satisfied: semantic-version>=2.8.0 in /home/ubuntu/.local/lib/python3.8/site-packages (from comet_ml->-r requirements.txt (line 19)) (2.8.5)
+Requirement already satisfied: dulwich>=0.20.6 in /home/ubuntu/.local/lib/python3.8/site-packages (from comet_ml->-r requirements.txt (line 19)) (0.20.26)
+Requirement already satisfied: requests-toolbelt>=0.8.0 in /home/ubuntu/.local/lib/python3.8/site-packages (from comet_ml->-r requirements.txt (line 19)) (0.9.1)
+Requirement already satisfied: python-utils>=1.6.2 in /home/ubuntu/.local/lib/python3.8/site-packages (from numpy-stl->-r requirements.txt (line 21)) (2.7.1)
+Requirement already satisfied: certifi in /usr/lib/python3/dist-packages (from dulwich>=0.20.6->comet_ml->-r requirements.txt (line 19)) (2019.11.28)
+Requirement already satisfied: urllib3>=1.24.1 in /usr/lib/python3/dist-packages (from dulwich>=0.20.6->comet_ml->-r requirements.txt (line 19)) (1.25.8)
+Requirement already satisfied: configobj in /usr/lib/python3/dist-packages (from everett[ini]>=1.0.1->comet_ml->-r requirements.txt (line 19)) (5.0.6)
+Requirement already satisfied: MarkupSafe>=2.0 in /usr/local/lib/python3.8/dist-packages (from jinja2>=2.1->jupyterlab==3.2.5->-r requirements.txt (line 1)) (2.0.1)
+Requirement already satisfied: nest-asyncio>=1.5 in /usr/local/lib/python3.8/dist-packages (from jupyter-client>=5.2.0->jupyter_kernel_gateway->-r requirements.txt (line 11)) (1.5.4)
+Requirement already satisfied: pyzmq>=13 in /usr/lib/python3/dist-packages (from jupyter-client>=5.2.0->jupyter_kernel_gateway->-r requirements.txt (line 11)) (18.1.1)
+Requirement already satisfied: entrypoints in /usr/lib/python3/dist-packages (from jupyter-client>=5.2.0->jupyter_kernel_gateway->-r requirements.txt (line 11)) (0.3)
+Requirement already satisfied: argon2-cffi in /usr/local/lib/python3.8/dist-packages (from jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (21.1.0)
+Requirement already satisfied: nbconvert in /usr/local/lib/python3.8/dist-packages (from jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (6.3.0)
+Requirement already satisfied: anyio<4,>=3.1.0 in /usr/local/lib/python3.8/dist-packages (from jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (3.4.0)
+Requirement already satisfied: ipython-genutils in /usr/lib/python3/dist-packages (from jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.2.0)
+Requirement already satisfied: prometheus-client in /usr/local/lib/python3.8/dist-packages (from jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.12.0)
+Requirement already satisfied: terminado>=0.8.3 in /usr/local/lib/python3.8/dist-packages (from jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.12.1)
+Requirement already satisfied: Send2Trash in /usr/local/lib/python3.8/dist-packages (from jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (1.8.0)
+Requirement already satisfied: nbformat in /usr/lib/python3/dist-packages (from jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (5.0.4)
+Requirement already satisfied: json5 in /usr/local/lib/python3.8/dist-packages (from jupyterlab-server~=2.3->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.9.6)
+Requirement already satisfied: babel in /usr/local/lib/python3.8/dist-packages (from jupyterlab-server~=2.3->jupyterlab==3.2.5->-r requirements.txt (line 1)) (2.9.1)
+Requirement already satisfied: idna<4,>=2.5 in /usr/lib/python3/dist-packages (from requests->torchtext->-r requirements.txt (line 6)) (2.8)
+Requirement already satisfied: charset-normalizer~=2.0.0 in /usr/local/lib/python3.8/dist-packages (from requests->torchtext->-r requirements.txt (line 6)) (2.0.9)
+Requirement already satisfied: tomli>=1.0.0 in /usr/local/lib/python3.8/dist-packages (from setuptools-scm>=4->matplotlib->-r requirements.txt (line 15)) (1.2.2)
+Requirement already satisfied: setuptools in /usr/lib/python3/dist-packages (from setuptools-scm>=4->matplotlib->-r requirements.txt (line 15)) (45.2.0)
+Requirement already satisfied: pexpect in /usr/lib/python3/dist-packages (from ipython->jupyterlab==3.2.5->-r requirements.txt (line 1)) (4.6.0)
+Requirement already satisfied: joblib in /usr/local/lib/python3.8/dist-packages (from sacremoses->transformers->-r requirements.txt (line 8)) (1.0.1)
+Requirement already satisfied: sniffio>=1.1 in /usr/local/lib/python3.8/dist-packages (from anyio<4,>=3.1.0->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (1.2.0)
+Requirement already satisfied: ptyprocess in /usr/local/lib/python3.8/dist-packages (from terminado>=0.8.3->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: cffi>=1.0.0 in /usr/local/lib/python3.8/dist-packages (from argon2-cffi->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (1.15.0)
+Requirement already satisfied: pytz>=2015.7 in /usr/lib/python3/dist-packages (from babel->jupyterlab-server~=2.3->jupyterlab==3.2.5->-r requirements.txt (line 1)) (2019.3)
+Requirement already satisfied: nbclient<0.6.0,>=0.5.0 in /usr/local/lib/python3.8/dist-packages (from nbconvert->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.5.9)
+Requirement already satisfied: defusedxml in /usr/local/lib/python3.8/dist-packages (from nbconvert->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.7.1)
+Requirement already satisfied: testpath in /usr/local/lib/python3.8/dist-packages (from nbconvert->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.5.0)
+Requirement already satisfied: bleach in /usr/lib/python3/dist-packages (from nbconvert->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (3.1.1)
+Requirement already satisfied: pygments>=2.4.1 in /usr/local/lib/python3.8/dist-packages (from nbconvert->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (2.10.0)
+Requirement already satisfied: jupyterlab-pygments in /usr/local/lib/python3.8/dist-packages (from nbconvert->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.1.2)
+Requirement already satisfied: pandocfilters>=1.4.1 in /usr/local/lib/python3.8/dist-packages (from nbconvert->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (1.5.0)
+Requirement already satisfied: mistune<2,>=0.8.1 in /usr/local/lib/python3.8/dist-packages (from nbconvert->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (0.8.4)
+Requirement already satisfied: pycparser in /usr/local/lib/python3.8/dist-packages (from cffi>=1.0.0->argon2-cffi->jupyter-server~=1.4->jupyterlab==3.2.5->-r requirements.txt (line 1)) (2.21)
+Defaulting to user installation because normal site-packages is not writeable
+Obtaining file:///home/ubuntu/mlab
+  Preparing metadata (setup.py): started
+  Preparing metadata (setup.py): finished with status 'done'
+Installing collected packages: ml-bootcamp
+  Attempting uninstall: ml-bootcamp
+    Found existing installation: ml-bootcamp 0.1
+    Uninstalling ml-bootcamp-0.1:
+      Successfully uninstalled ml-bootcamp-0.1
+  Running setup.py develop for ml-bootcamp
+Successfully installed ml-bootcamp-0.1
+COMET ERROR: Run will not be logged 
+For more details, please refer to: https://www.comet.ml/docs/python-sdk/warnings-errors/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.8/site-packages/comet_ml/experiment.py", line 834, in _start
+    self.alive = self._setup_streamer()
+  File "/home/ubuntu/.local/lib/python3.8/site-packages/comet_ml/_online.py", line 306, in _setup_streamer
+    self._initialize_streamer(full_ws_url, initial_offset)
+  File "/home/ubuntu/.local/lib/python3.8/site-packages/comet_ml/_online.py", line 363, in _initialize_streamer
+    self.ws_connection = WebSocketConnection(
+  File "/home/ubuntu/.local/lib/python3.8/site-packages/comet_ml/connection.py", line 954, in __init__
+    self.ws = self.connect_ws()
+  File "/home/ubuntu/.local/lib/python3.8/site-packages/comet_ml/connection.py", line 971, in connect_ws
+    ws = websocket.WebSocketApp(
+AttributeError: module 'websocket' has no attribute 'WebSocketApp'
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to get amp_loss_mapping for closed experiment
+COMET INFO: Failed to run Tensor.backward logger
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+COMET WARNING: Attempting to clean amp_loss_mapping for closed experiment
+params {'fn_path': 'days.w2d4.demo_train.train', 'gin_config': '# Class.x is how you say Class.__init__.x\nMyModel.hidden_size = 16\nMyModel.input_size = 2\nMyModel.output_size = 2\nMyModel.n_layers = 2\ntrain.lr = 1e-4\ntrain.batch_size = 6\ntrain.num_epochs = 1\nlr = 0.001\nMyModel.hidden_size = 64', 'name': 'mlps_without_activations', 'comet_key': 'vABV7zo6pqS7lfzZBhyabU2Xe'}

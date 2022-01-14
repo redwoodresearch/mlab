@@ -13,7 +13,7 @@ import itertools
 import re
 from pathlib import Path
 
-corpus = open(Path.home() / "mlab/shakespeare.txt").readlines()
+corpus = open(Path.home() / "mlab/days/w2d4/shakespeare.txt").readlines()
 minicorpus = corpus[5000:6000]
 
 
@@ -275,7 +275,15 @@ def test_tokenizer_convenience(tokenizer):
 def test_bpe_tokenizer_from_corpus(tokenizer):
     reference = BPETokenizer.from_corpus(minicorpus)
     yours = tokenizer.from_corpus(minicorpus)
-    assert tuple(reference.vocab.items()) == tuple(yours.vocab.items())
+    print("THEIRS:", tuple(reference.vocab.items())[-50:])
+    print("OURS:", tuple(yours.vocab.items())[-50:])
+    a = tuple(reference.vocab.items())
+    b = tuple(yours.vocab.items())
+    for i, j in zip(a, b):
+        if i != j:
+            print(i, j)
+            raise Exception
+    assert a == b
 
 
 def test_bpe_tokenizer(tokenizer):

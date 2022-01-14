@@ -1,0 +1,6 @@
+train.epochs = 1
+train.optimizer = "adam"
+train.lr = 1e-06
+train.max_seq_len = 128
+train.batch_size = 16
+set_random_seed.seed = 0

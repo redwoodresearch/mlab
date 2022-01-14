@@ -249,7 +249,3 @@ if __name__ == "__main__":
                     if not k.startswith('classification_head')}
     my_bert.load_state_dict(mapped_params)
     bert_tests.test_same_output(my_bert, pretrained_bert)
-
-
-
-
