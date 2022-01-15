@@ -15,7 +15,9 @@ import subprocess
 
 # Pipeline parallel and data parallel at once
 
-
+# 104.171.200.117 104-171-200-117
+# 104.171.200.214 104-171-200-214
+# 104.171.200.196 104-171-200-196
 @dataclass
 class Config:
     stage_ips = [f"ubuntu@104.171.200.{x}" for x in [117, 117, 214, 214, 196, 196]]
@@ -143,7 +145,8 @@ def pprun(
         )
     for g_dp_rank in range(C.dp_size):
         process_groups["pipe"][g_dp_rank] = dist.new_group(
-            ranks=[get_total_rank(i, dp_rank) for i in range(C.mp_size)], backend="nccl"
+            ranks=[get_total_rank(i, g_dp_rank) for i in range(C.mp_size)],
+            backend="nccl",
         )
     for g_dp_rank in range(C.dp_size):
         for g_mp_rank in range(mp_rank):
@@ -369,8 +372,6 @@ def pprun(
     print(
         f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {mp_rank}"
     )
-    if mp_rank == 0:
-        tpeek("pipe", next(model.parameters()))
 
 
 def init_process(rank, run, *args, **kwargs):
@@ -415,14 +416,14 @@ def start_pipeline_cluster():  # does gin add the arguments here? crazy
     for i, ip in enumerate(C.stage_ips):
         remote_procs.append(
             subprocess.Popen(
-                f'ssh -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q; git fetch -q; git checkout -q -f 2dp; git pull; python days/w3d1/2dparallel.py machine {i}"',
+                f'ssh -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q origin/2dp; python days/w3d1/2dparallel.py machine {i}"',
                 shell=True,
                 # stdout=subprocess.STDOUT,
                 # stderr=subprocess.STDOUT,
             )
         )
     for proc in remote_procs:
-        proc.join()
+        proc.wait()
 
 
 # 2,8 produces 0.18 time units and final loss of 0.10 (noisy)
@@ -439,7 +440,7 @@ if __name__ == "__main__":
     # make_gptj_and_save_pieces()
     if sys.argv[1] == "orchestrate":
         print(
-            f"""STARTING DP RUN___________________________
+            f"""STARTING 2DP RUN___________________________
         
         
         
