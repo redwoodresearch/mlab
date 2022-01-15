@@ -347,7 +347,7 @@ def pprun(
 def start_dp_cluster(
     mp_rank: int,
 ):
-    print("starting dp cluster", mp_rank)
+    print("starting dp cluster for real", mp_rank)
     processes = []
     print("dp size", C.dp_size)
     for dp_rank in range(C.dp_size):
