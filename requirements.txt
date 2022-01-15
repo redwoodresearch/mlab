@@ -19,4 +19,5 @@ black
 comet_ml
 mediapy
 numpy-stl
+traitlets==5.1.1
 git+https://github.com/google/gin-config.git@e518c4ec7755a3e5da973e894ab23cc80c6665ed#egg=gin-config

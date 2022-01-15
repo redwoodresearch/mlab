@@ -47,8 +47,8 @@ import days.gpt2 as gpt2
 import days.old_resnet as old_resnet
 import pytest
 import transformers
-from utils import tpeek
-import days.dataparallel as dp
+from days.utils import tpeek
+import days.w2d5.dataparallel as dp
 
 
 def init_both(my_class, their_class, *args, **kwargs):
