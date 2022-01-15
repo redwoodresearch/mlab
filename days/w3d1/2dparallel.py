@@ -6,12 +6,12 @@ import os
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import sys
-from days.utils import import_object_from_qualified_name
 import torch as t
 from days.utils import *
 import transformers
 from time import time
 import json
+import subprocess
 
 # Pipeline parallel and data parallel at once
 
@@ -385,11 +385,11 @@ def init_process(rank, run, *args, **kwargs):
 def start_dp_cluster(
     mp_rank: int,
 ):
+    print("starting dp cluster", mp_rank)
     processes = []
     mp.set_start_method("spawn")
     for dp_rank in range(C.dp_size):
         total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
-        print(total_rank.__class__)
         p = mp.Process(
             target=init_process,
             args=(total_rank, C.total_size, pprun),
@@ -407,10 +407,17 @@ def start_dp_cluster(
 
 
 def start_pipeline_cluster():  # does gin add the arguments here? crazy
+    remote_procs = []
     for i, ip in enumerate(C.stage_ips):
-        os.system(
-            f'ssh -i ~/mlab_ssh {ip} "cd mlab; git fetch; git checkout -f 2dp; git pull; python days/w3d1/2dparallel.py machine {i} {i}"'
+        remote_procs.append(
+            subprocess.Popen(
+                f'ssh -i ~/mlab_ssh {ip} "cd mlab; git fetch -q; git checkout -q -f 2dp; git pull; python days/w3d1/2dparallel.py machine {i}"',
+                stdout=subprocess.STDOUT,
+                stderr=subprocess.STDOUT,
+            )
         )
+    for proc in remote_procs:
+        proc.join()
 
 
 # 2,8 produces 0.18 time units and final loss of 0.10 (noisy)
