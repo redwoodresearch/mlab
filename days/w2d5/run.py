@@ -149,7 +149,7 @@ def init_process(rank, num_processes, backend='nccl'):
     params = list(model.parameters())
     my_params = []
     if OPTIMIZER_STATE_SHARDING:
-        my_params = params[i:params:num_processes]
+        my_params = params[rank:len(params):num_processes]
     else:
         my_params = params
     optimizer = torch.optim.Adam(my_params, lr=1e-4)
