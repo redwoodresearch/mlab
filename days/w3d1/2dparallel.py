@@ -97,6 +97,7 @@ def get_total_rank(mp_rank, dp_rank):
 
 
 # 'bad address' error means you tried to use operations that weren't supported on cuda
+# Multiple groups cannot operate simultaneously in NCCL, so we have to await all of one group before we start the next group.
 def pprun(
     mp_rank,
     dp_rank,
@@ -169,17 +170,17 @@ def pprun(
         dist.barrier()
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
-            pipe_batches = batches[batch_num]
+            pipe_batches = batches[batch_num].to(device)
             out_tensors = []
+
+            # send batch Ys to the end so it can calculate loss
             dist.broadcast(pipe_batches, src=total_rank, group=bwd_group)
 
             for i, microbatch in enumerate(pipe_batches):
                 with t.autocast(
                     dtype=autocast_type, device_type=device[:4], enabled=C.use_autocast
                 ):
-                    out = model(
-                        microbatch.long().to(device)
-                    ).cpu()  # all the gpu action
+                    out = model(microbatch.long().to(device))  # all the gpu action
                 out_tensors.append(out)
                 dist.broadcast(out, src=total_rank, group=fwd_group)
             grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
@@ -204,7 +205,7 @@ def pprun(
             xs = []
             backward_sends = []
             xs = [
-                t.zeros(C.microbatch_size, *C.model_in_shape)
+                t.zeros(C.microbatch_size, *C.model_in_shape, device=device)
                 for _ in range(C.pipe_width)
             ]
             xjobs = [
@@ -222,7 +223,7 @@ def pprun(
                 with t.autocast(
                     dtype=autocast_type, device_type=device[:4], enabled=C.use_autocast
                 ):
-                    out = model(x_buffer.to(device)).cpu()
+                    out = model(x_buffer.to(device))
                 xs.append(x_buffer)
                 out_tensors.append(out)
                 dist.isend(out, src=total_rank, group=fwd_group)
@@ -251,21 +252,30 @@ def pprun(
             xs = []
             losses = []
             backward_sends = []
-            ys = [t.zeros(microbatch_size, *y_size) for _ in range(pipe_width)]
-            yjobs = [dist.irecv(y, 0, tag=TAGS["Y"] + i) for i, y in enumerate(ys)]
-            xs = [t.zeros(microbatch_size, *model_in_shape) for _ in range(pipe_width)]
+            ys = [
+                t.zeros(C.microbatch_size, C.seq_len, device=device)
+                for _ in range(C.pipe_width)
+            ]
+            yjobs = [
+                dist.broadcast(y, get_total_rank(0, dp_rank), group=fwd_group)
+                for i, y in enumerate(ys)
+            ]
+            xs = [
+                t.zeros(C.microbatch_size, *C.model_in_shape[mp_rank], device=device)
+                for _ in range(C.pipe_width)
+            ]
             xjobs = [
-                dist.irecv(x, mp_rank - 1, tag=TAGS["ACTIVATION"] + i)
+                dist.broadcast(x, get_total_rank(mp_rank - 1, dp_rank), group=bwd_group)
                 for i, x in enumerate(xs)
             ]
-            for minibatch_num in range(pipe_width):
+            for minibatch_num in range(C.pipe_width):
                 xjobs[minibatch_num].wait()
                 x_buffer = xs[minibatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
-                    dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+                    dtype=autocast_type, device_type=device[:4], enabled=C.use_autocast
                 ):  # save memory by computing with less precision
-                    out = model(x_buffer.to(device)).cpu()
+                    out = model(x_buffer.to(device))
                 out = out[
                     :, -1, -2:
                 ]  # use the last 2 tokens of LM head as classification head
@@ -286,13 +296,24 @@ def pprun(
                 loss.backward()
                 xgrad = x.grad
                 backward_sends.append(
-                    dist.isend(xgrad, mp_rank - 1, tag=TAGS["GRAD"] + i)
+                    dist.broadcast(xgrad, src=total_rank, group=bwd_group)
                 )
                 losses[i] = None
                 xs[i] = None
+
+        # average grad
+        reduce_ops = [
+            dist.all_reduce(
+                param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True
+            )
+            for param in model.parameters()
+        ]
+        for op in reduce_ops:
+            op.wait()
+
         optimizer.step()
         optimizer.zero_grad()
-        if time() - last_checkpoint_time > 60 * checkpoint_every_m:
+        if time() - last_checkpoint_time > 60 * C.checkpoint_every_m:
             last_checkpoint_time = time()
             if mp_rank == 0:
                 print("saving")
@@ -355,6 +376,25 @@ def start_pipeline_cluster():  # does gin add the arguments here? crazy
 # with 4 minibatches of 12, took 3.1s
 # with 1 minibatch of 48, took 4.6
 #
+
+
+def add_grad(buckets, rank_mp, rank_dp):
+    reduce_ops = []
+    for i, bucket in enumerate(buckets):
+        for param in bucket:
+            reduce_ops.append(dist.reduce(param.grad, i, async_op=True))
+    for op in reduce_ops:
+        op.wait()
+
+
+def broadcast_updated_params(buckets, rank_mp, rank_dp):
+    reduce_ops = []
+    for i, bucket in enumerate(buckets):
+        for param in bucket:
+            reduce_ops.append(dist.broadcast(param, i, async_op=True))
+    for op in reduce_ops:
+        op.wait()
+
 
 if __name__ == "__main__":
     # make_gptj_and_save_pieces()
