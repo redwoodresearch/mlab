@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from test_all import allclose
 from typing import *
 
@@ -5,7 +6,6 @@ from torch import nn
 import os
 import torch.distributed as dist
 import torch.multiprocessing as mp
-import gin
 import sys
 from days.utils import import_object_from_qualified_name
 import torch as t
@@ -14,13 +14,43 @@ import transformers
 import torchtext
 from time import time
 
-TAGS = {
-    "Y": 1000,
-    "X": 2000,
-    "ACTIVATION": 3000,
-    "GRAD": 4000,
-    "SYNC": 5000,
-}  # why thousands/not single digits?
+# Pipeline parallel and data parallel at once
+
+
+@dataclass
+class Config:
+    stage_ips = [f"ubuntu@104.171.200.{x}" for x in [117, 117, 214, 214, 196, 196]]
+    stage_dp_cuda_ids = [[0, 1], [2, 3], [0, 1], [2, 3], [0, 1], [2, 3]]
+    model_in_shapes = [(1024,), (1024, 4096), (1024, 4096), (1024, 4096)]
+
+    microbatch_size = 1
+    seq_len = 1024
+    master_addr = "104.171.200.117"
+    master_port = "29559"
+    dp_size = 2
+    mp_size = 6
+    model_file_prefix = "gpt-j-6b"
+    data_file_prefix = "lw_tensor"
+    y_shape = (1024,)
+    dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
+    dist_backend = "nccl"
+    use_autocast = True
+    pipe_width = 4
+    checkpoint_every_m = 10
+    use_cpu = False
+
+    total_size = None
+    stage_dp_sizes_cum = None
+
+    def __init__(self):
+        self.stage_dp_sizes_cum = t.tensor(
+            [0] + [len(x) for x in self.stage_dp_cuda_ids]
+        ).cumsum(0)
+        self.total_size = self.stage_dp_sizes_cum[0].item()
+
+
+C = Config()
+print(C)
 
 # HuggingFace models return tuples in the middle (things like activation patterns), thus the [0]
 class HFBlockSequence(nn.Module):
@@ -58,131 +88,108 @@ def make_gptj_and_save_pieces():
     return models
 
 
-def make_dataset_imdb():
-    if os.path.exists("imdb_data.pt"):
-        print("reading cached data tensors")
-        return t.load("imdb_data.pt")
-    train_data = list(torchtext.datasets.IMDB(split="train"))
-    import random
+def load_data(dp_rank):
+    return t.load(f"{C.data_file_prefix}_part{dp_rank}.pt")
 
-    sent_to_num = {"neg": 0, "pos": 1}
-    random.shuffle(train_data)
-    tokenizer = transformers.AutoTokenizer.from_pretrained("EleutherAI/gpt-j-6B")
-    print("starting tokenization")
-    # save as float32 so you don't have to pass dtype around, convert to long right before use
-    data = [
-        t.Tensor(
-            [
-                x[-128:]
-                for x in tokenizer(
-                    [
-                        # gptj wasn't trained with pad token, so doing this
-                        """However, when I quit and come back and try the top command again, it is refreshing the processes information again for every 3 seconds and not with the interval that I've set earlier.
 
-I was looking for a way to configure this interval permanently. I've looked at some articles where in they mentioned to use the toprc file in /etc directory for this configuration.
-
-But it doesn't seem like I have any such file in /etc or my home directory.
-
-How do I set the refresh interval for top command? When generating samples interactively sometimes an "end of text" marker is included on the text. Is this related to the sanitization of the training data?However, when I quit and come back and try the top command again, it is refreshing the processes information again for every 3 seconds and not with the interval that I've set earlier.
-
-I was looking for a way to configure this interval permanently. I've looked at some articles where in they mentioned to use the toprc file in /etc directory for this configuration.
-
-But it doesn't seem like I have any such file in /etc or my home directory.
-
-How do I set the refresh interval for top command? When generating samples interactively sometimes an "end of text" marker is included on the text. Is this related to the sanitization of the training data?<|endoftext|>"""
-                        + x
-                        for _, x in train_data
-                    ],
-                    padding=False,
-                    truncation=False,
-                )["input_ids"]
-            ]
-        ),
-        t.Tensor([sent_to_num[x] for x, _ in train_data]),
-    ]
-    t.save(data, "imdb_data.pt")
-    print("finished tokenization")
-    return data
+def get_total_rank(mp_rank, dp_rank):
+    return C.stage_dp_sizes_cum[mp_rank] + dp_rank
 
 
 # 'bad address' error means you tried to use operations that weren't supported on cuda
-# I think the gradient accumulation will just work out?
-@gin.configurable()
 def pprun(
     mp_rank,
-    mp_size,
     dp_rank,
-    dp_size,
     total_rank,
-    total_size,
-    model_file_name,
-    model_in_shape,
-    num_batches,
-    y_size,
-    pipe_width,
-    cuda_id: int,
-    minibatch_size: int,
-    dataset_fn_name: str = "days.pipelineparallel.make_dataset",
-    checkpoint_every_m=10,
-    use_cpu=True,
-    use_autocast=False,
 ):
-    autocast_type = t.bfloat16 if use_cpu else t.float16
-    device = "cpu" if use_cpu else "cuda:" + str(cuda_id)
+    autocast_type = t.bfloat16 if C.use_cpu else t.float16
+    device = (
+        "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
+    )
 
     # start all our fucking process groups!
     process_groups = {
-        "stagewide": [],
-        "stage_links": [],
+        "stage": [None for _ in range(C.mp_size)],
+        "pipe": [None for _ in range(C.dp_size)],
+        "stage_links": [[None for _ in range(C.mp_size)] for _ in range(C.dp_size)],
     }
-    for g_mp_rank in range(mp_size):
-        process_groups["stagewide"].append(dist.new_group())  # @HERE
-    stage_group = process_groups["stagewide"][mp_rank]
-    fwd_group = process_groups["stage_links"][dp_rank][mp_rank + 1]
-    bwd_group = process_groups["stage_links"][dp_rank][mp_rank]
+    print("initing subgroups", mp_rank, dp_rank)
+    for g_mp_rank in range(C.mp_size):
+        process_groups["stage"][g_mp_rank] = dist.new_group(
+            ranks=[get_total_rank(g_mp_rank, i) for i in range(C.dp_size)],
+            backend="nccl",
+        )
+    for g_dp_rank in range(C.dp_size):
+        process_groups["pipe"][g_dp_rank] = dist.new_group(
+            ranks=[get_total_rank(i, dp_rank) for i in range(C.mp_size)], backend="nccl"
+        )
+    for g_dp_rank in range(C.dp_size):
+        for g_mp_rank in range(mp_rank):
+            process_groups["stage_links"][g_dp_rank][g_mp_rank] = dist.new_group(
+                ranks=[
+                    get_total_rank(g_mp_rank, g_dp_rank),
+                    get_total_rank((g_mp_rank + 1) % C.mp_size, g_dp_rank),
+                ],
+                backend="nccl",
+            )
+    pipe_group = process_groups["pipe"][dp_rank]
+    stage_group = process_groups["stage"][mp_rank]
+    fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
+    bwd_group = process_groups["stage_links"][dp_rank][
+        (C.mp_size + mp_rank - 1) % C.mp_size
+    ]
+    print("initiated subgroups")
 
-    model: nn.Module = t.load(model_file_name)
+    model: nn.Module = t.load(f"[{C.model_file_prefix}_part{mp_rank}.pt")
     model.train()
     model.to(device)
-    optimizer = t.optim.SGD(model.parameters(), lr=1e-4)
-    print("model loaded", mp_rank)
+
+    optimizer = t.optim.SGD(
+        model.parameters(), lr=1e-4
+    )  # TODO switch to sharded optimizer adam
+
+    print("model loaded", mp_rank, dp_rank)
+    num_batches = t.IntTensor([0])
     if mp_rank == 0:
-        dataset = import_object_from_qualified_name(
-            dataset_fn_name
-        )()  # tokenizer. embedding in the model (don't worry)
-        batches = (
-            to_batches(batch, minibatch_size, trim=True)
-            for batch in to_batches(dataset, minibatch_size * pipe_width, trim=True)
-        )
-    total_examples = num_batches * minibatch_size * pipe_width
+        dataset = load_data()
+        # dp sections are already split out into multiple files
+        batches = dataset[
+            : -(dataset.shape[0] % (C.pipe_width * C.microbatch_size * C.seq_len))
+        ].reshape(-1, C.pipe_width, C.microbatch_size, C.seq_len)
+        total_examples = batches.shape[0] * batches.shape[1] * batches.shape[2]
+        num_batches[0] = batches.shape[0]
+
+    dist.broadcast(num_batches, src=get_total_rank(0, 0))
+    num_batches = num_batches.item()
+
     start = time()
     batch_start = time()
     last_checkpoint_time = time()
     for batch_num in range(num_batches):
-        dist.all_reduce(t.zeros(1))
+        dist.barrier()
+        print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
-            minibatches = next(batches)
-            forward_sends = []
+            pipe_batches = batches[batch_num]
             out_tensors = []
-            ysends = [  # send the ys all the way to the end. This is not being used for some reason?
-                dist.isend(
-                    batch[1], mp_size - 1, tag=TAGS["Y"] + i
-                )  # tag on the send forces it to only be received by same tag
-                for i, batch in enumerate(minibatches)
-            ]
+            dist.broadcast(pipe_batches, src=total_rank, group=bwd_group)
 
-            for i, batch in enumerate(minibatches):
+            for i, microbatch in enumerate(pipe_batches):
                 with t.autocast(
-                    dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+                    dtype=autocast_type, device_type=device[:4], enabled=C.use_autocast
                 ):
-                    out = model(batch[0].long().to(device)).cpu()  # all the gpu action
+                    out = model(
+                        microbatch.long().to(device)
+                    ).cpu()  # all the gpu action
                 out_tensors.append(out)
-                forward_sends.append(
-                    dist.isend(out, mp_rank + 1, tag=TAGS["ACTIVATION"] + i)
-                )
-            grad_buffers = [t.zeros_like(out) for _ in range(pipe_width)]
+                dist.broadcast(out, src=total_rank, group=fwd_group)
+            grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
             grad_recvs = [
-                dist.irecv(x, mp_rank + 1, tag=TAGS["GRAD"] + i)
+                dist.broadcast(
+                    x,
+                    src=get_total_rank(mp_rank + 1, dp_rank),
+                    group=bwd_group,
+                    async_op=True,
+                )
                 for i, x in enumerate(grad_buffers)
             ]
             grad_buffer = t.zeros_like(out)
@@ -191,53 +198,62 @@ def pprun(
                 grad_buffer = grad_buffers[i]
                 out_tensor.backward(grad_buffer)
                 out_tensors[i] = None  # why is this necessary? saves memory?
-        elif mp_rank != mp_size - 1:
+        elif mp_rank != C.mp_size - 1:
             forward_sends = []
             out_tensors = []
             xs = []
             backward_sends = []
-            xs = [t.zeros(minibatch_size, *model_in_shape) for _ in range(pipe_width)]
+            xs = [
+                t.zeros(C.microbatch_size, *C.model_in_shape)
+                for _ in range(C.pipe_width)
+            ]
             xjobs = [
-                dist.irecv(x, mp_rank - 1, tag=TAGS["ACTIVATION"] + i)
+                dist.broadcast(
+                    x,
+                    src=get_total_rank(mp_rank - 1, dp_rank),
+                    group=bwd_group,
+                )
                 for i, x in enumerate(xs)
             ]
 
-            for minibatch_num in range(pipe_width):
-                xjobs[minibatch_num].wait()
+            for minibatch_num in range(C.pipe_width):
                 x_buffer = xs[minibatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
-                    dtype=autocast_type, device_type=device[:4], enabled=use_autocast
+                    dtype=autocast_type, device_type=device[:4], enabled=C.use_autocast
                 ):
                     out = model(x_buffer.to(device)).cpu()
                 xs.append(x_buffer)
                 out_tensors.append(out)
-                forward_sends.append(
-                    dist.isend(out, mp_rank + 1, tag=TAGS["ACTIVATION"] + minibatch_num)
-                )
-            grad_buffers = [t.zeros_like(out) for _ in range(pipe_width)]
+                dist.isend(out, src=total_rank, group=fwd_group)
+            grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
             grad_recvs = [
-                dist.irecv(x, mp_rank + 1, tag=TAGS["GRAD"] + i)
+                dist.broadcast(
+                    x,
+                    src=get_total_rank(mp_rank + 1, dp_rank),
+                    group=fwd_group,
+                )
                 for i, x in enumerate(grad_buffers)
             ]
             for i, (out_tensor, x) in enumerate(zip(out_tensors, xs)):
-                grad_recvs[i].wait()
                 grad_buffer = grad_buffers[i]
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
-                backward_sends.append(
-                    dist.isend(xgrad, mp_rank - 1, tag=TAGS["GRAD"] + i)
+                dist.broadcast(
+                    x,
+                    src=total_rank,
+                    group=bwd_group,
                 )
                 xs[i] = None
                 out_tensors[i] = None
 
-        elif mp_rank == mp_size - 1:
+        elif mp_rank == C.mp_size - 1:
             xs = []
             losses = []
             backward_sends = []
-            ys = [t.zeros(minibatch_size, *y_size) for _ in range(pipe_width)]
+            ys = [t.zeros(microbatch_size, *y_size) for _ in range(pipe_width)]
             yjobs = [dist.irecv(y, 0, tag=TAGS["Y"] + i) for i, y in enumerate(ys)]
-            xs = [t.zeros(minibatch_size, *model_in_shape) for _ in range(pipe_width)]
+            xs = [t.zeros(microbatch_size, *model_in_shape) for _ in range(pipe_width)]
             xjobs = [
                 dist.irecv(x, mp_rank - 1, tag=TAGS["ACTIVATION"] + i)
                 for i, x in enumerate(xs)
@@ -292,45 +308,29 @@ def pprun(
         tpeek("pipe", next(model.parameters()))
 
 
-@gin.configurable
-def init_process(rank, size, run, master_addr="127.0.0.1", *args, **kwargs):
-    gin.parse_config_file(sys.argv[1])
-    os.environ["MASTER_ADDR"] = master_addr
-    os.environ["MASTER_PORT"] = "29500"
+def init_process(rank, run, *args, **kwargs):
+    os.environ["MASTER_ADDR"] = C.master_addr
+    os.environ["MASTER_PORT"] = C.master_port
     print("will init process group", rank)
-    dist.init_process_group(backend="gloo", rank=rank, world_size=size)
+    dist.init_process_group(backend=C.dist_backend, rank=rank, world_size=C.total_size)
     print("inited process group", rank)
-    run(rank, size, *args, **kwargs)
+    run(rank, C.total_size, *args, **kwargs)
 
 
-@gin.configurable
 def start_dp_cluster(
     mp_rank: int,
-    model_paths: List[str],
-    model_in_shapes: List[tuple],
-    stage_dp_cuda_ids: List[int],
 ):
-    dp_size = len(stage_dp_cuda_ids[mp_rank])
-    dp_sizes_cum = t.tensor([0] + [len(x) for x in stage_dp_cuda_ids]).cumsum(0)
-    total_size = dp_sizes_cum[0].item()
-
     processes = []
     mp.set_start_method("spawn")
-    for dp_rank in range(dp_size):
-        total_rank = dp_sizes_cum[mp_rank] + dp_rank
+    for dp_rank in range(C.dp_size):
+        total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
         p = mp.Process(
             target=init_process,
-            args=(total_rank, total_size, pprun),
+            args=(total_rank, C.total_size, pprun),
             kwargs={
-                "model_path": model_paths[mp_rank],
-                "model_in_size": model_in_shapes[mp_rank],
                 "dp_rank": dp_rank,
-                "dp_size": dp_size,
                 "mp_rank": mp_rank,
-                "mp_size": len(model_paths),
-                "total_size": total_size,
                 "total_rank": total_rank,
-                "cuda_id": stage_dp_cuda_ids[mp_rank][dp_rank],
             },
         )
         p.start()
@@ -340,11 +340,8 @@ def start_dp_cluster(
         process.join()
 
 
-@gin.configurable
-def start_pipeline_cluster(
-    model_part_host_ips: List[str],
-):  # does gin add the arguments here? crazy
-    for i, ip in enumerate(model_part_host_ips):
+def start_pipeline_cluster():  # does gin add the arguments here? crazy
+    for i, ip in enumerate(C.stage_ips):
         os.system(
             f'ssh -i ~/mlab_ssh {ip} "cd ~/mlab/days/w3d1; python 2dparallel.py {sys.argv[1]} machine {i}'
         )
@@ -361,7 +358,6 @@ def start_pipeline_cluster(
 
 if __name__ == "__main__":
     # make_gptj_and_save_pieces()
-    gin.parse_config_file(sys.argv[1])
     if sys.argv[2] == "orchestrate":
         start_pipeline_cluster()
     else:
