@@ -408,12 +408,16 @@ def start_dp_cluster(
 
 def start_pipeline_cluster():  # does gin add the arguments here? crazy
     remote_procs = []
+    os.system(
+        f'ssh -i ~/mlab_ssh ubuntu@{C.master_addr} "fuser -k {C.master_port}/tcp"'
+    )
     for i, ip in enumerate(C.stage_ips):
         remote_procs.append(
             subprocess.Popen(
                 f'ssh -i ~/mlab_ssh {ip} "cd mlab; git fetch -q; git checkout -q -f 2dp; git pull; python days/w3d1/2dparallel.py machine {i}"',
-                stdout=subprocess.STDOUT,
-                stderr=subprocess.STDOUT,
+                shell=True,
+                # stdout=subprocess.STDOUT,
+                # stderr=subprocess.STDOUT,
             )
         )
     for proc in remote_procs:
@@ -432,17 +436,17 @@ def start_pipeline_cluster():  # does gin add the arguments here? crazy
 
 if __name__ == "__main__":
     # make_gptj_and_save_pieces()
-    print(
-        f"""STARTING DP RUN___________________________
-    
-    
-    
-    
-    
-    
-    """
-    )
     if sys.argv[1] == "orchestrate":
+        print(
+            f"""STARTING DP RUN___________________________
+        
+        
+        
+        
+        
+        
+        """
+        )
         start_pipeline_cluster()
     else:
         start_dp_cluster(mp_rank=int(sys.argv[2]))
