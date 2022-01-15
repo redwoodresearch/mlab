@@ -411,10 +411,11 @@ def start_pipeline_cluster():  # does gin add the arguments here? crazy
     os.system(
         f'ssh -i ~/mlab_ssh ubuntu@{C.master_addr} "fuser -k {C.master_port}/tcp"'
     )
+    unique_name = str(int(time() * 10))
     for i, ip in enumerate(C.stage_ips):
         remote_procs.append(
             subprocess.Popen(
-                f'ssh -i ~/mlab_ssh {ip} "cd mlab; git fetch -q; git checkout -q -f 2dp; git pull; python days/w3d1/2dparallel.py machine {i}"',
+                f'ssh -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q; git fetch -q; git checkout -q -f 2dp; git pull; python days/w3d1/2dparallel.py machine {i}"',
                 shell=True,
                 # stdout=subprocess.STDOUT,
                 # stderr=subprocess.STDOUT,
