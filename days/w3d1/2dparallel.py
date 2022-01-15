@@ -4,7 +4,7 @@ from typing import *
 from torch import nn
 import os
 import torch.distributed as dist
-import torch.multiprocessing as mp
+import multiprocessing as mp  # torch.multiprocessing
 import sys
 import torch as t
 from days.utils import *
