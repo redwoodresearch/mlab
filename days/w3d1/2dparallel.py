@@ -4,16 +4,14 @@ from typing import *
 from torch import nn
 import os
 import torch.distributed as dist
-import multiprocessing as mp  # torch.multiprocessing
 import sys
 import torch as t
-from days.utils import *
 import transformers
 from time import time
 import json
 import subprocess
+import itertools
 
-os.system("pip install web-pdb")
 import web_pdb
 
 # Pipeline parallel and data parallel at once
@@ -47,11 +45,7 @@ class Config:
     stage_dp_sizes_cum = None
 
     def __init__(self):
-        self.stage_dp_sizes_cum = (
-            t.IntTensor([0] + [len(x) for x in self.stage_dp_cuda_ids])
-            .cumsum(0)
-            .tolist()
-        )
+        self.stage_dp_sizes_cum = t.IntTensor([0] + [len(x) for x in self.stage_dp_cuda_ids]).cumsum(0).tolist()
         self.total_size = int(self.stage_dp_sizes_cum[0])
         self.device_type = "cpu" if self.use_cpu else "cuda"
 
@@ -81,10 +75,7 @@ def make_gptj_and_save_pieces():
     assert sum(chunks) == num_layers
     chunk_cumsum = t.cumsum(t.tensor(chunks), dim=0).tolist()
     print("cumsum", chunk_cumsum)
-    models = [
-        HFBlockSequence(*model.h[start - size : start])
-        for start, size in zip(chunk_cumsum, chunks)
-    ]
+    models = [HFBlockSequence(*model.h[start - size : start]) for start, size in zip(chunk_cumsum, chunks)]
     models[0] = nn.Sequential(model.wte, model.drop, models[0])
     models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head)
     for i, model_part in enumerate(models):
@@ -103,11 +94,9 @@ def load_data():
         print("have json")
         texts = [x["text"] for x in lw_json]
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
-        tokenizer = transformers.AutoTokenizer.from_pretrained(
-            "gpt2", TOKENIZERS_PARALLELISM=True
-        )
+        tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2", TOKENIZERS_PARALLELISM=True)
+        # eot_id = tokenizer("<|endoftext|>")["input_ids"][0]
         eot_id = 50256
-        eot_id = tokenizer("<|endoftext|>")["input_ids"][0]
         tokens = tokenizer(texts)["input_ids"]
         for seq in tokens:
             seq.append(eot_id)
@@ -130,11 +119,14 @@ def pprun(
     total_rank,
 ):
     autocast_type = t.bfloat16 if C.use_cpu else t.float16
-    device = (
-        "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
-    )
+    device = "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
 
     # start all our fucking process groups!
+    os.environ["MASTER_ADDR"] = C.master_addr
+    os.environ["MASTER_PORT"] = C.master_port
+    print("will init process group", total_rank)
+    dist.init_process_group(backend=C.dist_backend, rank=total_rank, world_size=C.total_size)
+    print("inited process group", total_rank)
     process_groups = {
         "stage": [None for _ in range(C.mp_size)],
         "pipe": [None for _ in range(C.dp_size)],
@@ -163,9 +155,7 @@ def pprun(
     pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
-    bwd_group = process_groups["stage_links"][dp_rank][
-        (C.mp_size + mp_rank - 1) % C.mp_size
-    ]
+    bwd_group = process_groups["stage_links"][dp_rank][(C.mp_size + mp_rank - 1) % C.mp_size]
     print("initiated subgroups", mp_rank, dp_rank)
 
     model_part_fname = f"[{C.model_file_prefix}_part{mp_rank}.pt"
@@ -178,21 +168,16 @@ def pprun(
     model.to(device)
     print("loaded model", mp_rank, dp_rank)
 
-    optimizer = t.optim.SGD(
-        model.parameters(), lr=1e-4
-    )  # TODO switch to sharded optimizer adam
+    optimizer = t.optim.SGD(model.parameters(), lr=1e-4)  # TODO switch to sharded optimizer adam
 
     print("model loaded", mp_rank, dp_rank)
     num_batches = t.IntTensor([0])
     if mp_rank == 0:
         dataset = load_data()
         # each loads all data then takes its dp slice
-        batches = dataset[
-            : -(
-                dataset.shape[0]
-                % (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len)
-            )
-        ].reshape(C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len)
+        batches = dataset[: -(dataset.shape[0] % (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len))].reshape(
+            C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len
+        )
         batches = batches[dp_rank]
         total_examples = batches.shape[0] * batches.shape[1] * batches.shape[2]
         num_batches[0] = batches.shape[0]
@@ -244,10 +229,7 @@ def pprun(
             out_tensors = []
             xs = []
             backward_sends = []
-            xs = [
-                t.zeros(C.microbatch_size, *C.model_in_shape, device=device)
-                for _ in range(C.pipe_width)
-            ]
+            xs = [t.zeros(C.microbatch_size, *C.model_in_shape, device=device) for _ in range(C.pipe_width)]
             xjobs = [
                 dist.broadcast(
                     x,
@@ -296,18 +278,9 @@ def pprun(
             xs = []
             losses = []
             backward_sends = []
-            ys = [
-                t.zeros(C.microbatch_size, C.seq_len, device=device)
-                for _ in range(C.pipe_width)
-            ]
-            yjobs = [
-                dist.broadcast(y, get_total_rank(0, dp_rank), group=fwd_group)
-                for i, y in enumerate(ys)
-            ]
-            xs = [
-                t.zeros(C.microbatch_size, *C.model_in_shape[mp_rank], device=device)
-                for _ in range(C.pipe_width)
-            ]
+            ys = [t.zeros(C.microbatch_size, C.seq_len, device=device) for _ in range(C.pipe_width)]
+            yjobs = [dist.broadcast(y, get_total_rank(0, dp_rank), group=fwd_group) for i, y in enumerate(ys)]
+            xs = [t.zeros(C.microbatch_size, *C.model_in_shape[mp_rank], device=device) for _ in range(C.pipe_width)]
             xjobs = [
                 dist.broadcast(
                     x,
@@ -327,9 +300,7 @@ def pprun(
                     enabled=C.use_autocast,
                 ):  # save memory by computing with less precision
                     out = model(x_buffer.to(device))
-                out = out[
-                    :, -1, -2:
-                ]  # use the last 2 tokens of LM head as classification head
+                out = out[:, -1, -2:]  # use the last 2 tokens of LM head as classification head
                 cur_loss = nn.CrossEntropyLoss()(out.float(), ys[microbatch_num].long())
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
@@ -345,17 +316,13 @@ def pprun(
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
                 xgrad = x.grad
-                backward_sends.append(
-                    dist.broadcast(xgrad, src=total_rank, group=bwd_group)
-                )
+                backward_sends.append(dist.broadcast(xgrad, src=total_rank, group=bwd_group))
                 losses[i] = None
                 xs[i] = None
 
         # average grad
         reduce_ops = [
-            dist.all_reduce(
-                param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True
-            )
+            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
             for param in model.parameters()
         ]
         for op in reduce_ops:
@@ -377,55 +344,34 @@ def pprun(
     )
 
 
-def init_process(rank, run, *args, **kwargs):
-    os.environ["MASTER_ADDR"] = C.master_addr
-    os.environ["MASTER_PORT"] = C.master_port
-    print("will init process group", rank)
-    dist.init_process_group(backend=C.dist_backend, rank=rank, world_size=C.total_size)
-    print("inited process group", rank)
-    run(rank, C.total_size, *args, **kwargs)
-
-
 def start_dp_cluster(
     mp_rank: int,
 ):
     print("starting dp cluster", mp_rank)
     processes = []
-    web_pdb.set_trace(port="4058")
-    mp.set_start_method("spawn")
     for dp_rank in range(C.dp_size):
         total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
         print("will create process instance")
-        p = mp.Process(
-            target=init_process,
-            args=(total_rank, C.total_size, pprun),
-            kwargs={
-                "dp_rank": dp_rank,
-                "mp_rank": mp_rank,
-                "total_rank": total_rank,
-            },
+        p = subprocess.Popen(
+            f"python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}",
+            shell=True,
         )
         print("process instance created")
-        p.start()
         processes.append(p)  # why are we doing this? and why aren't we joining?
         print("started process", dp_rank)
     for process in processes:
-        process.join()
+        process.wait()
 
 
 def start_pipeline_cluster():  # does gin add the arguments here? crazy
     remote_procs = []
-    os.system(
-        f'ssh -i ~/mlab_ssh ubuntu@{C.master_addr} "fuser -k {C.master_port}/tcp"'
-    )
+    os.system(f'ssh -i ~/mlab_ssh ubuntu@{C.master_addr} "fuser -k {C.master_port}/tcp"')
     unique_name = str(int(time() * 10))
     for i, ip in enumerate(C.stage_ips):
         remote_procs.append(
             subprocess.Popen(
-                f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q origin/2dp; python days/w3d1/2dparallel.py machine {i}"',
+                f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q origin/2dp; python days/w3d1/2dparallel.py dp_cluster {i}"',
                 shell=True,
-                # stdout=subprocess.STDOUT,
-                # stderr=subprocess.STDOUT,
             )
         )
     for proc in remote_procs:
@@ -456,5 +402,7 @@ if __name__ == "__main__":
         """
         )
         start_pipeline_cluster()
-    else:
+    elif sys.argv[1] == "dp_cluster":
         start_dp_cluster(mp_rank=int(sys.argv[2]))
+    elif sys.argv[1] == "process":
+        pprun(mp_rank=int(sys.argv[2]), dp_rank=int(sys.argv[3]), total_rank=int(sys.argv[4]))
