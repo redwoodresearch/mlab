@@ -47,7 +47,7 @@ class Config:
             .cumsum(0)
             .tolist()
         )
-        self.total_size = int(self.stage_dp_sizes_cum[0].item())
+        self.total_size = int(self.stage_dp_sizes_cum[0])
         self.device_type = "cpu" if self.use_cpu else "cuda"
 
 
