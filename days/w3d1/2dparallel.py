@@ -215,12 +215,14 @@ def pprun(
                     x,
                     src=get_total_rank(mp_rank - 1, dp_rank),
                     group=bwd_group,
+                    async_op=True,
                 )
                 for i, x in enumerate(xs)
             ]
 
-            for minibatch_num in range(C.pipe_width):
-                x_buffer = xs[minibatch_num]
+            for microbatch_num in range(C.pipe_width):
+                xjobs[microbatch_num].wait()
+                x_buffer = xs[microbatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
                     dtype=autocast_type,
@@ -272,9 +274,9 @@ def pprun(
                 dist.broadcast(x, get_total_rank(mp_rank - 1, dp_rank), group=bwd_group)
                 for i, x in enumerate(xs)
             ]
-            for minibatch_num in range(C.pipe_width):
-                xjobs[minibatch_num].wait()
-                x_buffer = xs[minibatch_num]
+            for mirobatch_num in range(C.pipe_width):
+                xjobs[mirobatch_num].wait()
+                x_buffer = xs[mirobatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
                     dtype=autocast_type,
@@ -285,8 +287,8 @@ def pprun(
                 out = out[
                     :, -1, -2:
                 ]  # use the last 2 tokens of LM head as classification head
-                yjobs[minibatch_num].wait()
-                cur_loss = nn.CrossEntropyLoss()(out.float(), ys[minibatch_num].long())
+                yjobs[mirobatch_num].wait()
+                cur_loss = nn.CrossEntropyLoss()(out.float(), ys[mirobatch_num].long())
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
@@ -370,7 +372,7 @@ def start_dp_cluster(
 def start_pipeline_cluster():  # does gin add the arguments here? crazy
     for i, ip in enumerate(C.stage_ips):
         os.system(
-            f'ssh -i ~/mlab_ssh {ip} "cd mlab; git fetch; cp days/w2d5/dataparallel.py days/w2d5/dataparallel_mine.py; git checkout -f 2dp; python days/w3d1/2dparallel.py machine {i}"'
+            f'ssh -i ~/mlab_ssh {ip} "cd mlab; git fetch; git checkout -f 2dp; git pull; python days/w3d1/2dparallel.py machine {i} {i}"'
         )
 
 
@@ -407,4 +409,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "orchestrate":
         start_pipeline_cluster()
     else:
-        start_dp_cluster(mp_rank=sys.argv[2])
+        start_dp_cluster(mp_rank=int(sys.argv[2]))
