@@ -349,6 +349,7 @@ def start_dp_cluster(
 ):
     print("starting dp cluster", mp_rank)
     processes = []
+    print("dp size", C.dp_size)
     for dp_rank in range(C.dp_size):
         total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
         print("will create process instance")
