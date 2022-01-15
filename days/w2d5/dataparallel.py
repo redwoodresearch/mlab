@@ -54,9 +54,14 @@ def load_data():
 def init_model():
     t.random.manual_seed(0)
     # storing model locally because huggingface throttles checking
+<<<<<<< Updated upstream
     if os.path.exists("/home/ubuntu/gpt2_copy.pt"):
         return t.load("/home/ubuntu/gpt2_copy.pt")
     model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
+=======
+    # model = transformers.AutoModelForCausalLM.from_pretrained("gpt2")
+    model = t.load("gpt2.pt")
+>>>>>>> Stashed changes
     return model
 
 
@@ -115,7 +120,11 @@ class DistributedDataLoader:
                     self.mini_batch_size,
                     *self.data_size,
                     dtype=t.int64,
+<<<<<<< Updated upstream
                     device=DEVICE,
+=======
+                    device=DEVICE
+>>>>>>> Stashed changes
                 )
                 dist.broadcast(mini_batches, src=0)
                 my_batch = mini_batches[self.rank]
@@ -184,8 +193,12 @@ def run(
     # else, listen for a minibatch from rank 1
     dataloader = DistributedDataLoader(rank=rank, size=size)
     dist.barrier()
+<<<<<<< Updated upstream
     pbar = tqdm(enumerate(dataloader))
     for batch_num, batch in pbar:
+=======
+    for batch_num, batch in tqdm(enumerate(dataloader)):
+>>>>>>> Stashed changes
         out = model(batch.to(DEVICE)).logits
         loss = t.nn.CrossEntropyLoss()(
             rearrange(out[:-1], "a b c -> (a b) c"),
@@ -202,7 +215,10 @@ def run(
             broadcast_updated_params(param_buckets, rank)
         # print(rank, "loss", loss.cpu().detach().numpy())
         print(rank, batch_num)
+<<<<<<< Updated upstream
         pbar.set_description(f"loss {loss.cpu().item()}")
+=======
+>>>>>>> Stashed changes
     print(rank, "done training")
     dist.barrier()
 
@@ -212,7 +228,11 @@ def run(
 
 @gin.configurable
 def init_process(
+<<<<<<< Updated upstream
     rank, size, run, device, backend="nccl"
+=======
+    rank, size, run, device, backend="gloo"
+>>>>>>> Stashed changes
 ):  # gloo is algo for sharing gradients. nccl better?
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
@@ -242,5 +262,9 @@ def create_processes(
 
 
 if __name__ == "__main__":
+<<<<<<< Updated upstream
     # gin.parse_config_file(sys.argv[1])
+=======
+    gin.parse_config_file(sys.argv[1])
+>>>>>>> Stashed changes
     create_processes()

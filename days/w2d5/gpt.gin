@@ -1,0 +1,3 @@
+train.epochs = 1
+train.seed = 11
+train.lr = 1e-4
