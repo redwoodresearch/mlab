@@ -391,6 +391,7 @@ def start_dp_cluster(
 ):
     print("starting dp cluster", mp_rank)
     processes = []
+    web_pdb.set_trace(port="4058")
     mp.set_start_method("spawn")
     for dp_rank in range(C.dp_size):
         total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
@@ -408,7 +409,6 @@ def start_dp_cluster(
         p.start()
         processes.append(p)  # why are we doing this? and why aren't we joining?
         print("started process", dp_rank)
-        web_pdb.set_trace(port="4058")
     for process in processes:
         process.join()
 
