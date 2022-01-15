@@ -394,6 +394,7 @@ def start_dp_cluster(
     mp.set_start_method("spawn")
     for dp_rank in range(C.dp_size):
         total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
+        print("will create process instance")
         p = mp.Process(
             target=init_process,
             args=(total_rank, C.total_size, pprun),
@@ -403,6 +404,7 @@ def start_dp_cluster(
                 "total_rank": total_rank,
             },
         )
+        print("process instance created")
         p.start()
         processes.append(p)  # why are we doing this? and why aren't we joining?
         print("started process", dp_rank)
