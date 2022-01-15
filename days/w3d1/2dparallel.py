@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from test_all import allclose
 from typing import *
 
 from torch import nn
@@ -11,7 +10,6 @@ from days.utils import import_object_from_qualified_name
 import torch as t
 from days.utils import *
 import transformers
-import torchtext
 from time import time
 
 # Pipeline parallel and data parallel at once
@@ -47,6 +45,7 @@ class Config:
             [0] + [len(x) for x in self.stage_dp_cuda_ids]
         ).cumsum(0)
         self.total_size = self.stage_dp_sizes_cum[0].item()
+        self.device_type = "cpu" if self.use_cpu else "cuda"
 
 
 C = Config()
@@ -178,7 +177,9 @@ def pprun(
 
             for i, microbatch in enumerate(pipe_batches):
                 with t.autocast(
-                    dtype=autocast_type, device_type=device[:4], enabled=C.use_autocast
+                    dtype=autocast_type,
+                    device_type=C.device_type,
+                    enabled=C.use_autocast,
                 ):
                     out = model(microbatch.long().to(device))  # all the gpu action
                 out_tensors.append(out)
@@ -198,7 +199,8 @@ def pprun(
                 grad_recvs[i].wait()
                 grad_buffer = grad_buffers[i]
                 out_tensor.backward(grad_buffer)
-                out_tensors[i] = None  # why is this necessary? saves memory?
+                # release out tensor memory after each backward minibatch
+                out_tensors[i] = None
         elif mp_rank != C.mp_size - 1:
             forward_sends = []
             out_tensors = []
@@ -221,7 +223,9 @@ def pprun(
                 x_buffer = xs[minibatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
-                    dtype=autocast_type, device_type=device[:4], enabled=C.use_autocast
+                    dtype=autocast_type,
+                    device_type=C.device_type,
+                    enabled=C.use_autocast,
                 ):
                     out = model(x_buffer.to(device))
                 xs.append(x_buffer)
@@ -273,7 +277,9 @@ def pprun(
                 x_buffer = xs[minibatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
-                    dtype=autocast_type, device_type=device[:4], enabled=C.use_autocast
+                    dtype=autocast_type,
+                    device_type=C.device_type,
+                    enabled=C.use_autocast,
                 ):  # save memory by computing with less precision
                     out = model(x_buffer.to(device))
                 out = out[
@@ -364,7 +370,7 @@ def start_dp_cluster(
 def start_pipeline_cluster():  # does gin add the arguments here? crazy
     for i, ip in enumerate(C.stage_ips):
         os.system(
-            f'ssh -i ~/mlab_ssh {ip} "cd ~/mlab/days/w3d1; python 2dparallel.py {sys.argv[1]} machine {i}'
+            f'ssh -i ~/mlab_ssh {ip} "cd mlab; git fetch; cp days/w2d5/dataparallel.py days/w2d5/dataparallel_mine.py; git checkout -f 2dp; python days/w3d1/2dparallel.py machine {i}"'
         )
 
 
@@ -398,7 +404,7 @@ def broadcast_updated_params(buckets, rank_mp, rank_dp):
 
 if __name__ == "__main__":
     # make_gptj_and_save_pieces()
-    if sys.argv[2] == "orchestrate":
+    if sys.argv[1] == "orchestrate":
         start_pipeline_cluster()
     else:
-        start_dp_cluster(mp_rank=sys.argv[3])
+        start_dp_cluster(mp_rank=sys.argv[2])
