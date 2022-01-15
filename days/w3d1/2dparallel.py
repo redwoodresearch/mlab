@@ -11,6 +11,7 @@ import torch as t
 from days.utils import *
 import transformers
 from time import time
+import json
 
 # Pipeline parallel and data parallel at once
 
@@ -44,7 +45,7 @@ class Config:
         self.stage_dp_sizes_cum = t.tensor(
             [0] + [len(x) for x in self.stage_dp_cuda_ids]
         ).cumsum(0)
-        self.total_size = self.stage_dp_sizes_cum[0].item()
+        self.total_size = int(self.stage_dp_sizes_cum[0].item())
         self.device_type = "cpu" if self.use_cpu else "cuda"
 
 
@@ -67,12 +68,10 @@ class HFBlockSequence(nn.Module):
 def make_gptj_and_save_pieces():
     model_lm = transformers.AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
     model = model_lm.transformer
-    with open("gptj_arch.txt", "w") as f:
-        f.write(str(model))
-    print(model_lm)
 
-    num_layers = 28
-    chunks = [6, 8, 8, 6]  # less at ends due to embeddings/unembed
+    num_layers = len(model)
+    assert num_layers == 28
+    chunks = [4, 5, 5, 5, 5, 4]  # less at ends due to embeddings/unembed
     assert sum(chunks) == num_layers
     chunk_cumsum = t.cumsum(t.tensor(chunks), dim=0).tolist()
     print("cumsum", chunk_cumsum)
@@ -83,12 +82,34 @@ def make_gptj_and_save_pieces():
     models[0] = nn.Sequential(model.wte, model.drop, models[0])
     models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head)
     for i, model_part in enumerate(models):
-        t.save(model_part, "gpt-j-6b_part" + str(i))
+        t.save(model_part, f"gpt-j-6b_part{i}.pt")
     return models
 
 
-def load_data(dp_rank):
-    return t.load(f"{C.data_file_prefix}_part{dp_rank}.pt")
+def load_data():
+    print("loading data")
+    tensor_path = "/home/ubuntu/lw.pt"
+    if os.path.exists(tensor_path):
+        tokens = t.load(tensor_path)
+        print("tokens shape", tokens.shape)
+    else:
+        lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
+        print("have json")
+        texts = [x["text"] for x in lw_json]
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+        tokenizer = transformers.AutoTokenizer.from_pretrained(
+            "gpt2", TOKENIZERS_PARALLELISM=True
+        )
+        eot_id = 50256
+        eot_id = tokenizer("<|endoftext|>")["input_ids"][0]
+        tokens = tokenizer(texts)["input_ids"]
+        for seq in tokens:
+            seq.append(eot_id)
+        print("tokenized")
+        tokens = t.LongTensor(list(itertools.chain(*tokens)))
+
+        t.save(tokens, tensor_path)
+    return tokens
 
 
 def get_total_rank(mp_rank, dp_rank):
@@ -138,11 +159,17 @@ def pprun(
     bwd_group = process_groups["stage_links"][dp_rank][
         (C.mp_size + mp_rank - 1) % C.mp_size
     ]
-    print("initiated subgroups")
+    print("initiated subgroups", mp_rank, dp_rank)
 
-    model: nn.Module = t.load(f"[{C.model_file_prefix}_part{mp_rank}.pt")
+    model_part_fname = f"[{C.model_file_prefix}_part{mp_rank}.pt"
+    if not os.path.exists(model_part_fname):
+        if dp_rank == 0:
+            make_gptj_and_save_pieces()
+        dist.barrier(group=stage_group)
+    model: nn.Module = t.load(model_part_fname)
     model.train()
     model.to(device)
+    print("loaded model", mp_rank, dp_rank)
 
     optimizer = t.optim.SGD(
         model.parameters(), lr=1e-4
@@ -152,10 +179,14 @@ def pprun(
     num_batches = t.IntTensor([0])
     if mp_rank == 0:
         dataset = load_data()
-        # dp sections are already split out into multiple files
+        # each loads all data then takes its dp slice
         batches = dataset[
-            : -(dataset.shape[0] % (C.pipe_width * C.microbatch_size * C.seq_len))
-        ].reshape(-1, C.pipe_width, C.microbatch_size, C.seq_len)
+            : -(
+                dataset.shape[0]
+                % (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len)
+            )
+        ].reshape(C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len)
+        batches = batches[dp_rank]
         total_examples = batches.shape[0] * batches.shape[1] * batches.shape[2]
         num_batches[0] = batches.shape[0]
 
@@ -271,12 +302,17 @@ def pprun(
                 for _ in range(C.pipe_width)
             ]
             xjobs = [
-                dist.broadcast(x, get_total_rank(mp_rank - 1, dp_rank), group=bwd_group)
+                dist.broadcast(
+                    x,
+                    get_total_rank(mp_rank - 1, dp_rank),
+                    group=bwd_group,
+                    async_op=True,
+                )
                 for i, x in enumerate(xs)
             ]
-            for mirobatch_num in range(C.pipe_width):
-                xjobs[mirobatch_num].wait()
-                x_buffer = xs[mirobatch_num]
+            for microbatch_num in range(C.pipe_width):
+                xjobs[microbatch_num].wait()
+                x_buffer = xs[microbatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
                     dtype=autocast_type,
@@ -287,8 +323,7 @@ def pprun(
                 out = out[
                     :, -1, -2:
                 ]  # use the last 2 tokens of LM head as classification head
-                yjobs[mirobatch_num].wait()
-                cur_loss = nn.CrossEntropyLoss()(out.float(), ys[mirobatch_num].long())
+                cur_loss = nn.CrossEntropyLoss()(out.float(), ys[microbatch_num].long())
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
@@ -384,24 +419,6 @@ def start_pipeline_cluster():  # does gin add the arguments here? crazy
 # with 4 minibatches of 12, took 3.1s
 # with 1 minibatch of 48, took 4.6
 #
-
-
-def add_grad(buckets, rank_mp, rank_dp):
-    reduce_ops = []
-    for i, bucket in enumerate(buckets):
-        for param in bucket:
-            reduce_ops.append(dist.reduce(param.grad, i, async_op=True))
-    for op in reduce_ops:
-        op.wait()
-
-
-def broadcast_updated_params(buckets, rank_mp, rank_dp):
-    reduce_ops = []
-    for i, bucket in enumerate(buckets):
-        for param in bucket:
-            reduce_ops.append(dist.broadcast(param, i, async_op=True))
-    for op in reduce_ops:
-        op.wait()
 
 
 if __name__ == "__main__":
