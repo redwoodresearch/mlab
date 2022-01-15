@@ -149,14 +149,14 @@ def init_process(rank, num_processes, backend='nccl'):
     params = list(model.parameters())
     my_params = []
     if OPTIMIZER_STATE_SHARDING:
-        my_params = [params[i] for i in range(rank, len(params), num_processes)]
+        my_params = params[i:params:num_processes]
     else:
         my_params = params
     optimizer = torch.optim.Adam(my_params, lr=1e-4)
 
     model.train()
     criterion = torch.nn.CrossEntropyLoss()
-    for epoch in range(1):
+    for epoch in range(4):
         for iter, mini_batch in enumerate(loader):
             optimizer.zero_grad()
             x = mini_batch[:,:-1]
@@ -175,6 +175,10 @@ def init_process(rank, num_processes, backend='nccl'):
 
             if iter % 10 == 0 and rank == LEADER_RANK:
                 print(f"{epoch=} {iter=}")
+            if iter % 1000 == 0 and rank == LEADER_RANK:
+                print("saving model")
+                torch.save(model.state_dict(), MODEL_FILENAME)
+                print("model saved")
 
     if rank == LEADER_RANK:
         print("finished")
