@@ -416,7 +416,7 @@ def start_pipeline_cluster():  # does gin add the arguments here? crazy
     for i, ip in enumerate(C.stage_ips):
         remote_procs.append(
             subprocess.Popen(
-                f'ssh -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q origin/2dp; python days/w3d1/2dparallel.py machine {i}"',
+                f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q origin/2dp; python days/w3d1/2dparallel.py machine {i}"',
                 shell=True,
                 # stdout=subprocess.STDOUT,
                 # stderr=subprocess.STDOUT,
