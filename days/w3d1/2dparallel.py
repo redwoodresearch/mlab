@@ -13,6 +13,9 @@ from time import time
 import json
 import subprocess
 
+os.system("pip install web-pdb")
+import web_pdb
+
 # Pipeline parallel and data parallel at once
 
 # 104.171.200.117 104-171-200-117
@@ -403,6 +406,7 @@ def start_dp_cluster(
         p.start()
         processes.append(p)  # why are we doing this? and why aren't we joining?
         print("started process", dp_rank)
+        web_pdb.set_trace(port="4058")
     for process in processes:
         process.join()
 
