@@ -402,7 +402,7 @@ def start_dp_cluster(
         )
         p.start()
         processes.append(p)  # why are we doing this? and why aren't we joining?
-
+        print("started process", dp_rank)
     for process in processes:
         process.join()
 
