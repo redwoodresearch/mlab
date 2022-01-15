@@ -10,14 +10,26 @@ import transformers
 
 devices = [f'cuda:{i}' for i in [2,3]]
 
-def json_file_corpus_to_batches(json_path, batch_size, max_seq_len, tokenizer, device):
-    with open(json_path) as fp:
-        json_contents = json.load(fp=fp)
-    all_tokens = [
-        token
-        for article in tqdm(json_contents)
-        for token in tokenizer(article["text"]).input_ids + [tokenizer.eos_token_id]
-    ]
+def saved_tokenization_path_for_corpus(corpus_path):
+    return f'{os.path.basename(corpus_path)}.saved-tokens'
+
+def json_file_corpus_to_batches(json_path, batch_size, max_seq_len, device):
+    all_tokens = []
+    saved_path = saved_tokenization_path_for_corpus(corpus_path=json_path)
+    try:
+        with open(saved_path) as saved:
+            all_tokens = json.load(fp=saved)
+    except FileNotFoundError:
+        tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
+        with open(json_path) as fp:
+            json_contents = json.load(fp=fp)
+        all_tokens = [
+            token
+            for article in tqdm(json_contents)
+            for token in tokenizer(article["text"]).input_ids + [tokenizer.eos_token_id]
+        ]
+        with open(saved_path, 'w') as saved:
+            json.dump(all_tokens, saved)
     num_batches = len(all_tokens) // (batch_size * max_seq_len) 
     all_tokens = all_tokens[:num_batches * batch_size * max_seq_len]
     batches = t.tensor(all_tokens, device=device, dtype=t.long).view(num_batches, batch_size, max_seq_len)
@@ -43,11 +55,11 @@ class DistributedDataLoader:
         
     def get_data(self):
         json_path = sys.argv[1] if len(sys.argv) == 2 else "/home/ubuntu/lw_corpus.json"
+        
         return json_file_corpus_to_batches(
             json_path=json_path,
             batch_size=self.mini_batch_size * self.world_size,
             max_seq_len=1024,
-            tokenizer=transformers.AutoTokenizer.from_pretrained("gpt2"),
             device=self.device,
         )
             
@@ -87,9 +99,13 @@ def run(rank, size):
     dataloader = DistributedDataLoader(
         rank=rank,
         world_size=size,
-        mini_batch_size=2,
+        mini_batch_size=8,
     )
-    train_loop(gpt2, dataloader)
+    train_loop(
+        model=gpt2,
+        dataloader=dataloader,
+        rank=rank,
+    )
 
 def init_process(rank, size, fn, backend='nccl'):
     """ Initialize the distributed environment. """
@@ -110,11 +126,11 @@ def main():
     for p in processes:
         p.join()
         
-def train_loop(model, dataloader):
+def train_loop(model, dataloader, rank):
     optim = t.optim.Adam(model.parameters())
     model.train()
     
-    for batch in dataloader:
+    for i, batch in enumerate(dataloader):
         optim.zero_grad()
         output = model(input_ids=batch, labels=batch)
         # https://huggingface.co/docs/transformers/main_classes/output#transformers.modeling_outputs.CausalLMOutput
@@ -122,8 +138,10 @@ def train_loop(model, dataloader):
         for param in model.parameters():
             dist.all_reduce(tensor=param.grad, op=dist.ReduceOp.SUM)
         optim.step()
+        if i % 1000 == 999:
+            t.save(model, f"gpt_trained.{i // 1000:03}.{rank}.zip")
     
-    t.save(model, "gpt_trained")
+    t.save(model, f"gpt_trained.final.{rank}.zip")
         
 if __name__ == "__main__":
     main()
