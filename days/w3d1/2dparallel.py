@@ -344,37 +344,24 @@ def pprun(
     )
 
 
-def start_dp_cluster(
-    mp_rank: int,
-):
-    print("starting dp cluster for real", mp_rank)
-    processes = []
-    print("dp size", C.dp_size)
-    for dp_rank in range(C.dp_size):
-        total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
-        print("will create process instance")
-        p = subprocess.Popen(
-            f"python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}",
-            shell=True,
-        )
-        print("process instance created")
-        processes.append(p)  # why are we doing this? and why aren't we joining?
-        print("started process", dp_rank)
-    for process in processes:
-        process.wait()
-
-
-def start_pipeline_cluster():  # does gin add the arguments here? crazy
+def start_cluster():  # does gin add the arguments here? crazy
     remote_procs = []
     os.system(f'ssh -i ~/mlab_ssh ubuntu@{C.master_addr} "fuser -k {C.master_port}/tcp"')
     unique_name = str(int(time() * 10))
-    for i, ip in enumerate(C.stage_ips):
-        remote_procs.append(
-            subprocess.Popen(
-                f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q origin/2dp; python days/w3d1/2dparallel.py dp_cluster {i}"',
-                shell=True,
-            )
+    for ip in set(C.stage_ips):
+        os.system(
+            f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git reset --hard -q origin/2dp;"',
         )
+    for mp_rank, ip in enumerate(C.stage_ips):
+        for dp_rank in range(C.dp_size):
+            total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
+            print("started process", dp_rank)
+            remote_procs.append(
+                subprocess.Popen(
+                    f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}"',
+                    shell=True,
+                )
+            )
     for proc in remote_procs:
         proc.wait()
 
@@ -399,11 +386,8 @@ if __name__ == "__main__":
         
         
         
-        
         """
         )
-        start_pipeline_cluster()
-    elif sys.argv[1] == "dp_cluster":
-        start_dp_cluster(mp_rank=int(sys.argv[2]))
+        start_cluster()
     elif sys.argv[1] == "process":
         pprun(mp_rank=int(sys.argv[2]), dp_rank=int(sys.argv[3]), total_rank=int(sys.argv[4]))
