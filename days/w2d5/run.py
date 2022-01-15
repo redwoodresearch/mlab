@@ -10,24 +10,39 @@ import pickle
 
 DEVICES=["cuda:3","cuda:4", "cuda:5"]
 LEADER_RANK = 0
-LW_FILENAME = "/home/ubuntu/lw_corpus.json"
-TOKENS_FILENAME = "/home/ubuntu/alwin_tom_mlab/lw_corpus_tokens.pickle"
-OPTIMIZER_STATE_SHARDING = True
+OPTIMIZER_STATE_SHARDING = False
+SEQ_LEN = 1024
 
-# HACK: setting padding token to EOS token so i can pad
-# everything to the same length
-tokenizer = transformers.GPT2TokenizerFast.from_pretrained("gpt2")
-tokenizer.pad_token = tokenizer.eos_token
+MODEL_FILENAME = "/home/ubuntu/alwin_tom_mlab/model.pt"
+TOKENS_FILENAME = "/home/ubuntu/alwin_tom_mlab/lw_corpus_tokens_packed.pickle"
+
+def packed_tokens():
+    tokenizer = transformers.GPT2TokenizerFast.from_pretrained("gpt2")
+
+    with open(LW_FILENAME) as json_file:
+        # keys: id (of post), user_id, karma, af (alignment forum y/n), text
+        json_data = json.load(json_file)
+
+    texts = tokenizer([post["text"] for post in json_data]).input_ids
+    # flatten texts
+    texts = [token for text in texts for token in (text + [tokenizer.eos_token_id])]
+
+    # pad text out to be a multiple of SEQ_LEN
+    padding_amount = SEQ_LEN - (((len(texts) - 1) % SEQ_LEN) + 1)
+    texts = texts + [tokenizer.eos_token_id] * padding_amount
+
+    text_tensor = torch.tensor(texts, dtype=torch.long)
+    return text_tensor.view(-1, SEQ_LEN)
+    # shape: [97668, 1024]
 
 class DistributedDataLoader:
-    def __init__(self, rank, world_size, device, mini_batch_size, random_seed = 0, max_seq_len=512):
+    def __init__(self, rank, world_size, device, mini_batch_size, random_seed = 0):
         torch.manual_seed(random_seed)
 
         self.rank = rank
         self.world_size = world_size
         self.mini_batch_size = mini_batch_size
         self.device = device
-        self.max_seq_len = max_seq_len
         self.iter_num = 0
         self.iters_in_epoch = torch.zeros(1, dtype=torch.long, device=device)
 
@@ -43,27 +58,7 @@ class DistributedDataLoader:
             if os.path.isfile(TOKENS_FILENAME):
                 texts = pickle.load(open(TOKENS_FILENAME, "rb"))
             else:
-                # how many text entries to load and train on. set this to None for normal
-                # operation.
-                # set this to lower if you're testing and don't want to spend an eternity to
-                # tokenize everything
-                NUM_TEXTS_TO_LOAD = None
-
-                with open(LW_FILENAME) as json_file:
-                    # keys: id (of post), user_id, karma, af (alignment forum y/n), text
-                    json_data = json.load(json_file)
-
-                # TODO: should pack batches, not have each batch be a single
-                # sentence
-                texts = tokenizer(
-                        [post["text"] for post in json_data[:NUM_TEXTS_TO_LOAD]], 
-                        truncation=True,
-                        # this is wasteful but let's padding everything to the
-                        # same length so that we can put them in a tensor
-                        padding='max_length',
-                        max_length=max_seq_len,
-                        return_tensors="pt"
-                ).input_ids
+                texts = packed_tokens()
                 pickle.dump(texts, open(TOKENS_FILENAME, "wb"))
 
             train_loader = torch.utils.data.DataLoader(
@@ -100,8 +95,7 @@ class DistributedDataLoader:
                 if self.rank == LEADER_RANK:
                     batch = next(loader_iter).to(self.device)
                 else:
-                    batch = torch.empty(self.world_size * self.mini_batch_size,
-                            self.max_seq_len, dtype=torch.long, device=self.device)
+                    batch = torch.empty(self.world_size * self.mini_batch_size, SEQ_LEN, dtype=torch.long, device=self.device)
                 dist.broadcast(batch, LEADER_RANK)
 
                 mini_batch_start = self.rank * self.mini_batch_size
@@ -110,11 +104,10 @@ class DistributedDataLoader:
 
         return generator()
 
-def average_gradients(model):
-    size = float(dist.get_world_size())
+def average_gradients(model, world_size):
     for param in model.parameters():
         dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)
-        param.grad.data /= size
+        param.grad.data /= world_size
 
 def next_token(model, input_ids, temperature, freq_penalty=2.0):
     logits = model(input_ids.unsqueeze(0)).logits[0,-1,:]
@@ -122,11 +115,13 @@ def next_token(model, input_ids, temperature, freq_penalty=2.0):
     logits = logits / temperature - freq_penalty * id_freqs
     return torch.distributions.categorical.Categorical(logits=logits).sample()
 
-def generate(model, text, max_length=30, temperature=1.0, freq_penalty=2.0):
+def generate(model, device, tokenizer, text, max_length=512, temperature=1.0, freq_penalty=2.0):
+    model.eval()
     input_ids = tokenizer(text).input_ids
     generated = []
+    # TODO could do something smarter by caching outputs of previous runs but eh
     for i in range(max_length):
-        new_token = next_token(model, torch.LongTensor(input_ids + generated).to(DEVICES[0]),
+        new_token = next_token(model, torch.LongTensor(input_ids + generated).to(device),
                                     temperature=temperature, freq_penalty=freq_penalty)
 
         generated.append(new_token)
@@ -148,7 +143,7 @@ def init_process(rank, num_processes, backend='nccl'):
             rank=rank, 
             world_size=num_processes, 
             device=device,
-            mini_batch_size=8
+            mini_batch_size=3
     )
 
     params = list(model.parameters())
@@ -157,11 +152,11 @@ def init_process(rank, num_processes, backend='nccl'):
         my_params = [params[i] for i in range(rank, len(params), num_processes)]
     else:
         my_params = params
-
     optimizer = torch.optim.Adam(my_params, lr=1e-4)
 
+    model.train()
     criterion = torch.nn.CrossEntropyLoss()
-    for epoch in range(4):
+    for epoch in range(1):
         for iter, mini_batch in enumerate(loader):
             optimizer.zero_grad()
             x = mini_batch[:,:-1]
@@ -171,20 +166,23 @@ def init_process(rank, num_processes, backend='nccl'):
             y = rearrange(y, "b s -> (b s)")
             loss = criterion(logits, y)
             loss.backward()
-            average_gradients(model)
+            average_gradients(model, num_processes)
             optimizer.step()
             if OPTIMIZER_STATE_SHARDING:
                 for i, param in enumerate(params):
                     param_owner = i % num_processes
                     dist.broadcast(param, param_owner)
 
-            if iter % 10 == 0:
-                if rank == LEADER_RANK:
-                    print(f"{epoch=} {iter=}")
-
+            if iter % 10 == 0 and rank == LEADER_RANK:
+                print(f"{epoch=} {iter=}")
 
     if rank == LEADER_RANK:
-        print(generate(model, "Making predictions is a good"))
+        print("finished")
+        print("saving model")
+        torch.save(model.state_dict(), MODEL_FILENAME)
+        print("model saved")
+        tokenizer = transformers.GPT2TokenizerFast.from_pretrained("gpt2")
+        print(generate(model, device, tokenizer, "Making predictions is a good"))
 
 if __name__ == "__main__":
     num_processes = len(DEVICES)
