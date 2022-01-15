@@ -42,15 +42,16 @@ class Config:
     stage_dp_sizes_cum = None
 
     def __init__(self):
-        self.stage_dp_sizes_cum = t.tensor(
-            [0] + [len(x) for x in self.stage_dp_cuda_ids]
-        ).cumsum(0)
+        self.stage_dp_sizes_cum = (
+            t.IntTensor([0] + [len(x) for x in self.stage_dp_cuda_ids])
+            .cumsum(0)
+            .tolist()
+        )
         self.total_size = int(self.stage_dp_sizes_cum[0].item())
         self.device_type = "cpu" if self.use_cpu else "cuda"
 
 
 C = Config()
-print(C)
 
 # HuggingFace models return tuples in the middle (things like activation patterns), thus the [0]
 class HFBlockSequence(nn.Module):
@@ -388,6 +389,7 @@ def start_dp_cluster(
     mp.set_start_method("spawn")
     for dp_rank in range(C.dp_size):
         total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
+        print(total_rank.__class__)
         p = mp.Process(
             target=init_process,
             args=(total_rank, C.total_size, pprun),
@@ -423,6 +425,16 @@ def start_pipeline_cluster():  # does gin add the arguments here? crazy
 
 if __name__ == "__main__":
     # make_gptj_and_save_pieces()
+    print(
+        f"""STARTING DP RUN___________________________
+    
+    
+    
+    
+    
+    
+    """
+    )
     if sys.argv[1] == "orchestrate":
         start_pipeline_cluster()
     else:
