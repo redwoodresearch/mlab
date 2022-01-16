@@ -404,6 +404,7 @@ def start_cluster():  # does gin add the arguments here? crazy
 
 if __name__ == "__main__":
     print("hi from 2dparallel")
+    raise AssertionError("er")
     import hashlib
 
     os.system("touch ~/touchfile")
