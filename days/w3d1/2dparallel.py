@@ -79,7 +79,6 @@ def load_data():
     if os.path.exists(tensor_path):
         tokens = t.load(tensor_path)
     else:
-        raise AssertionError("not doin that")
         lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
         texts = [x["text"] for x in lw_json]
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -288,16 +287,14 @@ def pprun(
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
-            print(
-                "whole batch loss",
-                batch_num,
-                sum([x.cpu().item() for x in losses]) / len(losses),
-                "took",
-                time.time() - batch_start,
-            )
+            batch_loss = sum([x.cpu().item() for x in losses]) / len(losses)
+            batch_time = time.time() - batch_start
+            tokens_per_second = (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len) / batch_time
+            print("whole batch loss", batch_loss, "took", batch_time, "tokens per second", tokens_per_second)
             if total_rank == 11:
-                experiment.log_metric("batch_loss", sum([x.cpu().item() for x in losses]) / len(losses))
-                experiment.log_metric("batch_time", time.time() - batch_start)
+                experiment.log_metric("batch_loss", batch_loss)
+                experiment.log_metric("batch_time", batch_time)
+                experiment.log_metric("tokens_per_second", tokens_per_second)
             batch_start = time.time()
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
