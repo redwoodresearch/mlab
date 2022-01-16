@@ -192,7 +192,7 @@ def pprun(
                     device_type=C.device_type,
                     enabled=C.use_autocast,
                 ):
-                    out = model(microbatch.to(device))  # all the gpu action
+                    out = model(microbatch.to(device)).float()  # all the gpu action
                 out_tensors.append(out)
                 dist.broadcast(out, src=total_rank, group=fwd_group)
 
@@ -229,7 +229,7 @@ def pprun(
                     device_type=C.device_type,
                     enabled=C.use_autocast,
                 ):
-                    out = model(x_buffer.to(device))
+                    out = model(x_buffer.to(device)).float()
                 xs.append(x_buffer)
                 out_tensors.append(out)
                 dist.broadcast(out, src=total_rank, group=fwd_group)
@@ -276,7 +276,7 @@ def pprun(
                     device_type=C.device_type,
                     enabled=C.use_autocast,
                 ):  # save memory by computing with less precision
-                    out = model(x_buffer.to(device))
+                    out = model(x_buffer.to(device)).float()
                 cur_loss = nn.CrossEntropyLoss()(
                     rearrange(out[:, :-1], "a b c -> (a b) c"),
                     rearrange(ys[microbatch_num][:, 1:], "a b -> (a b)"),
