@@ -356,9 +356,11 @@ def start_cluster():  # does gin add the arguments here? crazy
     for mp_rank, ip in enumerate(C.stage_ips):
         for dp_rank in range(C.dp_size):
             total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
+            cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/dist_basic.py process {mp_rank} {dp_rank} {total_rank}"'
+            print(cmd)
             remote_procs.append(
                 subprocess.Popen(
-                    f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}"',
+                    cmd,
                     shell=True,
                 )
             )
