@@ -239,7 +239,7 @@ def pprun(
             grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
             for i, (out_tensor, x) in enumerate(zip(out_tensors, xs)):
                 dist.broadcast(
-                    x,
+                    grad_buffers[i],
                     src=get_total_rank(mp_rank + 1, dp_rank),
                     group=fwd_group,
                 )
