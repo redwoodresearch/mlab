@@ -32,7 +32,7 @@ class Config:
     stage_dp_cuda_ids = [[0, 1], [2, 3], [0, 1], [2, 3], [0, 1], [2, 3]]
     model_in_shapes = [(1024,), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096)]
 
-    microbatch_size = 5
+    microbatch_size = 2
     seq_len = 1024
     master_addr = "104.171.200.117"
     master_port = "29500"
@@ -44,9 +44,10 @@ class Config:
     dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
     dist_backend = "nccl"
     use_autocast = True
-    pipe_width = 2
+    pipe_width = 4
     checkpoint_every_m = 10
     use_cpu = False
+    sharded_optimizer = True
 
     total_size = None
     stage_dp_sizes_cum = None
@@ -289,7 +290,7 @@ def pprun(
                 xs.append(x_buffer)
             batch_loss = sum([x.cpu().item() for x in losses]) / len(losses)
             batch_time = time.time() - batch_start
-            tokens_per_second = (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len) / batch_time
+            tokens_per_second = (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len) // batch_time
             print("whole batch loss", batch_loss, "took", batch_time, "tokens per second", tokens_per_second)
             if total_rank == 11:
                 experiment.log_metric("batch_loss", batch_loss)
