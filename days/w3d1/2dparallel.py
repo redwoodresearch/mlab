@@ -43,7 +43,7 @@ class Config:
     dist_backend = "nccl"
     use_autocast = True
     pipe_width = 4
-    checkpoint_every_m = 5
+    checkpoint_every_m = 0.1
     use_cpu = False
     sharded_optimizer = True
 
@@ -389,12 +389,12 @@ def pprun(
         optimizer.zero_grad()
         if time.time() - last_checkpoint_time > 60 * C.checkpoint_every_m:
             last_checkpoint_time = time.time()
-            if mp_rank == 0:
-                print("saving")
-            filename = f"./.checkpoints/gptj_imdb_{batch_num}_rank{mp_rank}"
+            print("saving", mp_rank, dp_rank)
+            filename = f"./.checkpoints/gptj_lw_{batch_num}_rank{mp_rank}"
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             with open(filename, "wb") as f:  # added this
                 t.save(model, f)
+                os.system(f"scp -i ~/mlab_ssh {filename} {C.master_addr}:/home/ubuntu/mlab/{filename}")
     end = time.time()
     print(
         f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {mp_rank}"
@@ -407,7 +407,7 @@ from queue import Queue, Empty
 
 def git_pull(ip):
     os.system(
-        f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "pkill python; cd mlab; git fetch -q; git reset -q --hard  origin/2dp;"',
+        f'scp -i ~/mlab_ssh ~/mlab_ssh {ip}:/home/ubuntu/mlab_ssh; ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "pkill python; cd mlab; git fetch -q; git reset -q --hard  origin/2dp; chmod 700 ~/mlab_ssh"',
     )
 
 
