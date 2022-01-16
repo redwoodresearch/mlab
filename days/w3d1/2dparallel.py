@@ -380,6 +380,7 @@ def start_cluster():  # does gin add the arguments here? crazy
             )
             remote_procs.append(proc)
             t = Thread(target=enqueue, args=(proc.stdout, mp_rank))
+            t = Thread(target=enqueue, args=(proc.stderr, mp_rank))
             t.daemon = True
             t.start()
             print("started process", mp_rank, dp_rank)
@@ -404,13 +405,12 @@ def start_cluster():  # does gin add the arguments here? crazy
 
 if __name__ == "__main__":
     print("hi from 2dparallel")
-    import hashlib
+    # import hashlib
 
-    os.system("touch ~/touchfile")
-    thisfile = __file__
-    tfh = hashlib.md5(open(thisfile, "rb").read()).hexdigest()
-    print("file hash", tfh)
-    # make_gptj_and_save_pieces()
+    # os.system("touch ~/touchfile")
+    # thisfile = __file__
+    # tfh = hashlib.md5(open(thisfile, "rb").read()).hexdigest()
+    # print("file hash", tfh)
     if sys.argv[1] == "orchestrate":
         print(
             f"""STARTING 2DP RUN___________________________
