@@ -1,18 +1,15 @@
 from dataclasses import dataclass
-from typing import *
 
 from torch import nn
 import os
 import torch.distributed as dist
 import sys
 import torch as t
-import transformers
 from time import time
 import json
 import subprocess
 import itertools
 
-import web_pdb
 
 # Pipeline parallel and data parallel at once
 
@@ -67,6 +64,8 @@ class HFBlockSequence(nn.Module):
 
 # call once
 def make_gptj_and_save_pieces():
+    import transformers
+
     model_lm = transformers.AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
     model = model_lm.transformer
 
@@ -85,6 +84,8 @@ def make_gptj_and_save_pieces():
 
 
 def load_data():
+    import transformers
+
     print("loading data")
     tensor_path = "/home/ubuntu/lw.pt"
     if os.path.exists(tensor_path):
@@ -356,7 +357,7 @@ def start_cluster():  # does gin add the arguments here? crazy
     for mp_rank, ip in enumerate(C.stage_ips):
         for dp_rank in range(C.dp_size):
             total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
-            cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/dist_basic.py process {mp_rank} {dp_rank} {total_rank}"'
+            cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}"'
             print(cmd)
             remote_procs.append(
                 subprocess.Popen(
