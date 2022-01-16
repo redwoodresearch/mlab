@@ -45,7 +45,7 @@ class Config:
     use_autocast = True
     pipe_width = 1
     checkpoint_every_m = 10
-    use_cpu = True
+    use_cpu = False
 
     total_size = None
     stage_dp_sizes_cum = None
@@ -279,7 +279,7 @@ def pprun(
                     enabled=C.use_autocast,
                 ):  # save memory by computing with less precision
                     out = model(x_buffer.to(device))
-                cur_loss = nn.CrossEntropyLoss()(out.float()[:, :-1], ys[microbatch_num][:, 1:].long())
+                cur_loss = nn.CrossEntropyLoss()(out.float()[:, :-1], ys[microbatch_num][:, 1:])
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
