@@ -383,7 +383,7 @@ if __name__ == "__main__":
     # print("file hash", tfh)
     if sys.argv[1] == "save_model":
         procs = []
-        for mp_rank, ip in enumerate(C.stage_ips):
+        for mp_rank, ip in enumerate(set(C.stage_ips)):  # only do each ip once
             git_pull(ip)
             cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/save_model.py"'
             proc = subprocess.Popen(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr, bufsize=1, text=True)
