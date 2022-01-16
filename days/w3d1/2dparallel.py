@@ -268,7 +268,7 @@ def pprun(
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
                 dist.broadcast(
-                    x,
+                    xgrad,
                     src=total_rank,
                     group=bwd_group,
                 )
@@ -358,7 +358,7 @@ def start_cluster():  # does gin add the arguments here? crazy
             total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
             remote_procs.append(
                 subprocess.Popen(
-                    f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab;python -m pip; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank} & echo afterthing"',
+                    f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}"',
                     shell=True,
                 )
             )
@@ -399,3 +399,5 @@ if __name__ == "__main__":
         start_cluster()
     elif sys.argv[1] == "process":
         pprun(mp_rank=int(sys.argv[2]), dp_rank=int(sys.argv[3]), total_rank=int(sys.argv[4]))
+    else:
+        print("ERRORIE")
