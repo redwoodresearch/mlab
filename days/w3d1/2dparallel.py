@@ -32,7 +32,7 @@ class Config:
     stage_dp_cuda_ids = [[0, 1], [2, 3], [0, 1], [2, 3], [0, 1], [2, 3]]
     model_in_shapes = [(1024,), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096)]
 
-    microbatch_size = 2
+    microbatch_size = 3
     seq_len = 1024
     master_addr = "104.171.200.117"
     master_port = "29500"
@@ -153,7 +153,7 @@ def pprun(
     model.train()
     model.to(device)
 
-    optimizer = t.optim.SGD(model.parameters(), lr=1e-4)  # TODO switch to sharded optimizer adam
+    optimizer = t.optim.SGD(model.parameters(), lr=1e-4 / C.dp_size)  # TODO switch to sharded optimizer adam
 
     print("model loaded", mp_rank, dp_rank)
     num_batches = t.IntTensor([0]).to(device)
@@ -306,10 +306,11 @@ def pprun(
         sinc()
         # average grad
         reduce_ops = [
-            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group) for param in model.parameters()
+            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
+            for param in model.parameters()
         ]
-        # for op in reduce_ops:
-        #     op.wait()
+        for op in reduce_ops:
+            op.wait()
         sinc()  # done using stage group
 
         optimizer.step()
