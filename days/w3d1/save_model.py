@@ -21,6 +21,7 @@ def make_gptj_and_save_pieces(chunks=[4, 5, 5, 5, 5, 4]):
     import transformers
 
     model_lm = transformers.AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
+    print("Model loaded successfully")
     model = model_lm.transformer
     num_layers = len(model.h)
     assert num_layers == 28
