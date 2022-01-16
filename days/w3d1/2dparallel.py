@@ -41,7 +41,7 @@ class Config:
     dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
     dist_backend = "nccl"
     use_autocast = True
-    pipe_width = 4
+    pipe_width = 1
     checkpoint_every_m = 10
     use_cpu = False
 
@@ -76,6 +76,7 @@ def load_data():
     if os.path.exists(tensor_path):
         tokens = t.load(tensor_path)
     else:
+        raise AssertionError("not doin that")
         lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
         texts = [x["text"] for x in lw_json]
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -326,13 +327,12 @@ from queue import Queue, Empty
 
 def git_pull(ip):
     os.system(
-        f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git fetch -q; git reset -q --hard  origin/2dp;"',
+        f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "pkill python; cd mlab; git fetch -q; git reset -q --hard  origin/2dp;"',
     )
 
 
 def start_cluster():  # does gin add the arguments here? crazy
     remote_procs = []
-    os.system(f'ssh -i ~/mlab_ssh ubuntu@{C.master_addr} "fuser -k {C.master_port}/tcp"')
     unique_name = str(int(time() * 10))
     for ip in set(C.stage_ips):
         git_pull(ip)
@@ -349,10 +349,6 @@ def start_cluster():  # does gin add the arguments here? crazy
             cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank} 1>&2 4>&2"'
             proc = subprocess.Popen(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr, bufsize=1, text=True)
             remote_procs.append(proc)
-            # t = Thread(target=enqueue, args=(proc.stdout, mp_rank))
-            # t = Thread(target=enqueue, args=(proc.stderr, mp_rank))
-            # t.daemon = True
-            # t.start()
             print("started process", mp_rank, dp_rank)
 
     while 1:
