@@ -351,7 +351,7 @@ def start_cluster():  # does gin add the arguments here? crazy
     unique_name = str(int(time() * 10))
     for ip in set(C.stage_ips):
         os.system(
-            f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git reset --hard  origin/2dp; echo hi;"',
+            f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git fetch; git reset --hard  origin/2dp; echo hi;"',
         )
     for mp_rank, ip in enumerate(C.stage_ips):
         for dp_rank in range(C.dp_size):
