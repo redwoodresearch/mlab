@@ -18,6 +18,7 @@ import json
 import subprocess
 import itertools
 from einops import rearrange
+from comet_ml import Experiment
 
 # Pipeline parallel and data parallel at once
 
@@ -169,7 +170,11 @@ def pprun(
     dist.broadcast(num_batches, src=get_total_rank(0, 0))
 
     num_batches = num_batches.item()
-
+    if total_rank == 11:
+        experiment = Experiment(
+            api_key="vABV7zo6pqS7lfzZBhyabU2Xe",
+            project_name="jan15-2dp",
+        )
     start = time.time()
     batch_start = time.time()
     last_checkpoint_time = time.time()
@@ -290,6 +295,8 @@ def pprun(
                 "took",
                 time.time() - batch_start,
             )
+            experiment.log_metric("batch_loss", sum([x.cpu().item() for x in losses]) / len(losses))
+            experiment.log_metric("batch_time", time.time() - batch_start)
             batch_start = time.time()
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
