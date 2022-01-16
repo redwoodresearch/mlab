@@ -310,7 +310,7 @@ def pprun(
         #     op.wait()
         sinc()  # done using stage group
 
-        optimizer.step()
+        # optimizer.step()
         optimizer.zero_grad()
         if time.time() - last_checkpoint_time > 60 * C.checkpoint_every_m:
             last_checkpoint_time = time.time()
