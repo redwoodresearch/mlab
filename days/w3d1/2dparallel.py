@@ -260,7 +260,7 @@ def pprun(
                     out = model(x_buffer.to(device))
                 xs.append(x_buffer)
                 out_tensors.append(out)
-                dist.isend(out, src=total_rank, group=fwd_group)
+                dist.broadcast(out, src=total_rank, group=fwd_group)
             grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
             grad_recvs = [
                 dist.broadcast(
@@ -367,7 +367,7 @@ def start_cluster():  # does gin add the arguments here? crazy
     q = Queue()
 
     def enqueue(out, rank):
-        for line in iter(out.readline, ""):
+        for line in iter(out.readline, b""):
             q.put(f"{rank}: {line}")
 
     for mp_rank, ip in enumerate(C.stage_ips):
@@ -375,7 +375,9 @@ def start_cluster():  # does gin add the arguments here? crazy
             total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
             cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank} 1>&2 4>&2"'
             print(cmd)
-            proc = subprocess.Popen(cmd, shell=True, bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc = subprocess.Popen(
+                cmd, shell=True, bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
             remote_procs.append(proc)
             t = Thread(target=enqueue, args=(proc.stdout, mp_rank))
             t.daemon = True
