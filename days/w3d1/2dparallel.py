@@ -57,6 +57,17 @@ class Config:
 C = Config()
 
 
+class HFBlockSequence(nn.Module):
+    def __init__(self, *layers):
+        super().__init__()
+        self.layers = nn.ModuleList(layers)  # treat like a list
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)[0]
+        return x
+
+
 def load_data():
     import transformers
 
