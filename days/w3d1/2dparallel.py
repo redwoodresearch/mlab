@@ -160,7 +160,7 @@ def pprun(
                 ],
                 backend="nccl",
             )
-    raise AssertionError("hi")
+    # raise AssertionError("hi")
     # pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
