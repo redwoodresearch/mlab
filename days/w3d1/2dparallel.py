@@ -163,6 +163,8 @@ def pprun(
             C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len
         )
         batches = batches[dp_rank]
+        print("bshape", batches.shape, dp_rank)
+        raise AssertionError("hi")
         total_examples = batches.shape[0] * batches.shape[1] * batches.shape[2]
         num_batches[0] = batches.shape[0]
 
@@ -181,7 +183,6 @@ def pprun(
         if mp_rank == 0:
             pipe_batches = batches[batch_num].long().to(device)
             out_tensors = []
-
             # send batch Ys to the end so it can calculate loss
             dist.broadcast(pipe_batches, src=total_rank, group=bwd_group)
             sinc()  # done using bwd group
@@ -258,8 +259,8 @@ def pprun(
             xs = []
             losses = []
             backward_sends = []
-            ys = [t.zeros(C.microbatch_size, C.seq_len, dtype=t.int64, device=device) for _ in range(C.pipe_width)]
-            yjobs = [dist.broadcast(y, get_total_rank(0, dp_rank), group=fwd_group) for i, y in enumerate(ys)]
+            ys = t.zeros((C.pipe_width, C.microbatch_size, C.seq_len), dtype=t.int64, device=device)
+            dist.broadcast(ys, get_total_rank(0, dp_rank), group=fwd_group)
             sinc()  # done using fwd group
 
             xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
