@@ -3,6 +3,7 @@ import sys
 import os
 
 if len(sys.argv) > 2:
+    print("hi")
     myport = 5555 + int(sys.argv[4])
     os.system(f"fuser -k {myport}/tcp")
     web_pdb.set_trace(port=myport)
@@ -50,7 +51,7 @@ class Config:
 
     def __init__(self):
         self.stage_dp_sizes_cum = t.IntTensor([0] + [len(x) for x in self.stage_dp_cuda_ids]).cumsum(0).tolist()
-        self.total_size = int(self.stage_dp_sizes_cum[0])
+        self.total_size = int(self.stage_dp_sizes_cum[-1])
         self.device_type = "cpu" if self.use_cpu else "cuda"
 
 
@@ -387,7 +388,7 @@ def start_cluster():  # does gin add the arguments here? crazy
 
 
 if __name__ == "__main__":
-    print("hi")
+    print("hi from 2dparallel")
     import hashlib
 
     os.system("touch ~/touchfile")
