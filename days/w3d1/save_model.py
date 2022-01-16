@@ -39,5 +39,9 @@ def make_gptj_and_save_pieces(chunks=[4, 5, 5, 5, 5, 4]):
     return models
 
 
+def gptj_from_pieces(base_path="gpt-j-6b"):
+    ...
+
+
 if __name__ == "__main__":
     make_gptj_and_save_pieces()

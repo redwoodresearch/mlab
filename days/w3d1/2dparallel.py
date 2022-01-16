@@ -109,7 +109,6 @@ def model_params_to_buckets(model, n_buckets):
         else:
             buckets[-1].append(param)
             bucket_size += param.numel()
-    print("bucket sizes", [sum([x.numel() for x in b]) for b in buckets])
     return buckets
 
 
@@ -129,8 +128,8 @@ def pprun(
 
     def sinc():
         if not C.use_cpu:
-            return
             t.cuda.synchronize(device)
+            return
 
     # start all our fucking process groups!
     os.environ["MASTER_ADDR"] = C.master_addr
