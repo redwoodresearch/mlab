@@ -133,6 +133,7 @@ def pprun(
     os.environ["MASTER_ADDR"] = C.master_addr
     os.environ["MASTER_PORT"] = C.master_port
     print("will init process group", total_rank)
+    raise AssertionError("hi")
     dist.init_process_group(backend=C.dist_backend, rank=total_rank, world_size=C.total_size)
     print("inited process group", total_rank)
     process_groups = {
