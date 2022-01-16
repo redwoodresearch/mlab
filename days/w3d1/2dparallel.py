@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from torch import nn
 import torch.distributed as dist
 import torch as t
-from time import time
+import time
 import json
 import subprocess
 import itertools
@@ -163,12 +163,14 @@ def pprun(
 
     num_batches = num_batches.item()
 
-    start = time()
-    batch_start = time()
-    last_checkpoint_time = time()
+    start = time.time()
+    batch_start = time.time()
+    last_checkpoint_time = time.time()
     print("num_batches", num_batches, mp_rank, dp_rank)
     for batch_num in range(num_batches):
         dist.barrier()
+        print("hello")
+        os.sleep(10)
         t.cuda.synchronize(device)  # done using global group
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
@@ -290,9 +292,9 @@ def pprun(
                 batch_num,
                 sum([x.cpu().item() for x in losses]) / len(losses),
                 "took",
-                time() - batch_start,
+                time.time() - batch_start,
             )
-            batch_start = time()
+            batch_start = time.time()
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
                 xgrad = x.grad
@@ -311,15 +313,15 @@ def pprun(
 
         optimizer.step()
         optimizer.zero_grad()
-        if time() - last_checkpoint_time > 60 * C.checkpoint_every_m:
-            last_checkpoint_time = time()
+        if time.time() - last_checkpoint_time > 60 * C.checkpoint_every_m:
+            last_checkpoint_time = time.time()
             if mp_rank == 0:
                 print("saving")
             filename = f"./.checkpoints/gptj_imdb_{batch_num}_rank{mp_rank}"
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             with open(filename, "wb") as f:  # added this
                 t.save(model, f)
-    end = time()
+    end = time.time()
     print(
         f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {mp_rank}"
     )
@@ -337,7 +339,7 @@ def git_pull(ip):
 
 def start_cluster():  # does gin add the arguments here? crazy
     remote_procs = []
-    unique_name = str(int(time() * 10))
+    unique_name = str(int(time.time() * 10))
     for ip in set(C.stage_ips):
         git_pull(ip)
 
