@@ -170,7 +170,7 @@ def pprun(
     for batch_num in range(num_batches):
         dist.barrier()
         print("hello")
-        os.sleep(10)
+        time.sleep(10)
         t.cuda.synchronize(device)  # done using global group
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
