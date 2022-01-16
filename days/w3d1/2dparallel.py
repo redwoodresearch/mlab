@@ -46,7 +46,7 @@ class Config:
     use_cpu = False
     sharded_optimizer = True
 
-    lr = 1e-5
+    lr = 1e-7
 
     total_size = None
     stage_dp_sizes_cum = None
@@ -96,8 +96,8 @@ def load_data():
     return tokens
 
 
-def model_params_to_buckets(model, n_buckets):
-    params = list(model.parameters())
+def params_to_buckets(params, n_buckets):
+    params = list(params)
     target_params_per = sum([x.numel() for x in params]) // n_buckets
     buckets = [[]]
     bucket_size = 0
@@ -170,10 +170,14 @@ def pprun(
     model.train()
     model.to(device)
     if C.sharded_optimizer:
-        param_buckets = model_params_to_buckets(model, C.dp_size)
-        optimizer = t.optim.AdamW(param_buckets[dp_rank], lr=C.lr / C.dp_size)
+        param_buckets = params_to_buckets(model.parameters(), C.dp_size)
+        params = param_buckets[dp_rank]
     else:
-        optimizer = t.optim.SGD(model.parameters(), lr=C.lr / C.dp_size)
+        # some hyperparameters copied from gpt3 paper
+        # use 10% LR because that's what they use at end of training?
+        # gpt3 uses 1.2e-4 at 2m batch size, 1.2e-5 at end of training, I'm using 24k tokens so I want 1e-7 lr?
+        params = model.parameters()
+    optimizer = t.optim.Adam(params, lr=C.lr / C.dp_size, weight_decay=0.1, betas=(0.9, 0.95), eps=1e-8)
 
     print("model loaded", mp_rank, dp_rank)
     num_batches = t.IntTensor([0]).to(device)
