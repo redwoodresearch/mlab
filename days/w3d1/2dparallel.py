@@ -135,10 +135,7 @@ def pprun(
     print("initiated subgroups", mp_rank, dp_rank)
 
     model_part_fname = f"[{C.model_file_prefix}_part{mp_rank}.pt"
-    if not os.path.exists(model_part_fname):
-        if dp_rank == 0:
-            make_gptj_and_save_pieces()
-        dist.barrier(group=stage_group)
+    assert os.path.exists(model_part_fname)
     model: nn.Module = t.load(model_part_fname)
     model.train()
     model.to(device)
