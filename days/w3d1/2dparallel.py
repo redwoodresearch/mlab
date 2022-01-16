@@ -167,7 +167,6 @@ def pprun(
     print("initiated subgroups", mp_rank, dp_rank)
 
     model_part_fname = f"[{C.model_file_prefix}_part{mp_rank}.pt"
-    raise AssertionError("hi")
     if not os.path.exists(model_part_fname):
         if dp_rank == 0:
             make_gptj_and_save_pieces()
@@ -409,6 +408,9 @@ if __name__ == "__main__":
     # thisfile = __file__
     # tfh = hashlib.md5(open(thisfile, "rb").read()).hexdigest()
     # print("file hash", tfh)
+    if sys.argv[1] == "save_model":
+        for mp_rank, ip in enumerate(C.stage_ips):
+            cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank} 1>&2 4>&2"'
     if sys.argv[1] == "orchestrate":
         print(
             f"""STARTING 2DP RUN___________________________
