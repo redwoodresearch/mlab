@@ -154,7 +154,7 @@ def pprun(
     optimizer = t.optim.SGD(model.parameters(), lr=1e-4)  # TODO switch to sharded optimizer adam
 
     print("model loaded", mp_rank, dp_rank)
-    num_batches = t.IntTensor([0])
+    num_batches = t.IntTensor([0]).to(device)
     if mp_rank == 0:
         dataset = load_data()
         # each loads all data then takes its dp slice
