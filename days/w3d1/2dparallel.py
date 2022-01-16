@@ -97,15 +97,18 @@ def load_data():
 
 
 def model_params_to_buckets(model, n_buckets):
-    target_params_per = sum([x.numel() for x in model.parameters()]) // n_buckets
+    params = list(model.parameters())
+    target_params_per = sum([x.numel() for x in params]) // n_buckets
     buckets = [[]]
     bucket_size = 0
-    for param in model.parameters():
+    for param in params:
         if len(buckets) < n_buckets and param.numel() + bucket_size > target_params_per:
             buckets.append([])
             buckets[-1].append(param)
+            bucket_size = 0
         else:
             buckets[-1].append(param)
+            bucket_size += param.numel()
     print("bucket sizes", [sum([x.numel() for x in b]) for b in buckets])
     return buckets
 
