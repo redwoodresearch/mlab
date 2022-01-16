@@ -2,6 +2,7 @@ import web_pdb
 import sys
 import os
 
+os.environ["NCCL_DEBUG"] = "INFO"
 if False and len(sys.argv) > 2:
     myport = 5555 + int(sys.argv[4])
     os.system(f"fuser -k {myport}/tcp")
