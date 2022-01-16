@@ -420,7 +420,6 @@ if __name__ == "__main__":
         )
         start_cluster()
     elif sys.argv[1] == "process":
-        raise AssertionError("er")
         pprun(mp_rank=int(sys.argv[2]), dp_rank=int(sys.argv[3]), total_rank=int(sys.argv[4]))
     else:
         print("ERRORIE")
