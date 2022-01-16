@@ -152,7 +152,7 @@ def pprun(
     #         backend="nccl",
     #     )
     for g_dp_rank in range(C.dp_size):
-        for g_mp_rank in range(mp_rank):
+        for g_mp_rank in range(C.mp_size):
             process_groups["stage_links"][g_dp_rank][g_mp_rank] = dist.new_group(
                 ranks=[
                     get_total_rank(g_mp_rank, g_dp_rank),
