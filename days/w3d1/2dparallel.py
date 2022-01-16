@@ -2,8 +2,7 @@ import web_pdb
 import sys
 import os
 
-if len(sys.argv) > 2:
-    print("hi")
+if False and len(sys.argv) > 2:
     myport = 5555 + int(sys.argv[4])
     os.system(f"fuser -k {myport}/tcp")
     web_pdb.set_trace(port=myport)
@@ -364,16 +363,17 @@ def start_cluster():  # does gin add the arguments here? crazy
     for mp_rank, ip in enumerate(C.stage_ips):
         for dp_rank in range(C.dp_size):
             total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
-            cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}"'
+            cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank} 1>&2"'
             print(cmd)
             remote_procs.append(
                 subprocess.Popen(
                     cmd,
                     shell=True,
+                    bufsize=0,
                 )
             )
             print("started process", mp_rank, dp_rank)
-    for proc in remote_procs:
+                for proc in remote_procs:
         proc.wait()
 
 
