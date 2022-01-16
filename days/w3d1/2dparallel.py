@@ -44,7 +44,7 @@ class Config:
     dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
     dist_backend = "nccl"
     use_autocast = True
-    pipe_width = 5
+    pipe_width = 4
     checkpoint_every_m = 10
     use_cpu = False
     sharded_optimizer = True
