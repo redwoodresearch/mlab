@@ -109,6 +109,10 @@ def pprun(
     autocast_type = t.bfloat16 if C.use_cpu else t.float16
     device = "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
 
+    def sinc():
+        if not C.use_cpu:
+            t.cuda.synchronize(device)
+
     # start all our fucking process groups!
     os.environ["MASTER_ADDR"] = C.master_addr
     os.environ["MASTER_PORT"] = C.master_port
@@ -174,7 +178,7 @@ def pprun(
         dist.barrier()
         print("hello")
         time.sleep(10)
-        t.cuda.synchronize(device)  # done using global group
+        sinc()  # done using global group
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
             pipe_batches = batches[batch_num].to(device)
@@ -182,7 +186,7 @@ def pprun(
 
             # send batch Ys to the end so it can calculate loss
             dist.broadcast(pipe_batches, src=total_rank, group=bwd_group)
-            t.cuda.synchronize(device)  # done using bwd group
+            sinc()  # done using bwd group
 
             for i, microbatch in enumerate(pipe_batches):
                 with t.autocast(
@@ -205,7 +209,7 @@ def pprun(
                 out_tensor.backward(grad_buffer)
                 # release out tensor memory after each backward minibatch
                 out_tensors[i] = None
-            t.cuda.synchronize(device)  # done using fwd group
+            sinc()  # done using fwd group
         elif mp_rank != C.mp_size - 1:
             out_tensors = []
             xs = []
@@ -218,7 +222,7 @@ def pprun(
                     src=get_total_rank(mp_rank - 1, dp_rank),
                     group=bwd_group,
                 )
-                t.cuda.synchronize(device)  # done using bwd group
+                sinc()  # done using bwd group
 
                 x_buffer = xs[microbatch_num]
                 x_buffer.requires_grad = True
@@ -231,7 +235,7 @@ def pprun(
                 xs.append(x_buffer)
                 out_tensors.append(out)
                 dist.broadcast(out, src=total_rank, group=fwd_group)
-                t.cuda.synchronize(device)  # done using fwd group
+                sinc()  # done using fwd group
             grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
             for i, (out_tensor, x) in enumerate(zip(out_tensors, xs)):
                 dist.broadcast(
@@ -239,7 +243,7 @@ def pprun(
                     src=get_total_rank(mp_rank + 1, dp_rank),
                     group=fwd_group,
                 )
-                t.cuda.synchronize(device)  # done using fwd group
+                sinc()  # done using fwd group
                 grad_buffer = grad_buffers[i]
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
@@ -248,7 +252,7 @@ def pprun(
                     src=total_rank,
                     group=bwd_group,
                 )
-                t.cuda.synchronize(device)  # done using bwd group
+                sinc()  # done using bwd group
                 xs[i] = None
                 out_tensors[i] = None
 
@@ -258,7 +262,7 @@ def pprun(
             backward_sends = []
             ys = [t.zeros(C.microbatch_size, C.seq_len, device=device) for _ in range(C.pipe_width)]
             yjobs = [dist.broadcast(y, get_total_rank(0, dp_rank), group=fwd_group) for i, y in enumerate(ys)]
-            t.cuda.synchronize(device)  # done using fwd group
+            sinc()  # done using fwd group
 
             xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
             for microbatch_num in range(C.pipe_width):
@@ -293,14 +297,14 @@ def pprun(
                 backward_sends.append(dist.broadcast(xgrad, src=total_rank, group=bwd_group))
                 losses[i] = None
                 xs[i] = None
-        t.cuda.synchronize(device)
+        sinc()
         # average grad
         reduce_ops = [
             dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group) for param in model.parameters()
         ]
         # for op in reduce_ops:
         #     op.wait()
-        t.cuda.synchronize(device)  # done using stage group
+        sinc()  # done using stage group
 
         optimizer.step()
         optimizer.zero_grad()
