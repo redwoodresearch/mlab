@@ -133,7 +133,6 @@ def pprun(
     os.environ["MASTER_ADDR"] = C.master_addr
     os.environ["MASTER_PORT"] = C.master_port
     print("will init process group", total_rank)
-    raise AssertionError("hi")
     dist.init_process_group(backend=C.dist_backend, rank=total_rank, world_size=C.total_size)
     print("inited process group", total_rank)
     process_groups = {
@@ -142,6 +141,7 @@ def pprun(
         "stage_links": [[None for _ in range(C.mp_size)] for _ in range(C.dp_size)],
     }
     print("initing subgroups", mp_rank, dp_rank)
+    raise AssertionError("hi")
     for g_mp_rank in range(C.mp_size):
         process_groups["stage"][g_mp_rank] = dist.new_group(
             ranks=[get_total_rank(g_mp_rank, i) for i in range(C.dp_size)],
