@@ -181,7 +181,7 @@ def pprun(
         sinc()  # done using global group
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
-            pipe_batches = batches[batch_num].to(device)
+            pipe_batches = batches[batch_num].long().to(device)
             out_tensors = []
 
             # send batch Ys to the end so it can calculate loss
@@ -194,7 +194,7 @@ def pprun(
                     device_type=C.device_type,
                     enabled=C.use_autocast,
                 ):
-                    out = model(microbatch.long().to(device))  # all the gpu action
+                    out = model(microbatch.to(device))  # all the gpu action
                 out_tensors.append(out)
                 dist.broadcast(out, src=total_rank, group=fwd_group)
 
@@ -260,7 +260,7 @@ def pprun(
             xs = []
             losses = []
             backward_sends = []
-            ys = [t.zeros(C.microbatch_size, C.seq_len, device=device) for _ in range(C.pipe_width)]
+            ys = [t.zeros(C.microbatch_size, C.seq_len, dtype=t.int64, device=device) for _ in range(C.pipe_width)]
             yjobs = [dist.broadcast(y, get_total_rank(0, dp_rank), group=fwd_group) for i, y in enumerate(ys)]
             sinc()  # done using fwd group
 
