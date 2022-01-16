@@ -134,8 +134,7 @@ def pprun(
     bwd_group = process_groups["stage_links"][dp_rank][(C.mp_size + mp_rank - 1) % C.mp_size]
     print("initiated subgroups", mp_rank, dp_rank)
 
-    model_part_fname = f"[{C.model_file_prefix}_part{mp_rank}.pt"
-    assert os.path.exists(model_part_fname)
+    model_part_fname = f"{C.model_file_prefix}_part{mp_rank}.pt"
     model: nn.Module = t.load(model_part_fname)
     model.train()
     model.to(device)
