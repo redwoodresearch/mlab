@@ -6,7 +6,7 @@ import os
 # os.environ["NCCL_BLOCKING_WAIT"] = "1"
 # os.environ["NCCL_DEBUG"] = "INFO"
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from torch import nn
 import torch.distributed as dist
@@ -17,6 +17,7 @@ import subprocess
 import itertools
 from einops import rearrange
 import random
+from typing import *
 
 # Pipeline parallel and data parallel at once
 
@@ -46,6 +47,9 @@ class Config:
     use_cpu = False
     sharded_optimizer = True
 
+    betas = (0.9, 0.95)
+    weight_decay = 0.1
+
     lr = 1e-7
 
     total_size = None
@@ -74,9 +78,9 @@ class HFBlockSequence(nn.Module):
 def load_data():
     import transformers
 
-    print("loading data")
     tensor_path = "/home/ubuntu/lw.pt"
     if os.path.exists(tensor_path):
+        print("loading data")
         tokens = t.load(tensor_path)
     else:
         lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
@@ -129,6 +133,11 @@ def pprun(
             project_name="jan15-2dp",
             workspace="redwood",
         )
+        experiment.log_parameter("mp_rank", mp_rank)
+        experiment.log_parameter("dp_rank", dp_rank)
+        experiment.log_parameter("total_rank", total_rank)
+        for k, v in asdict(C):
+            experiment.log_parameter(k, v)
     autocast_type = t.bfloat16 if C.use_cpu else t.float16
     device = "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
 
@@ -194,9 +203,8 @@ def pprun(
         # use 10% LR because that's what they use at end of training?
         # gpt3 uses 1.2e-4 at 2m batch size, 1.2e-5 at end of training, I'm using 24k tokens so I want 1e-7 lr?
         params = model.parameters()
-    optimizer = t.optim.Adam(params, lr=C.lr / C.dp_size, weight_decay=0.1, betas=(0.9, 0.95), eps=1e-8)
+    optimizer = t.optim.Adam(params, lr=C.lr / C.dp_size, weight_decay=C.weight_decay, betas=C.betas, eps=1e-8)
 
-    print("model loaded", mp_rank, dp_rank)
     num_batches = t.IntTensor([0]).to(device)
     if mp_rank == 0:
         dataset = load_data()
@@ -429,16 +437,6 @@ def start_cluster():  # does gin add the arguments here? crazy
             print(line)
         except Empty:
             pass
-
-
-# 2,8 produces 0.18 time units and final loss of 0.10 (noisy)
-# 2,10 breaks (too much mem)
-# 4,4 produced something like 0.17 time-units/example, final loss of 0.11, half-way 0.38
-# 8,2 produced something like 0.10 time-units/example, final loss of 0.37, half-way 0.53
-
-# with 4 minibatches of 12, took 3.1s
-# with 1 minibatch of 48, took 4.6
-#
 
 
 if __name__ == "__main__":
