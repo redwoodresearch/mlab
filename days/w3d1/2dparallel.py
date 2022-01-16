@@ -363,7 +363,7 @@ def start_cluster():  # does gin add the arguments here? crazy
                 )
             )
             subprocess.Popen(
-                f"echo sp",
+                f"ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} 'echo sp'",
                 shell=True,
             )
             print("started process", mp_rank, dp_rank)
