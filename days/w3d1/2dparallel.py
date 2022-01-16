@@ -1,6 +1,7 @@
 import web_pdb
 
-web_pdb.set_trace()
+if len(sys.argv) > 2:
+    web_pdb.set_trace(port=5555 + int(sys.argv[4]))
 from dataclasses import dataclass
 
 from torch import nn
