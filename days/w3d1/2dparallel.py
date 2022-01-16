@@ -16,6 +16,7 @@ import web_pdb
 
 # Pipeline parallel and data parallel at once
 
+# to fix hostname lan issues add this to /etc/hosts
 # 104.171.200.117 104-171-200-117
 # 104.171.200.214 104-171-200-214
 # 104.171.200.196 104-171-200-196
@@ -28,7 +29,7 @@ class Config:
     microbatch_size = 1
     seq_len = 1024
     master_addr = "104.171.200.117"
-    master_port = "29559"
+    master_port = "29500"
     dp_size = 2
     mp_size = 6
     model_file_prefix = "gpt-j-6b"
@@ -355,13 +356,13 @@ def start_cluster():  # does gin add the arguments here? crazy
     for mp_rank, ip in enumerate(C.stage_ips):
         for dp_rank in range(C.dp_size):
             total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
-            print("started process", dp_rank)
             remote_procs.append(
                 subprocess.Popen(
                     f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}"',
                     shell=True,
                 )
             )
+            print("started process", mp_rank, dp_rank)
     for proc in remote_procs:
         proc.wait()
 
@@ -377,6 +378,12 @@ def start_cluster():  # does gin add the arguments here? crazy
 
 
 if __name__ == "__main__":
+    import hashlib
+
+    thisfile = __file__
+    print("thisfile", thisfile)
+    tfh = hashlib.md5(thisfile)
+    print("thisfile hash", tfh)
     # make_gptj_and_save_pieces()
     if sys.argv[1] == "orchestrate":
         print(
