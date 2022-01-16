@@ -378,10 +378,10 @@ def start_cluster():  # does gin add the arguments here? crazy
                 cmd, shell=True, bufsize=1, stdout=subprocess.STDOUT, stderr=subprocess.STDOUT, text=True
             )
             remote_procs.append(proc)
-            t = Thread(target=enqueue, args=(proc.stdout, mp_rank))
-            t = Thread(target=enqueue, args=(proc.stderr, mp_rank))
-            t.daemon = True
-            t.start()
+            # t = Thread(target=enqueue, args=(proc.stdout, mp_rank))
+            # t = Thread(target=enqueue, args=(proc.stderr, mp_rank))
+            # t.daemon = True
+            # t.start()
             print("started process", mp_rank, dp_rank)
 
     while 1:
