@@ -56,38 +56,6 @@ class Config:
 
 C = Config()
 
-# HuggingFace models return tuples in the middle (things like activation patterns), thus the [0]
-class HFBlockSequence(nn.Module):
-    def __init__(self, *layers):
-        super().__init__()
-        self.layers = nn.ModuleList(layers)  # treat like a list
-
-    def forward(self, x):
-        for layer in self.layers:
-            x = layer(x)[0]
-        return x
-
-
-# call once
-def make_gptj_and_save_pieces():
-    import transformers
-
-    model_lm = transformers.AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
-    model = model_lm.transformer
-
-    num_layers = len(model)
-    assert num_layers == 28
-    chunks = [4, 5, 5, 5, 5, 4]  # less at ends due to embeddings/unembed
-    assert sum(chunks) == num_layers
-    chunk_cumsum = t.cumsum(t.tensor(chunks), dim=0).tolist()
-    print("cumsum", chunk_cumsum)
-    models = [HFBlockSequence(*model.h[start - size : start]) for start, size in zip(chunk_cumsum, chunks)]
-    models[0] = nn.Sequential(model.wte, model.drop, models[0])
-    models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head)
-    for i, model_part in enumerate(models):
-        t.save(model_part, f"gpt-j-6b_part{i}.pt")
-    return models
-
 
 def load_data():
     import transformers
@@ -356,14 +324,19 @@ from threading import Thread
 from queue import Queue, Empty
 
 
+def git_pull(ip):
+    os.system(
+        f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git fetch -q; git reset -q --hard  origin/2dp;"',
+    )
+
+
 def start_cluster():  # does gin add the arguments here? crazy
     remote_procs = []
     os.system(f'ssh -i ~/mlab_ssh ubuntu@{C.master_addr} "fuser -k {C.master_port}/tcp"')
     unique_name = str(int(time() * 10))
     for ip in set(C.stage_ips):
-        os.system(
-            f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git fetch -q; git reset -q --hard  origin/2dp;"',
-        )
+        git_pull(ip)
+
     q = Queue()
 
     def enqueue(out, rank):
@@ -409,8 +382,15 @@ if __name__ == "__main__":
     # tfh = hashlib.md5(open(thisfile, "rb").read()).hexdigest()
     # print("file hash", tfh)
     if sys.argv[1] == "save_model":
+        procs = []
         for mp_rank, ip in enumerate(C.stage_ips):
-            cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank} 1>&2 4>&2"'
+            git_pull(ip)
+            cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/save_model.py"'
+            proc = subprocess.Popen(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr, bufsize=1, text=True)
+            procs.append(proc)
+        for proc in procs:
+            proc.wait()
+
     if sys.argv[1] == "orchestrate":
         print(
             f"""STARTING 2DP RUN___________________________
