@@ -160,7 +160,6 @@ def pprun(
                 ],
                 backend="nccl",
             )
-    # raise AssertionError("hi")
     # pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
@@ -168,6 +167,7 @@ def pprun(
     print("initiated subgroups", mp_rank, dp_rank)
 
     model_part_fname = f"[{C.model_file_prefix}_part{mp_rank}.pt"
+    raise AssertionError("hi")
     if not os.path.exists(model_part_fname):
         if dp_rank == 0:
             make_gptj_and_save_pieces()
