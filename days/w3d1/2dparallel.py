@@ -75,10 +75,8 @@ def load_data():
     tensor_path = "/home/ubuntu/lw.pt"
     if os.path.exists(tensor_path):
         tokens = t.load(tensor_path)
-        print("tokens shape", tokens.shape)
     else:
         lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
-        print("have json")
         texts = [x["text"] for x in lw_json]
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
         tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2", TOKENIZERS_PARALLELISM=True)
@@ -111,15 +109,12 @@ def pprun(
     # start all our fucking process groups!
     os.environ["MASTER_ADDR"] = C.master_addr
     os.environ["MASTER_PORT"] = C.master_port
-    print("will init process group", total_rank)
     dist.init_process_group(backend=C.dist_backend, rank=total_rank, world_size=C.total_size)
-    print("inited process group", total_rank)
     process_groups = {
         "stage": [None for _ in range(C.mp_size)],
         "pipe": [None for _ in range(C.dp_size)],
         "stage_links": [[None for _ in range(C.mp_size)] for _ in range(C.dp_size)],
     }
-    print("initing subgroups", mp_rank, dp_rank)
     for g_mp_rank in range(C.mp_size):
         process_groups["stage"][g_mp_rank] = dist.new_group(
             ranks=[get_total_rank(g_mp_rank, i) for i in range(C.dp_size)],
@@ -143,13 +138,11 @@ def pprun(
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
     bwd_group = process_groups["stage_links"][dp_rank][(C.mp_size + mp_rank - 1) % C.mp_size]
-    print("initiated subgroups", mp_rank, dp_rank)
 
     model_part_fname = f"{C.model_file_prefix}_part{mp_rank}.pt"
     model: nn.Module = t.load(model_part_fname)
     model.train()
     model.to(device)
-    print("loaded model", mp_rank, dp_rank)
 
     optimizer = t.optim.SGD(model.parameters(), lr=1e-4)  # TODO switch to sharded optimizer adam
 
@@ -174,7 +167,6 @@ def pprun(
     print("num_batches", num_batches, mp_rank, dp_rank)
     for batch_num in range(num_batches):
         dist.barrier()
-        raise AssertionError("hi")
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
             pipe_batches = batches[batch_num].to(device)
@@ -285,8 +277,7 @@ def pprun(
                     enabled=C.use_autocast,
                 ):  # save memory by computing with less precision
                     out = model(x_buffer.to(device))
-                out = out[:, -1, -2:]  # use the last 2 tokens of LM head as classification head
-                cur_loss = nn.CrossEntropyLoss()(out.float(), ys[microbatch_num].long())
+                cur_loss = nn.CrossEntropyLoss()(out.float()[:, :-1], ys[microbatch_num][:, 1:].long())
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
@@ -383,13 +374,6 @@ def start_cluster():  # does gin add the arguments here? crazy
 
 
 if __name__ == "__main__":
-    print("hi from 2dparallel")
-    # import hashlib
-
-    # os.system("touch ~/touchfile")
-    # thisfile = __file__
-    # tfh = hashlib.md5(open(thisfile, "rb").read()).hexdigest()
-    # print("file hash", tfh)
     if sys.argv[1] == "save_model":
         procs = []
         for mp_rank, ip in enumerate(set(C.stage_ips)):  # only do each ip once
