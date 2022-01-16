@@ -121,11 +121,11 @@ def pprun(
             ranks=[get_total_rank(g_mp_rank, i) for i in range(C.dp_size)],
             backend="nccl",
         )
-    # for g_dp_rank in range(C.dp_size):
-    #     process_groups["pipe"][g_dp_rank] = dist.new_group(
-    #         ranks=[get_total_rank(i, g_dp_rank) for i in range(C.mp_size)],
-    #         backend="nccl",
-    #     )
+    for g_dp_rank in range(C.dp_size):
+        process_groups["pipe"][g_dp_rank] = dist.new_group(
+            ranks=[get_total_rank(i, g_dp_rank) for i in range(C.mp_size)],
+            backend="nccl",
+        )
     for g_dp_rank in range(C.dp_size):
         for g_mp_rank in range(C.mp_size):
             process_groups["stage_links"][g_dp_rank][g_mp_rank] = dist.new_group(
@@ -135,7 +135,7 @@ def pprun(
                 ],
                 backend="nccl",
             )
-    # pipe_group = process_groups["pipe"][dp_rank]
+    pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
     bwd_group = process_groups["stage_links"][dp_rank][(C.mp_size + mp_rank - 1) % C.mp_size]
@@ -160,6 +160,7 @@ def pprun(
         num_batches[0] = batches.shape[0]
 
     dist.broadcast(num_batches, src=get_total_rank(0, 0))
+
     num_batches = num_batches.item()
 
     start = time()
@@ -168,6 +169,7 @@ def pprun(
     print("num_batches", num_batches, mp_rank, dp_rank)
     for batch_num in range(num_batches):
         dist.barrier()
+        t.cuda.synchronize(device)  # done using global group
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
             pipe_batches = batches[batch_num].to(device)
@@ -175,6 +177,7 @@ def pprun(
 
             # send batch Ys to the end so it can calculate loss
             dist.broadcast(pipe_batches, src=total_rank, group=bwd_group)
+            t.cuda.synchronize(device)  # done using bwd group
 
             for i, microbatch in enumerate(pipe_batches):
                 with t.autocast(
@@ -185,6 +188,7 @@ def pprun(
                     out = model(microbatch.long().to(device))  # all the gpu action
                 out_tensors.append(out)
                 dist.broadcast(out, src=total_rank, group=fwd_group)
+
             grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
             grad_recvs = [
                 dist.broadcast(
@@ -202,24 +206,21 @@ def pprun(
                 out_tensor.backward(grad_buffer)
                 # release out tensor memory after each backward minibatch
                 out_tensors[i] = None
+            t.cuda.synchronize(device)  # done using fwd group
         elif mp_rank != C.mp_size - 1:
-            forward_sends = []
             out_tensors = []
             xs = []
             backward_sends = []
             xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
-            xjobs = [
-                dist.broadcast(
-                    x,
-                    src=get_total_rank(mp_rank - 1, dp_rank),
-                    group=bwd_group,
-                    async_op=True,
-                )
-                for i, x in enumerate(xs)
-            ]
 
             for microbatch_num in range(C.pipe_width):
-                xjobs[microbatch_num].wait()
+                dist.broadcast(
+                    xs[microbatch_num],
+                    src=get_total_rank(mp_rank - 1, dp_rank),
+                    group=bwd_group,
+                )
+                t.cuda.synchronize(device)  # done using bwd group
+
                 x_buffer = xs[microbatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
@@ -231,16 +232,15 @@ def pprun(
                 xs.append(x_buffer)
                 out_tensors.append(out)
                 dist.broadcast(out, src=total_rank, group=fwd_group)
+                t.cuda.synchronize(device)  # done using fwd group
             grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
-            grad_recvs = [
+            for i, (out_tensor, x) in enumerate(zip(out_tensors, xs)):
                 dist.broadcast(
                     x,
                     src=get_total_rank(mp_rank + 1, dp_rank),
                     group=fwd_group,
                 )
-                for i, x in enumerate(grad_buffers)
-            ]
-            for i, (out_tensor, x) in enumerate(zip(out_tensors, xs)):
+                t.cuda.synchronize(device)  # done using fwd group
                 grad_buffer = grad_buffers[i]
                 out_tensor.backward(grad_buffer)
                 xgrad = x.grad
@@ -249,6 +249,7 @@ def pprun(
                     src=total_rank,
                     group=bwd_group,
                 )
+                t.cuda.synchronize(device)  # done using bwd group
                 xs[i] = None
                 out_tensors[i] = None
 
@@ -258,6 +259,8 @@ def pprun(
             backward_sends = []
             ys = [t.zeros(C.microbatch_size, C.seq_len, device=device) for _ in range(C.pipe_width)]
             yjobs = [dist.broadcast(y, get_total_rank(0, dp_rank), group=fwd_group) for i, y in enumerate(ys)]
+            t.cuda.synchronize(device)  # done using fwd group
+
             xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
             xjobs = [
                 dist.broadcast(
@@ -296,7 +299,7 @@ def pprun(
                 backward_sends.append(dist.broadcast(xgrad, src=total_rank, group=bwd_group))
                 losses[i] = None
                 xs[i] = None
-
+        t.cuda.synchronize(device)
         # average grad
         reduce_ops = [
             dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
@@ -304,6 +307,7 @@ def pprun(
         ]
         for op in reduce_ops:
             op.wait()
+        t.cuda.synchronize(device)  # done using stage group
 
         optimizer.step()
         optimizer.zero_grad()
