@@ -16,6 +16,7 @@ import json
 import subprocess
 import itertools
 from einops import rearrange
+import random
 
 # Pipeline parallel and data parallel at once
 
@@ -36,15 +37,16 @@ class Config:
     dp_size = 2
     mp_size = 6
     model_file_prefix = "gpt-j-6b"
-    data_file_prefix = "lw_tensor"
     y_shape = (1024,)
     dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
     dist_backend = "nccl"
     use_autocast = True
     pipe_width = 4
-    checkpoint_every_m = 10
+    checkpoint_every_m = 5
     use_cpu = False
     sharded_optimizer = True
+
+    lr = 1e-5
 
     total_size = None
     stage_dp_sizes_cum = None
@@ -74,11 +76,12 @@ def load_data():
 
     print("loading data")
     tensor_path = "/home/ubuntu/lw.pt"
-    if os.path.exists(tensor_path):
+    if os.path.exists(tensor_path) and False:
         tokens = t.load(tensor_path)
     else:
         lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
         texts = [x["text"] for x in lw_json]
+        random.shuffle(texts)
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
         tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2", TOKENIZERS_PARALLELISM=True)
         # eot_id = tokenizer("<|endoftext|>")["input_ids"][0]
@@ -91,6 +94,20 @@ def load_data():
 
         t.save(tokens, tensor_path)
     return tokens
+
+
+def model_params_to_buckets(model, n_buckets):
+    target_params_per = sum([x.numel() for x in model.parameters()]) // n_buckets
+    buckets = []
+    bucket_size = 0
+    for param in model.parameters():
+        if len(buckets) < n_buckets and param.numel() + bucket_size > target_params_per:
+            buckets.append([])
+            buckets[-1].append(param)
+        else:
+            buckets[-1].append(param)
+    print("bucket sizes", [sum([x.numel() for x in b]) for b in buckets])
+    return buckets
 
 
 def get_total_rank(mp_rank, dp_rank):
@@ -150,8 +167,11 @@ def pprun(
     model: nn.Module = t.load(model_part_fname)
     model.train()
     model.to(device)
-
-    optimizer = t.optim.SGD(model.parameters(), lr=1e-4 / C.dp_size)  # TODO switch to sharded optimizer adam
+    if C.sharded_optimizer:
+        param_buckets = model_params_to_buckets(model, C.dp_size)
+        optimizer = t.optim.AdamW(param_buckets[dp_rank], lr=C.lr / C.dp_size)
+    else:
+        optimizer = t.optim.SGD(model.parameters(), lr=C.lr / C.dp_size)
 
     print("model loaded", mp_rank, dp_rank)
     num_batches = t.IntTensor([0]).to(device)
@@ -301,16 +321,31 @@ def pprun(
                 losses[i] = None
                 xs[i] = None
         sinc()
-        # average grad
-        # reduce_ops = [
-        #     dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
-        #     for param in model.parameters()
-        # ]
-        # for op in reduce_ops:
-        #     op.wait()
-        sinc()  # done using stage group
+        if C.sharded_optimizer:
+            reduce_ops = []
+            for i, bucket in enumerate(param_buckets):
+                for param in bucket:
+                    reduce_ops.append(dist.reduce(param.grad, get_total_rank(mp_rank, i), async_op=True))
+            for op in reduce_ops:
+                op.wait()
 
-        # optimizer.step()
+            optimizer.step()
+
+            reduce_ops = []
+            for i, bucket in enumerate(param_buckets):
+                for param in bucket:
+                    reduce_ops.append(dist.broadcast(param, get_total_rank(mp_rank, i), async_op=True))
+            for op in reduce_ops:
+                op.wait()
+        else:
+            reduce_ops = [
+                dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
+                for param in model.parameters()
+            ]
+            for op in reduce_ops:
+                op.wait()
+            optimizer.step()
+        sinc()  # done using stage group
         optimizer.zero_grad()
         if time.time() - last_checkpoint_time > 60 * C.checkpoint_every_m:
             last_checkpoint_time = time.time()
