@@ -373,7 +373,8 @@ def start_cluster():  # does gin add the arguments here? crazy
                 )
             )
             print("started process", mp_rank, dp_rank)
-                for proc in remote_procs:
+
+    for proc in remote_procs:
         proc.wait()
 
 
