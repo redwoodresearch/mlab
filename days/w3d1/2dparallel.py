@@ -80,7 +80,7 @@ def load_data():
         tokens = t.load(tensor_path)
     else:
         lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
-        texts = [x["text"] for x in lw_json]
+        texts = [f'{x["karma"]}\n{x["title"]}\n{x["text"].replace("\n\n","\n")}' for x in lw_json]
         random.shuffle(texts)
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
         tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2", TOKENIZERS_PARALLELISM=True)
@@ -138,7 +138,7 @@ def pprun(
     from datetime import timedelta
 
     dist.init_process_group(
-        backend=C.dist_backend, rank=total_rank, world_size=C.total_size, timeout=timedelta(seconds=15)
+        backend=C.dist_backend, rank=total_rank, world_size=C.total_size, timeout=timedelta(seconds=90)
     )
     process_groups = {
         "stage": [None for _ in range(C.mp_size)],
