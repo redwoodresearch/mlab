@@ -2,6 +2,7 @@ import web_pdb
 import sys
 import os
 
+os.environ["NCCL_BLOCKING_WAIT"] = "1"
 # os.environ["NCCL_DEBUG"] = "INFO"
 if False and len(sys.argv) > 2:
     myport = 5555 + int(sys.argv[4])
@@ -111,7 +112,11 @@ def pprun(
     # start all our fucking process groups!
     os.environ["MASTER_ADDR"] = C.master_addr
     os.environ["MASTER_PORT"] = C.master_port
-    dist.init_process_group(backend=C.dist_backend, rank=total_rank, world_size=C.total_size)
+    from datetime import timedelta
+
+    dist.init_process_group(
+        backend=C.dist_backend, rank=total_rank, world_size=C.total_size, timeout=timedelta(seconds=15)
+    )
     process_groups = {
         "stage": [None for _ in range(C.mp_size)],
         "pipe": [None for _ in range(C.dp_size)],
