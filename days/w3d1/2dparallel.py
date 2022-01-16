@@ -17,7 +17,7 @@ import time
 import json
 import subprocess
 import itertools
-
+from einops import rearrange
 
 # Pipeline parallel and data parallel at once
 
@@ -279,7 +279,10 @@ def pprun(
                     enabled=C.use_autocast,
                 ):  # save memory by computing with less precision
                     out = model(x_buffer.to(device))
-                cur_loss = nn.CrossEntropyLoss()(out.float()[:, :-1], ys[microbatch_num][:, 1:])
+                cur_loss = nn.CrossEntropyLoss()(
+                    rearrange(out[:, :-1], "a b c -> (a b) c"),
+                    rearrange(ys[microbatch_num][:, 1:], "a b -> (a b)"),
+                )
                 # print(cur_loss.cpu().item())
                 losses.append(cur_loss)
                 xs.append(x_buffer)
