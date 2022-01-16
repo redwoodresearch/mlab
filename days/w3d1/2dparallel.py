@@ -352,6 +352,10 @@ def pprun(
     )
 
 
+from threading import Thread
+from queue import Queue, Empty
+
+
 def start_cluster():  # does gin add the arguments here? crazy
     remote_procs = []
     os.system(f'ssh -i ~/mlab_ssh ubuntu@{C.master_addr} "fuser -k {C.master_port}/tcp"')
@@ -360,22 +364,30 @@ def start_cluster():  # does gin add the arguments here? crazy
         os.system(
             f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git fetch -q; git reset -q --hard  origin/2dp;"',
         )
+    q = Queue()
+
+    def enqueue(out, rank):
+        for line in iter(out.readline, ""):
+            q.put(f"{rank}: {line}")
+
     for mp_rank, ip in enumerate(C.stage_ips):
         for dp_rank in range(C.dp_size):
             total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
             cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank} 1>&2 4>&2"'
             print(cmd)
-            remote_procs.append(
-                subprocess.Popen(
-                    cmd,
-                    shell=True,
-                    bufsize=0,
-                )
-            )
+            proc = subprocess.Popen(cmd, shell=True, bufsize=0, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            remote_procs.append(proc)
+            t = Thread(target=enqueue, args=(proc.stdout, mp_rank))
+            t.daemon = True
+            t.start()
             print("started process", mp_rank, dp_rank)
 
-    for proc in remote_procs:
-        proc.wait()
+    while 1:
+        try:
+            line = q.get(timeout=0.5)
+            print(line)
+        except Empty:
+            pass
 
 
 # 2,8 produces 0.18 time units and final loss of 0.10 (noisy)
