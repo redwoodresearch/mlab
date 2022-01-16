@@ -3,7 +3,7 @@ import web_pdb
 import sys
 import os
 
-os.environ["NCCL_BLOCKING_WAIT"] = "1"
+# os.environ["NCCL_BLOCKING_WAIT"] = "1"
 # os.environ["NCCL_DEBUG"] = "INFO"
 if False and len(sys.argv) > 2:
     myport = 5555 + int(sys.argv[4])
