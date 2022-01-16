@@ -5,10 +5,7 @@ import os
 
 # os.environ["NCCL_BLOCKING_WAIT"] = "1"
 # os.environ["NCCL_DEBUG"] = "INFO"
-if False and len(sys.argv) > 2:
-    myport = 5555 + int(sys.argv[4])
-    os.system(f"fuser -k {myport}/tcp")
-    web_pdb.set_trace(port=myport)
+
 from dataclasses import dataclass
 
 from torch import nn
@@ -112,6 +109,7 @@ def pprun(
 
     def sinc():
         if not C.use_cpu:
+            return
             t.cuda.synchronize(device)
 
     # start all our fucking process groups!
@@ -182,7 +180,6 @@ def pprun(
     for batch_num in range(num_batches):
         dist.barrier()
         sinc()  # done using global group
-        print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
             pipe_batches = batches[batch_num].long().to(device)
             out_tensors = []
