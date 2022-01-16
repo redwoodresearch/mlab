@@ -17,12 +17,12 @@ class HFBlockSequence(nn.Module):
 
 
 def make_gptj_and_save_pieces(chunks=[4, 5, 5, 5, 5, 4]):
-    print("Saving model into chunks: {chunks}")
+    print(f"Saving model into chunks: {chunks}")
     import transformers
 
     model_lm = transformers.AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
     model = model_lm.transformer
-    num_layers = len(model)
+    num_layers = len(model.h)
     assert num_layers == 28
     # less at ends due to embeddings/unembed
     assert sum(chunks) == num_layers
