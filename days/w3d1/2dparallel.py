@@ -76,11 +76,11 @@ def load_data():
 
     print("loading data")
     tensor_path = "/home/ubuntu/lw.pt"
-    if os.path.exists(tensor_path) and False:
+    if os.path.exists(tensor_path):
         tokens = t.load(tensor_path)
     else:
         lw_json = json.load(open("/home/ubuntu/lw_corpus.json"))
-        texts = [f'{x["karma"]}\n{x["title"]}\n{x["text"]}' for x in lw_json]
+        texts = [f'{x["karma"]}\n{x["text"]}' for x in lw_json]
         random.shuffle(texts)
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
         tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2", TOKENIZERS_PARALLELISM=True)
