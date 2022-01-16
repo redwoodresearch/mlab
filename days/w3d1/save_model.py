@@ -1,5 +1,6 @@
 import torch as t
 from torch import nn
+import os
 
 # HuggingFace models return tuples in the middle (things like activation patterns), thus the [0]
 
@@ -31,5 +32,11 @@ def make_gptj_and_save_pieces(chunks=[4, 5, 5, 5, 5, 4]):
     models[0] = nn.Sequential(model.wte, model.drop, models[0])
     models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head)
     for i, model_part in enumerate(models):
-        t.save(model_part, f"gpt-j-6b_part{i}.pt")
+        path = os.path.abspath(f"gpt-j-6b_part{i}.pt")
+        print(f"Saving model part {i} to {path}")
+        t.save(model_part, path)
     return models
+
+
+if __name__ == "__main__":
+    make_gptj_and_save_pieces()
