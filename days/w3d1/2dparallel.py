@@ -189,7 +189,7 @@ def pprun(
                 dist.broadcast(
                     x,
                     src=get_total_rank(mp_rank + 1, dp_rank),
-                    group=bwd_group,
+                    group=fwd_group,
                     async_op=True,
                 )
                 for i, x in enumerate(grad_buffers)
