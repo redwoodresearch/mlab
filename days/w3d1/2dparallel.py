@@ -31,7 +31,7 @@ class Config:
     stage_dp_cuda_ids = [[0, 1], [2, 3], [0, 1], [2, 3], [0, 1], [2, 3]]
     model_in_shapes = [(1024,), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096)]
 
-    microbatch_size = 2
+    microbatch_size = 4
     seq_len = 1024
     master_addr = "104.171.200.117"
     master_port = "29500"
@@ -41,7 +41,7 @@ class Config:
     data_file_prefix = "lw_tensor"
     y_shape = (1024,)
     dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
-    dist_backend = "nccl"
+    dist_backend = "gloo"
     use_autocast = True
     pipe_width = 2
     checkpoint_every_m = 10
@@ -176,8 +176,6 @@ def pprun(
     print("num_batches", num_batches, mp_rank, dp_rank)
     for batch_num in range(num_batches):
         dist.barrier()
-        print("hello")
-        time.sleep(10)
         sinc()  # done using global group
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
