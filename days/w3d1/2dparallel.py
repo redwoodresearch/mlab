@@ -41,11 +41,11 @@ class Config:
     data_file_prefix = "lw_tensor"
     y_shape = (1024,)
     dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
-    dist_backend = "nccl"
+    dist_backend = "gloo"
     use_autocast = True
     pipe_width = 1
     checkpoint_every_m = 10
-    use_cpu = False
+    use_cpu = True
 
     total_size = None
     stage_dp_sizes_cum = None
@@ -125,12 +125,10 @@ def pprun(
     for g_mp_rank in range(C.mp_size):
         process_groups["stage"][g_mp_rank] = dist.new_group(
             ranks=[get_total_rank(g_mp_rank, i) for i in range(C.dp_size)],
-            backend="nccl",
         )
     for g_dp_rank in range(C.dp_size):
         process_groups["pipe"][g_dp_rank] = dist.new_group(
             ranks=[get_total_rank(i, g_dp_rank) for i in range(C.mp_size)],
-            backend="nccl",
         )
     for g_dp_rank in range(C.dp_size):
         for g_mp_rank in range(C.mp_size):
@@ -139,7 +137,6 @@ def pprun(
                     get_total_rank(g_mp_rank, g_dp_rank),
                     get_total_rank((g_mp_rank + 1) % C.mp_size, g_dp_rank),
                 ],
-                backend="nccl",
             )
     pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
