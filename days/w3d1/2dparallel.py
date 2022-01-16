@@ -163,8 +163,6 @@ def pprun(
             C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len
         )
         batches = batches[dp_rank]
-        print("bshape", batches.shape, dp_rank)
-        raise AssertionError("hi")
         total_examples = batches.shape[0] * batches.shape[1] * batches.shape[2]
         num_batches[0] = batches.shape[0]
 
