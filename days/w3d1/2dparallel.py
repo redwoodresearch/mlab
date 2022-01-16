@@ -27,7 +27,7 @@ import itertools
 class Config:
     stage_ips = [f"ubuntu@104.171.200.{x}" for x in [117, 117, 214, 214, 196, 196]]
     stage_dp_cuda_ids = [[0, 1], [2, 3], [0, 1], [2, 3], [0, 1], [2, 3]]
-    model_in_shapes = [(1024,), (1024, 4096), (1024, 4096), (1024, 4096)]
+    model_in_shapes = [(1024,), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096)]
 
     microbatch_size = 1
     seq_len = 1024
@@ -206,7 +206,7 @@ def pprun(
             out_tensors = []
             xs = []
             backward_sends = []
-            xs = [t.zeros(C.microbatch_size, *C.model_in_shape, device=device) for _ in range(C.pipe_width)]
+            xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
             xjobs = [
                 dist.broadcast(
                     x,
@@ -257,7 +257,7 @@ def pprun(
             backward_sends = []
             ys = [t.zeros(C.microbatch_size, C.seq_len, device=device) for _ in range(C.pipe_width)]
             yjobs = [dist.broadcast(y, get_total_rank(0, dp_rank), group=fwd_group) for i, y in enumerate(ys)]
-            xs = [t.zeros(C.microbatch_size, *C.model_in_shape[mp_rank], device=device) for _ in range(C.pipe_width)]
+            xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
             xjobs = [
                 dist.broadcast(
                     x,
