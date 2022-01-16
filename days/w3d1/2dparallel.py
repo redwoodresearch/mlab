@@ -166,6 +166,7 @@ def pprun(
         num_batches[0] = batches.shape[0]
 
     dist.broadcast(num_batches, src=get_total_rank(0, 0))
+    raise AssertionError("hi")
     num_batches = num_batches.item()
 
     start = time()
