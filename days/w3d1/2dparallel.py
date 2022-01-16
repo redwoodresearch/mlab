@@ -31,7 +31,7 @@ class Config:
     stage_dp_cuda_ids = [[0, 1], [2, 3], [0, 1], [2, 3], [0, 1], [2, 3]]
     model_in_shapes = [(1024,), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096)]
 
-    microbatch_size = 1
+    microbatch_size = 2
     seq_len = 1024
     master_addr = "104.171.200.117"
     master_port = "29500"
@@ -41,9 +41,9 @@ class Config:
     data_file_prefix = "lw_tensor"
     y_shape = (1024,)
     dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
-    dist_backend = "gloo"
+    dist_backend = "nccl"
     use_autocast = True
-    pipe_width = 1
+    pipe_width = 2
     checkpoint_every_m = 10
     use_cpu = False
 
