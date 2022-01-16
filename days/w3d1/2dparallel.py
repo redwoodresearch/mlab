@@ -302,12 +302,12 @@ def pprun(
                 xs[i] = None
         sinc()
         # average grad
-        reduce_ops = [
-            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
-            for param in model.parameters()
-        ]
-        for op in reduce_ops:
-            op.wait()
+        # reduce_ops = [
+        #     dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
+        #     for param in model.parameters()
+        # ]
+        # for op in reduce_ops:
+        #     op.wait()
         sinc()  # done using stage group
 
         optimizer.step()
