@@ -1,14 +1,15 @@
 import web_pdb
 import sys
+import os
 
 if len(sys.argv) > 2:
-    web_pdb.set_trace(port=5555 + int(sys.argv[4]))
+    myport = 5555 + int(sys.argv[4])
+    os.system(f"fuser -k {myport}/tcp")
+    web_pdb.set_trace(port=myport)
 from dataclasses import dataclass
 
 from torch import nn
-import os
 import torch.distributed as dist
-import sys
 import torch as t
 from time import time
 import json
