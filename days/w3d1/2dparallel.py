@@ -327,7 +327,9 @@ def pprun(
             reduce_ops = []
             for i, bucket in enumerate(param_buckets):
                 for param in bucket:
-                    reduce_ops.append(dist.reduce(param.grad, get_total_rank(mp_rank, i), async_op=True))
+                    reduce_ops.append(
+                        dist.reduce(param.grad, get_total_rank(mp_rank, i), group=stage_group, async_op=True)
+                    )
             for op in reduce_ops:
                 op.wait()
 
@@ -336,7 +338,9 @@ def pprun(
             reduce_ops = []
             for i, bucket in enumerate(param_buckets):
                 for param in bucket:
-                    reduce_ops.append(dist.broadcast(param, get_total_rank(mp_rank, i), async_op=True))
+                    reduce_ops.append(
+                        dist.broadcast(param, get_total_rank(mp_rank, i), group=stage_group, async_op=True)
+                    )
             for op in reduce_ops:
                 op.wait()
         else:
