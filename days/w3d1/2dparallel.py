@@ -166,14 +166,15 @@ def pprun(
         num_batches[0] = batches.shape[0]
 
     dist.broadcast(num_batches, src=get_total_rank(0, 0))
-    raise AssertionError("hi")
     num_batches = num_batches.item()
 
     start = time()
     batch_start = time()
     last_checkpoint_time = time()
+    print("num_batches", num_batches, mp_rank, dp_rank)
     for batch_num in range(num_batches):
         dist.barrier()
+        raise AssertionError("hi")
         print("crossed barrier", mp_rank, dp_rank)
         if mp_rank == 0:
             pipe_batches = batches[batch_num].to(device)
