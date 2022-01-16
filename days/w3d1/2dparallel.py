@@ -380,6 +380,7 @@ def start_cluster():  # does gin add the arguments here? crazy
 if __name__ == "__main__":
     import hashlib
 
+    os.system("touch ~/touchfile")
     thisfile = __file__
     tfh = hashlib.md5(open(thisfile, "rb").read()).hexdigest()
     print("file hash", tfh)
