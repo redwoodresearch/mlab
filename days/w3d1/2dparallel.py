@@ -123,6 +123,12 @@ def pprun(
     dp_rank,
     total_rank,
 ):
+    if True:
+        experiment = Experiment(
+            api_key="vABV7zo6pqS7lfzZBhyabU2Xe",
+            project_name="jan15-2dp",
+            workspace="redwood",
+        )
     autocast_type = t.bfloat16 if C.use_cpu else t.float16
     device = "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
 
@@ -130,6 +136,17 @@ def pprun(
         if not C.use_cpu:
             t.cuda.synchronize(device)
             return
+
+    class Timed:
+        def __init__(self, name):
+            self.experiment = experiment
+            self.name = name
+
+        def __enter__(self):
+            self.stime = time.time()
+
+        def __exit__(self):
+            self.experiment.log_metric(self.name, time.time() - self.stime)
 
     # start all our fucking process groups!
     os.environ["MASTER_ADDR"] = C.master_addr
@@ -197,17 +214,14 @@ def pprun(
     dist.broadcast(num_batches, src=get_total_rank(0, 0))
 
     num_batches = num_batches.item()
-    if total_rank == 11:
-        experiment = Experiment(
-            api_key="vABV7zo6pqS7lfzZBhyabU2Xe",
-            project_name="jan15-2dp",
-        )
+
     start = time.time()
     batch_start = time.time()
     last_checkpoint_time = time.time()
     print("num_batches", num_batches, mp_rank, dp_rank)
     for batch_num in range(num_batches):
-        dist.barrier()
+        with Timed("batch_start_barrier"):
+            dist.barrier()
         sinc()  # done using global group
         if mp_rank == 0:
             pipe_batches = batches[batch_num].long().to(device)
@@ -245,21 +259,23 @@ def pprun(
             xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
 
             for microbatch_num in range(C.pipe_width):
-                dist.broadcast(
-                    xs[microbatch_num],
-                    src=get_total_rank(mp_rank - 1, dp_rank),
-                    group=bwd_group,
-                )
+                with Timed("mid_recv_act"):
+                    dist.broadcast(
+                        xs[microbatch_num],
+                        src=get_total_rank(mp_rank - 1, dp_rank),
+                        group=bwd_group,
+                    )
                 sinc()  # done using bwd group
 
                 x_buffer = xs[microbatch_num]
                 x_buffer.requires_grad = True
-                with t.autocast(
-                    dtype=autocast_type,
-                    device_type=C.device_type,
-                    enabled=C.use_autocast,
-                ):
-                    out = model(x_buffer.to(device)).float()
+                with Timed("mid_run"):
+                    with t.autocast(
+                        dtype=autocast_type,
+                        device_type=C.device_type,
+                        enabled=C.use_autocast,
+                    ):
+                        out = model(x_buffer.to(device)).float()
                 xs.append(x_buffer)
                 out_tensors.append(out)
                 dist.broadcast(out, src=total_rank, group=fwd_group)
@@ -332,24 +348,27 @@ def pprun(
         sinc()
         if C.sharded_optimizer:
             reduce_ops = []
-            for i, bucket in enumerate(param_buckets):
-                for param in bucket:
-                    reduce_ops.append(
-                        dist.reduce(param.grad, get_total_rank(mp_rank, i), group=stage_group, async_op=True)
-                    )
-            for op in reduce_ops:
-                op.wait()
+            with Timed("param_reduce"):
+                for i, bucket in enumerate(param_buckets):
+                    for param in bucket:
+                        reduce_ops.append(
+                            dist.reduce(param.grad, get_total_rank(mp_rank, i), group=stage_group, async_op=True)
+                        )
+                for op in reduce_ops:
+                    op.wait()
+            with Timed("step"):
+                optimizer.step()
 
-            optimizer.step()
+            with Timed("param_broadcast"):
+                reduce_ops = []
+                for i, bucket in enumerate(param_buckets):
+                    for param in bucket:
+                        reduce_ops.append(
+                            dist.broadcast(param, get_total_rank(mp_rank, i), group=stage_group, async_op=True)
+                        )
+                for op in reduce_ops:
+                    op.wait()
 
-            reduce_ops = []
-            for i, bucket in enumerate(param_buckets):
-                for param in bucket:
-                    reduce_ops.append(
-                        dist.broadcast(param, get_total_rank(mp_rank, i), group=stage_group, async_op=True)
-                    )
-            for op in reduce_ops:
-                op.wait()
         else:
             reduce_ops = [
                 dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
