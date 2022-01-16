@@ -142,10 +142,10 @@ def pprun(
             self.experiment = experiment
             self.name = name
 
-        def __enter__(self):
+        def __enter__(self, *args, **kwargs):
             self.stime = time.time()
 
-        def __exit__(self):
+        def __exit__(self, *args, **kwargs):
             self.experiment.log_metric(self.name, time.time() - self.stime)
 
     # start all our fucking process groups!
