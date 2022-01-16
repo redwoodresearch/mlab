@@ -2,7 +2,7 @@ import web_pdb
 import sys
 import os
 
-os.environ["NCCL_DEBUG"] = "INFO"
+# os.environ["NCCL_DEBUG"] = "INFO"
 if False and len(sys.argv) > 2:
     myport = 5555 + int(sys.argv[4])
     os.system(f"fuser -k {myport}/tcp")
@@ -193,18 +193,12 @@ def pprun(
                 dist.broadcast(out, src=total_rank, group=fwd_group)
 
             grad_buffers = [t.zeros_like(out) for _ in range(C.pipe_width)]
-            grad_recvs = [
+            for i, out_tensor in enumerate(out_tensors):
                 dist.broadcast(
-                    x,
+                    grad_buffers[i],
                     src=get_total_rank(mp_rank + 1, dp_rank),
                     group=fwd_group,
-                    async_op=True,
                 )
-                for i, x in enumerate(grad_buffers)
-            ]
-            grad_buffer = t.zeros_like(out)
-            for i, out_tensor in enumerate(out_tensors):
-                grad_recvs[i].wait()
                 grad_buffer = grad_buffers[i]
                 out_tensor.backward(grad_buffer)
                 # release out tensor memory after each backward minibatch
@@ -265,17 +259,12 @@ def pprun(
             t.cuda.synchronize(device)  # done using fwd group
 
             xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
-            xjobs = [
+            for microbatch_num in range(C.pipe_width):
                 dist.broadcast(
-                    x,
+                    xs[microbatch_num],
                     get_total_rank(mp_rank - 1, dp_rank),
                     group=bwd_group,
-                    async_op=True,
                 )
-                for i, x in enumerate(xs)
-            ]
-            for microbatch_num in range(C.pipe_width):
-                xjobs[microbatch_num].wait()
                 x_buffer = xs[microbatch_num]
                 x_buffer.requires_grad = True
                 with t.autocast(
@@ -305,11 +294,10 @@ def pprun(
         t.cuda.synchronize(device)
         # average grad
         reduce_ops = [
-            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
-            for param in model.parameters()
+            dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group) for param in model.parameters()
         ]
-        for op in reduce_ops:
-            op.wait()
+        # for op in reduce_ops:
+        #     op.wait()
         t.cuda.synchronize(device)  # done using stage group
 
         optimizer.step()
