@@ -141,7 +141,6 @@ def pprun(
         "stage_links": [[None for _ in range(C.mp_size)] for _ in range(C.dp_size)],
     }
     print("initing subgroups", mp_rank, dp_rank)
-    raise AssertionError("hi")
     for g_mp_rank in range(C.mp_size):
         process_groups["stage"][g_mp_rank] = dist.new_group(
             ranks=[get_total_rank(g_mp_rank, i) for i in range(C.dp_size)],
@@ -161,6 +160,7 @@ def pprun(
                 ],
                 backend="nccl",
             )
+    raise AssertionError("hi")
     pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
