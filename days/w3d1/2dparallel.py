@@ -183,10 +183,13 @@ def pprun(
     num_batches = t.IntTensor([0]).to(device)
     if mp_rank == 0:
         dataset = load_data()
+
         # each loads all data then takes its dp slice
         batches = dataset[: -(dataset.shape[0] % (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len))].reshape(
-            C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len
+            -1, C.seq_len
         )
+        batches = batches[t.randperm(batches.shape[0])]
+        batches = batches.reshape(C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len)
         batches = batches[dp_rank]
         total_examples = batches.shape[0] * batches.shape[1] * batches.shape[2]
         num_batches[0] = batches.shape[0]
