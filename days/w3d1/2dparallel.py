@@ -146,11 +146,11 @@ def pprun(
             ranks=[get_total_rank(g_mp_rank, i) for i in range(C.dp_size)],
             backend="nccl",
         )
-    for g_dp_rank in range(C.dp_size):
-        process_groups["pipe"][g_dp_rank] = dist.new_group(
-            ranks=[get_total_rank(i, g_dp_rank) for i in range(C.mp_size)],
-            backend="nccl",
-        )
+    # for g_dp_rank in range(C.dp_size):
+    #     process_groups["pipe"][g_dp_rank] = dist.new_group(
+    #         ranks=[get_total_rank(i, g_dp_rank) for i in range(C.mp_size)],
+    #         backend="nccl",
+    #     )
     for g_dp_rank in range(C.dp_size):
         for g_mp_rank in range(mp_rank):
             process_groups["stage_links"][g_dp_rank][g_mp_rank] = dist.new_group(
@@ -161,7 +161,7 @@ def pprun(
                 backend="nccl",
             )
     raise AssertionError("hi")
-    pipe_group = process_groups["pipe"][dp_rank]
+    # pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
     bwd_group = process_groups["stage_links"][dp_rank][(C.mp_size + mp_rank - 1) % C.mp_size]
