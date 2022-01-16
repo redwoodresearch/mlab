@@ -351,7 +351,7 @@ def start_cluster():  # does gin add the arguments here? crazy
     unique_name = str(int(time() * 10))
     for ip in set(C.stage_ips):
         os.system(
-            f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git fetch; git reset --hard  origin/2dp; echo hi;"',
+            f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; git fetch -q; git reset -q --hard  origin/2dp;"',
         )
     for mp_rank, ip in enumerate(C.stage_ips):
         for dp_rank in range(C.dp_size):
@@ -361,6 +361,10 @@ def start_cluster():  # does gin add the arguments here? crazy
                     f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank}"',
                     shell=True,
                 )
+            )
+            subprocess.Popen(
+                f"echo sp",
+                shell=True,
             )
             print("started process", mp_rank, dp_rank)
     for proc in remote_procs:
@@ -382,7 +386,7 @@ if __name__ == "__main__":
 
     thisfile = __file__
     tfh = hashlib.md5(open(thisfile, "rb").read()).hexdigest()
-    print("thisfile hash", tfh)
+    print("file hash", tfh)
     # make_gptj_and_save_pieces()
     if sys.argv[1] == "orchestrate":
         print(
