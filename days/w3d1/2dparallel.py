@@ -394,7 +394,8 @@ def pprun(
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             with open(filename, "wb") as f:  # added this
                 t.save(model, f)
-                os.system(f"scp -i ~/mlab_ssh {filename} {C.master_addr}:/home/ubuntu/mlab/{filename}")
+                print("copying to master")
+                os.system(f"scp -i ~/mlab_ssh {filename} ubuntu@{C.master_addr}:/home/ubuntu/mlab/{filename}")
     end = time.time()
     print(
         f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {mp_rank}"
@@ -407,7 +408,8 @@ from queue import Queue, Empty
 
 def git_pull(ip):
     os.system(
-        f'scp -i ~/mlab_ssh ~/mlab_ssh {ip}:/home/ubuntu/mlab_ssh; ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "pkill python; cd mlab; git fetch -q; git reset -q --hard  origin/2dp; chmod 700 ~/mlab_ssh"',
+        # scp -i ~/mlab_ssh ~/mlab_ssh {ip}:/home/ubuntu/mlab_ssh;
+        f' ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "pkill python; cd mlab; git fetch -q; git reset -q --hard  origin/2dp; chmod 700 ~/mlab_ssh"',
     )
 
 
