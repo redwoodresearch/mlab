@@ -20,6 +20,7 @@ import random
 from typing import *
 
 # Answer to calculation question
+# In the forwards pass, each gpu does M work, and is idle for (S-1) time. Same is true for the backwards pass, but times 2.
 # time spend idle: (n_stages)*(n_stages-1)*3
 # total processor-time: n_stages*(n_microbatches*3+n_stages*3-3)
 
@@ -72,11 +73,7 @@ class Config:
     stage_dp_sizes_cum = None
 
     def __init__(self):
-        self.stage_dp_sizes_cum = (
-            t.IntTensor([0] + [len(x) for x in self.stage_dp_cuda_ids])
-            .cumsum(0)
-            .tolist()
-        )
+        self.stage_dp_sizes_cum = t.IntTensor([0] + [len(x) for x in self.stage_dp_cuda_ids]).cumsum(0).tolist()
         self.total_size = int(self.stage_dp_sizes_cum[-1])
         self.device_type = "cpu" if self.use_cpu else "cuda"
 
@@ -107,9 +104,7 @@ def load_data():
         texts = [f'{x["karma"]}\n{x["text"]}' for x in lw_json]
         random.shuffle(texts)
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
-        tokenizer = transformers.AutoTokenizer.from_pretrained(
-            "gpt2", TOKENIZERS_PARALLELISM=True
-        )
+        tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2", TOKENIZERS_PARALLELISM=True)
         # eot_id = tokenizer("<|endoftext|>")["input_ids"][0]
         eot_id = 50256
         tokens = tokenizer(texts)["input_ids"]
@@ -161,9 +156,7 @@ def pprun(
         for k, v in asdict(C):
             experiment.log_parameter(k, v)
     autocast_type = t.bfloat16 if C.use_cpu else t.float16
-    device = (
-        "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
-    )
+    device = "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
 
     def sinc():
         if not C.use_cpu:
@@ -216,9 +209,7 @@ def pprun(
     pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
-    bwd_group = process_groups["stage_links"][dp_rank][
-        (C.mp_size + mp_rank - 1) % C.mp_size
-    ]
+    bwd_group = process_groups["stage_links"][dp_rank][(C.mp_size + mp_rank - 1) % C.mp_size]
 
     model_part_fname = f"{C.model_file_prefix}_part{mp_rank}.pt"
     model: nn.Module = t.load(model_part_fname)
@@ -245,16 +236,11 @@ def pprun(
         dataset = load_data()
 
         # each loads all data then takes its dp slice
-        batches = dataset[
-            : -(
-                dataset.shape[0]
-                % (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len)
-            )
-        ].reshape(-1, C.seq_len)
-        batches = batches[t.randperm(batches.shape[0])]
-        batches = batches.reshape(
-            C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len
+        batches = dataset[: -(dataset.shape[0] % (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len))].reshape(
+            -1, C.seq_len
         )
+        batches = batches[t.randperm(batches.shape[0])]
+        batches = batches.reshape(C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len)
         batches = batches[dp_rank]
         total_examples = batches.shape[0] * batches.shape[1] * batches.shape[2]
         num_batches[0] = batches.shape[0]
@@ -304,10 +290,7 @@ def pprun(
             out_tensors = []
             xs = []
             backward_sends = []
-            xs = [
-                t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device)
-                for _ in range(C.pipe_width)
-            ]
+            xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
 
             for microbatch_num in range(C.pipe_width):
                 with Timed("mid_recv_act"):
@@ -363,10 +346,7 @@ def pprun(
             dist.broadcast(ys, get_total_rank(0, dp_rank), group=fwd_group)
             sinc()  # done using fwd group
 
-            xs = [
-                t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device)
-                for _ in range(C.pipe_width)
-            ]
+            xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
             for microbatch_num in range(C.pipe_width):
                 dist.broadcast(
                     xs[microbatch_num],
@@ -390,9 +370,7 @@ def pprun(
                 xs.append(x_buffer)
             batch_loss = sum([x.cpu().item() for x in losses]) / len(losses)
             batch_time = time.time() - batch_start
-            tokens_per_second = (
-                C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len
-            ) // batch_time
+            tokens_per_second = (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len) // batch_time
             print(
                 "whole batch loss",
                 batch_loss,
@@ -409,9 +387,7 @@ def pprun(
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
                 xgrad = x.grad
-                backward_sends.append(
-                    dist.broadcast(xgrad, src=total_rank, group=bwd_group)
-                )
+                backward_sends.append(dist.broadcast(xgrad, src=total_rank, group=bwd_group))
                 losses[i] = None
                 xs[i] = None
         sinc()
@@ -450,9 +426,7 @@ def pprun(
 
         else:
             reduce_ops = [
-                dist.all_reduce(
-                    param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True
-                )
+                dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
                 for param in model.parameters()
             ]
             for op in reduce_ops:
@@ -468,9 +442,7 @@ def pprun(
             with open(filename, "wb") as f:  # added this
                 t.save(model, f)
                 print("copying to master")
-                os.system(
-                    f"scp -i ~/mlab_ssh {filename} ubuntu@{C.master_addr}:/home/ubuntu/mlab/{filename}"
-                )
+                os.system(f"scp -i ~/mlab_ssh {filename} ubuntu@{C.master_addr}:/home/ubuntu/mlab/{filename}")
     end = time.time()
     print(
         f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {mp_rank}"

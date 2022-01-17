@@ -22,6 +22,7 @@ def make_gptj_and_save_pieces(chunks=[4, 5, 5, 5, 5, 4]):
 
     model_lm = transformers.AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
     print("Model loaded successfully")
+    print("lm head", model_lm.lm_head)
     model = model_lm.transformer
     num_layers = len(model.h)
     assert num_layers == 28
@@ -31,7 +32,7 @@ def make_gptj_and_save_pieces(chunks=[4, 5, 5, 5, 5, 4]):
     print("cumsum", chunk_cumsum)
     models = [HFBlockSequence(*model.h[start - size : start]) for start, size in zip(chunk_cumsum, chunks)]
     models[0] = nn.Sequential(model.wte, model.drop, models[0])
-    models[-1] = nn.Sequential(models[-1], model.ln_f, model_lm.lm_head)
+    models[-1] = nn.Sequential(models[-1], model.ln_f)
     for i, model_part in enumerate(models):
         path = os.path.abspath(f"gpt-j-6b_part{i}.pt")
         print(f"Saving model part {i} to {path}")
