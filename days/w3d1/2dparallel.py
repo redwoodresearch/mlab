@@ -19,6 +19,15 @@ from einops import rearrange
 import random
 from typing import *
 
+# Answer to calculation question
+# time spend idle: (n_stages)*(n_stages-1)*3
+# total processor-time: n_stages*(n_microbatches*3+n_stages*3-3)
+
+# fraction spent idle (n_stages-1)/(n_microbatches+n_stages-1)
+# 1/3 with 2/2 manually checks out
+
+# Reasons why it might be slower:
+
 # Pipeline parallel and data parallel at once
 
 # to fix hostname lan issues add this to /etc/hosts
@@ -29,7 +38,14 @@ from typing import *
 class Config:
     stage_ips = [f"ubuntu@104.171.200.{x}" for x in [117, 117, 214, 214, 196, 196]]
     stage_dp_cuda_ids = [[0, 1], [2, 3], [0, 1], [2, 3], [0, 1], [2, 3]]
-    model_in_shapes = [(1024,), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096), (1024, 4096)]
+    model_in_shapes = [
+        (1024,),
+        (1024, 4096),
+        (1024, 4096),
+        (1024, 4096),
+        (1024, 4096),
+        (1024, 4096),
+    ]
 
     microbatch_size = 2
     seq_len = 1024
@@ -56,7 +72,11 @@ class Config:
     stage_dp_sizes_cum = None
 
     def __init__(self):
-        self.stage_dp_sizes_cum = t.IntTensor([0] + [len(x) for x in self.stage_dp_cuda_ids]).cumsum(0).tolist()
+        self.stage_dp_sizes_cum = (
+            t.IntTensor([0] + [len(x) for x in self.stage_dp_cuda_ids])
+            .cumsum(0)
+            .tolist()
+        )
         self.total_size = int(self.stage_dp_sizes_cum[-1])
         self.device_type = "cpu" if self.use_cpu else "cuda"
 
@@ -87,7 +107,9 @@ def load_data():
         texts = [f'{x["karma"]}\n{x["text"]}' for x in lw_json]
         random.shuffle(texts)
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
-        tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2", TOKENIZERS_PARALLELISM=True)
+        tokenizer = transformers.AutoTokenizer.from_pretrained(
+            "gpt2", TOKENIZERS_PARALLELISM=True
+        )
         # eot_id = tokenizer("<|endoftext|>")["input_ids"][0]
         eot_id = 50256
         tokens = tokenizer(texts)["input_ids"]
@@ -139,7 +161,9 @@ def pprun(
         for k, v in asdict(C):
             experiment.log_parameter(k, v)
     autocast_type = t.bfloat16 if C.use_cpu else t.float16
-    device = "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
+    device = (
+        "cpu" if C.use_cpu else "cuda:" + str(C.stage_dp_cuda_ids[mp_rank][dp_rank])
+    )
 
     def sinc():
         if not C.use_cpu:
@@ -163,7 +187,10 @@ def pprun(
     from datetime import timedelta
 
     dist.init_process_group(
-        backend=C.dist_backend, rank=total_rank, world_size=C.total_size, timeout=timedelta(seconds=90)
+        backend=C.dist_backend,
+        rank=total_rank,
+        world_size=C.total_size,
+        timeout=timedelta(seconds=90),
     )
     process_groups = {
         "stage": [None for _ in range(C.mp_size)],
@@ -189,7 +216,9 @@ def pprun(
     pipe_group = process_groups["pipe"][dp_rank]
     stage_group = process_groups["stage"][mp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][mp_rank]
-    bwd_group = process_groups["stage_links"][dp_rank][(C.mp_size + mp_rank - 1) % C.mp_size]
+    bwd_group = process_groups["stage_links"][dp_rank][
+        (C.mp_size + mp_rank - 1) % C.mp_size
+    ]
 
     model_part_fname = f"{C.model_file_prefix}_part{mp_rank}.pt"
     model: nn.Module = t.load(model_part_fname)
@@ -203,18 +232,29 @@ def pprun(
         # use 10% LR because that's what they use at end of training?
         # gpt3 uses 1.2e-4 at 2m batch size, 1.2e-5 at end of training, I'm using 24k tokens so I want 1e-7 lr?
         params = model.parameters()
-    optimizer = t.optim.Adam(params, lr=C.lr / C.dp_size, weight_decay=C.weight_decay, betas=C.betas, eps=1e-8)
+    optimizer = t.optim.Adam(
+        params,
+        lr=C.lr / C.dp_size,
+        weight_decay=C.weight_decay,
+        betas=C.betas,
+        eps=1e-8,
+    )
 
     num_batches = t.IntTensor([0]).to(device)
     if mp_rank == 0:
         dataset = load_data()
 
         # each loads all data then takes its dp slice
-        batches = dataset[: -(dataset.shape[0] % (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len))].reshape(
-            -1, C.seq_len
-        )
+        batches = dataset[
+            : -(
+                dataset.shape[0]
+                % (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len)
+            )
+        ].reshape(-1, C.seq_len)
         batches = batches[t.randperm(batches.shape[0])]
-        batches = batches.reshape(C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len)
+        batches = batches.reshape(
+            C.dp_size, -1, C.pipe_width, C.microbatch_size, C.seq_len
+        )
         batches = batches[dp_rank]
         total_examples = batches.shape[0] * batches.shape[1] * batches.shape[2]
         num_batches[0] = batches.shape[0]
@@ -264,7 +304,10 @@ def pprun(
             out_tensors = []
             xs = []
             backward_sends = []
-            xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
+            xs = [
+                t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device)
+                for _ in range(C.pipe_width)
+            ]
 
             for microbatch_num in range(C.pipe_width):
                 with Timed("mid_recv_act"):
@@ -312,11 +355,18 @@ def pprun(
             xs = []
             losses = []
             backward_sends = []
-            ys = t.zeros((C.pipe_width, C.microbatch_size, C.seq_len), dtype=t.int64, device=device)
+            ys = t.zeros(
+                (C.pipe_width, C.microbatch_size, C.seq_len),
+                dtype=t.int64,
+                device=device,
+            )
             dist.broadcast(ys, get_total_rank(0, dp_rank), group=fwd_group)
             sinc()  # done using fwd group
 
-            xs = [t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device) for _ in range(C.pipe_width)]
+            xs = [
+                t.zeros(C.microbatch_size, *C.model_in_shapes[mp_rank], device=device)
+                for _ in range(C.pipe_width)
+            ]
             for microbatch_num in range(C.pipe_width):
                 dist.broadcast(
                     xs[microbatch_num],
@@ -340,8 +390,17 @@ def pprun(
                 xs.append(x_buffer)
             batch_loss = sum([x.cpu().item() for x in losses]) / len(losses)
             batch_time = time.time() - batch_start
-            tokens_per_second = (C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len) // batch_time
-            print("whole batch loss", batch_loss, "took", batch_time, "tokens per second", tokens_per_second)
+            tokens_per_second = (
+                C.dp_size * C.pipe_width * C.microbatch_size * C.seq_len
+            ) // batch_time
+            print(
+                "whole batch loss",
+                batch_loss,
+                "took",
+                batch_time,
+                "tokens per second",
+                tokens_per_second,
+            )
             if total_rank == 11:
                 experiment.log_metric("batch_loss", batch_loss)
                 experiment.log_metric("batch_time", batch_time)
@@ -350,7 +409,9 @@ def pprun(
             for i, (loss, x) in enumerate(zip(losses, xs)):
                 loss.backward()
                 xgrad = x.grad
-                backward_sends.append(dist.broadcast(xgrad, src=total_rank, group=bwd_group))
+                backward_sends.append(
+                    dist.broadcast(xgrad, src=total_rank, group=bwd_group)
+                )
                 losses[i] = None
                 xs[i] = None
         sinc()
@@ -360,7 +421,12 @@ def pprun(
                 for i, bucket in enumerate(param_buckets):
                     for param in bucket:
                         reduce_ops.append(
-                            dist.reduce(param.grad, get_total_rank(mp_rank, i), group=stage_group, async_op=True)
+                            dist.reduce(
+                                param.grad,
+                                get_total_rank(mp_rank, i),
+                                group=stage_group,
+                                async_op=True,
+                            )
                         )
                 for op in reduce_ops:
                     op.wait()
@@ -372,14 +438,21 @@ def pprun(
                 for i, bucket in enumerate(param_buckets):
                     for param in bucket:
                         reduce_ops.append(
-                            dist.broadcast(param, get_total_rank(mp_rank, i), group=stage_group, async_op=True)
+                            dist.broadcast(
+                                param,
+                                get_total_rank(mp_rank, i),
+                                group=stage_group,
+                                async_op=True,
+                            )
                         )
                 for op in reduce_ops:
                     op.wait()
 
         else:
             reduce_ops = [
-                dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
+                dist.all_reduce(
+                    param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True
+                )
                 for param in model.parameters()
             ]
             for op in reduce_ops:
@@ -395,7 +468,9 @@ def pprun(
             with open(filename, "wb") as f:  # added this
                 t.save(model, f)
                 print("copying to master")
-                os.system(f"scp -i ~/mlab_ssh {filename} ubuntu@{C.master_addr}:/home/ubuntu/mlab/{filename}")
+                os.system(
+                    f"scp -i ~/mlab_ssh {filename} ubuntu@{C.master_addr}:/home/ubuntu/mlab/{filename}"
+                )
     end = time.time()
     print(
         f"Total time: {start - end}, per batch: {(start - end)/num_batches}, per example {(start - end)/total_examples}, rank {mp_rank}"
@@ -429,7 +504,14 @@ def start_cluster():  # does gin add the arguments here? crazy
         for dp_rank in range(C.dp_size):
             total_rank = C.stage_dp_sizes_cum[mp_rank] + dp_rank
             cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/2dparallel.py process {mp_rank} {dp_rank} {total_rank} 1>&2 4>&2"'
-            proc = subprocess.Popen(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr, bufsize=1, text=True)
+            proc = subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                bufsize=1,
+                text=True,
+            )
             remote_procs.append(proc)
             print("started process", mp_rank, dp_rank)
 
@@ -447,7 +529,14 @@ if __name__ == "__main__":
         for mp_rank, ip in enumerate(set(C.stage_ips)):  # only do each ip once
             git_pull(ip)
             cmd = f'ssh -o StrictHostKeyChecking=no -i ~/mlab_ssh {ip} "cd ~/mlab; python days/w3d1/save_model.py"'
-            proc = subprocess.Popen(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr, bufsize=1, text=True)
+            proc = subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                bufsize=1,
+                text=True,
+            )
             procs.append(proc)
         for proc in procs:
             proc.wait()
@@ -464,6 +553,10 @@ if __name__ == "__main__":
         )
         start_cluster()
     elif sys.argv[1] == "process":
-        pprun(mp_rank=int(sys.argv[2]), dp_rank=int(sys.argv[3]), total_rank=int(sys.argv[4]))
+        pprun(
+            mp_rank=int(sys.argv[2]),
+            dp_rank=int(sys.argv[3]),
+            total_rank=int(sys.argv[4]),
+        )
     else:
         print("ERRORIE")
