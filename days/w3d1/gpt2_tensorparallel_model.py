@@ -14,6 +14,7 @@ class GPT2TPConfig:
     max_positions = 2048
     dropout = 0.1
     pos_enc_type = "RoPE"
+    n_layers = 9
 
     tp_rank = None
     part_hidden_size = None
@@ -85,3 +86,13 @@ class GPT2LayerTP(nn.Module):
         x = x + self.attention(self.ln1(x))
         x = x + self.mlp(self.ln2(x))
         return x
+
+
+class GPT2StackTP(nn.Module):
+    def __init__(self, config: GPT2TPConfig):
+        super().__init__()
+        self.config = config
+        self.stack = nn.Sequential(*[GPT2LayerTP(config) for _ in range(config.num_layers)])
+
+    def forward(self, x):
+        return self.stack(x)
