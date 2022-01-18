@@ -175,14 +175,14 @@ def pprun(
         timeout=timedelta(seconds=90),
     )
     process_groups = {
-        "stage": [[None for _ in range(C.tp_size)] for _ in range(C.pp_size)],
+        "dp": [[None for _ in range(C.tp_size)] for _ in range(C.pp_size)],
         "tensor": [[None for _ in range(C.pp_size)] for _ in range(C.dp_size)],
         "pipe": [None for _ in range(C.dp_size)],
         "stage_links": [[None for _ in range(C.pp_size)] for _ in range(C.dp_size)],
     }
     for g_pp_rank in range(C.pp_size):
         for g_tp_rank in range(C.tp_size):
-            process_groups["stage"][g_pp_rank][g_tp_rank] = dist.new_group(
+            process_groups["dp"][g_pp_rank][g_tp_rank] = dist.new_group(
                 ranks=[get_total_rank(i, g_pp_rank, g_tp_rank) for i in range(C.dp_size)],
             )
     for g_dp_rank in range(C.dp_size):
@@ -203,7 +203,7 @@ def pprun(
 
     pipe_group = process_groups["pipe"][dp_rank]
     tensor_group = process_groups["tensor"][dp_rank][pp_rank]
-    stage_group = process_groups["stage"][pp_rank]
+    dp_group = process_groups["dp"][pp_rank]
     fwd_group = process_groups["stage_links"][dp_rank][pp_rank]
     bwd_group = process_groups["stage_links"][dp_rank][(C.pp_size + pp_rank - 1) % C.pp_size]
 
@@ -399,7 +399,7 @@ def pprun(
                             dist.reduce(
                                 param.grad,
                                 get_total_rank(pp_rank, i),
-                                group=stage_group,
+                                group=dp_group,
                                 async_op=True,
                             )
                         )
@@ -416,7 +416,7 @@ def pprun(
                             dist.broadcast(
                                 param,
                                 get_total_rank(pp_rank, i),
-                                group=stage_group,
+                                group=dp_group,
                                 async_op=True,
                             )
                         )
@@ -425,7 +425,7 @@ def pprun(
 
         else:
             reduce_ops = [
-                dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=stage_group, async_op=True)
+                dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, group=dp_group, async_op=True)
                 for param in model.parameters()
             ]
             for op in reduce_ops:
