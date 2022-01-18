@@ -167,11 +167,10 @@ def run(
                     else:
                         intermediate = t.zeros(microbatch_shape, device=DEVICE, requires_grad=True)
                         
-                    dist.broadcast(intermediate, src=0)
-                    intermediates.append(intermediate)
+                    # Don't broadcast yet! Let second stage do work before we synchronize
 
+                # Run through second stage and compute loss
                 if j != 0:
-                    # Run through second stage and compute loss
                     if rank != ZERO:
                         out = model(intermediates[j-1])
 
@@ -187,9 +186,16 @@ def run(
                     else:
                         intermediate_grad = t.zeros_like(intermediates[j-1])
 
-                    # Broadcast grads to first stage and finish backward pass
+                    # Broadcast grads to first stage
                     dist.broadcast(intermediate_grad, src=1)
 
+                # Ok, now we're synchronizing, send the next intermediate forward
+                if j < num_microbatches:
+                    dist.broadcast(intermediate, src=0)
+                    intermediates.append(intermediate)
+
+                # Finish backward pass
+                if j != 0:
                     if rank == ZERO:
                         intermediates[j-1].backward(gradient = intermediate_grad)
                         intermediates[j-1] = None
