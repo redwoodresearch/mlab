@@ -12,9 +12,9 @@ from days.utils import *
 tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
 
 
-def get_minigpt():
+def get_minigpt(pt_fname):
     minigpt = MiniGPT()
-    weights = t.load("ao2.pt", map_location=t.device("cpu"))
+    weights = t.load(fname, map_location=t.device("cpu"))
     
     out = collections.OrderedDict()
     out['token_embedding.weight'] = \
@@ -51,7 +51,6 @@ class UniAttention(nn.Module):
         q = einops.rearrange(q, 'b n (h l) -> b h n l', l=self.head_size)
         k = einops.rearrange(k, 'b n (h l) -> b h n l', l=self.head_size)
         v = einops.rearrange(v, 'b n (h l) -> b h n l', l=self.head_size)
-        new_k, new_v = k, v
         
         neg_inf = t.tensor(-1e4).to(x.device)
         q_ind = t.arange(seq_len).unsqueeze(1)
