@@ -12,7 +12,7 @@ from days.utils import *
 tokenizer = transformers.AutoTokenizer.from_pretrained("gpt2")
 
 
-def get_minigpt(pt_fname):
+def get_minigpt(fname):
     minigpt = MiniGPT()
     weights = t.load(fname, map_location=t.device("cpu"))
     
