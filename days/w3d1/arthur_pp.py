@@ -1,21 +1,27 @@
+from importlib.metadata import requires
 import os
 from typing import Optional
 
 import torch as t
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from gptj_parallel import *
 import torch.nn.functional as F
-from days.w3d1.gptj_parallel import *
-from days.w3d1.imdb_data import DistributedIMDBData
 
-COMPONENT_PATHS = [f".data/gptj_components/component{i}.pt" for i in range(7)]
-DEVICES = [f"cuda:{i}" for i in range(len(COMPONENT_PATHS))]
-TRAINING_DATA_X_PATH = "imdb_train_xs_128.pt"
+DEVICES = [f"cuda:{i}" for i in range(4, 8)]
+TRAINING_DATA_X_PATH = "imdb_train_xs_1024.pt"
 TRAINING_DATA_Y_PATH = "imdb_train_ys.pt"
 TRAINING_DATA_SIZE = 25_000
-SEQUENCE_LENGTH = 128
-BATCH_SIZE = 2
+SEQUENCE_LENGTH = 1024
+BATCH_SIZE = 1
+COMPONENT_PATHS = [f"component{i}.pt" for i in range(4)]
 PROCESS_GROUPS = {}
+
+"""
+use t.mp to start up N processes and t.dist to create a process group. You can (and should) copy over your code. In each process, t.load one of your sub-models that you saved earlier onto the appropriate device and initialize a plain SGD optimizer (to save memory) on your model’s params. Also, have your rank-0 process load and batch the IMDB sentiment classification data.
+
+In pipeline parallelism, we often send data between two nodes. Pyt Nccl doesn't support dist.send though (I think raw Nccl does), so we're going to have to create a new process group with dist.new_group for every pair of processes that ever need to communicate, and then broadcast in those groups.
+"""
 
 
 def get_device() -> str:
@@ -61,41 +67,67 @@ def receive_tensor(src: int, dst: int) -> t.Tensor:
     return _send_receive_tensor(None, src, dst)
 
 
-def forward_and_back(
-    batch_x: Optional[t.Tensor],
-    batch_y: Optional[t.Tensor],
-    model_part: nn.Module,
-) -> Optional[t.Tensor]:
-    """
-    pass in batch_x and batch_y to rank 0
-    rank -1 returns the loss
-    """
-    rank = dist.get_rank()
-    size = dist.get_world_size()
+def run(rank, size):
+    device = get_device()
+    t.cuda.set_device(device)
+    print(f"Beginning loop for rank {rank}")
+
+    if rank == 0:
+        """
+        Load and microbatch (?) the training data
+        """
+
+        training_data_xs = t.load(TRAINING_DATA_X_PATH).to(device)  # TODO shuffle data
+        training_data_ys = t.load(TRAINING_DATA_Y_PATH).to(device)
+
+        # training_data_ys = t.load(TRAINING_DATA_Y_PATH).to(device)
+
+        assert training_data_xs.shape == t.Size(
+            [TRAINING_DATA_SIZE, SEQUENCE_LENGTH]
+        ), f"{training_data_xs.shape}"
+        assert training_data_ys.shape == t.Size([TRAINING_DATA_SIZE])
+
+        assert TRAINING_DATA_SIZE % BATCH_SIZE == 0
+        num_batches = TRAINING_DATA_SIZE // BATCH_SIZE
+
+        training_data_xs = training_data_xs.reshape(
+            num_batches, BATCH_SIZE, SEQUENCE_LENGTH
+        )
+        training_data_ys = training_data_ys.reshape(
+            num_batches, BATCH_SIZE,
+        )
+        print("Finished loaded training data")
+
+    component: GPTJComponent = t.load(COMPONENT_PATHS[rank]).to(device)
+    optimizer = t.optim.SGD(component.parameters(), lr=1e-3)
 
     # Forward pass
+    # print(training_data_xs.shape, "the current shape")
+    prv_activations = training_data_xs[0] if rank == 0 else None
     if rank == 0:
-        prv_activations = batch_x
+        print(training_data_xs.shape, "the current shape")
+        print(prv_activations.shape)
+        prv_activations = prv_activations[:, :10]
+        # t.save(prv_activations, "input_test.pt")
+        pass
+
+
     else:
         prv_activations = t.autograd.Variable(
-            receive_tensor(rank - 1, rank),
-            requires_grad=True,
+            receive_tensor(rank - 1, rank), requires_grad=True
         )
 
-    activations = model_part(prv_activations)
+    activations = component(prv_activations)
 
     if rank < size - 1:
         send_tensor(activations, rank, rank + 1)
 
-    if rank == 0:
-        send_tensor(batch_y, src=0, dst=size - 1)
-    if rank == size - 1:
-        batch_y = receive_tensor(src=0, dst=size - 1)
+    # print(f"Finished forward pass rank {rank}")
 
-    loss = None
     if rank == size - 1:
-        logits = model_part(prv_activations)
-        loss = F.cross_entropy(input=logits, target=batch_y)
+        activations = component(prv_activations)
+        # print(activations.shape)
+        loss = t.linalg.norm(activations[1])
         loss.backward()
 
     if rank < size - 1:
@@ -111,27 +143,9 @@ def forward_and_back(
     if rank > 0:
         send_tensor(prv_activations.grad, rank, rank - 1)
 
-    return loss
-
-
-def run():
-    rank = dist.get_rank()
-    print(f"Beginning loop for rank {rank}")
-
-    model_part: GPTJComponent = t.load(COMPONENT_PATHS[rank]).to(get_device())
-    optimizer = t.optim.SGD(model_part.parameters(), lr=1e-3)
-
-    train_dl = DistributedIMDBData(batch_size=BATCH_SIZE, device=get_device())
-    for batch_x, batch_y in train_dl:
-        forward_and_back(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            model_part=model_part,
-        )
-
-        # print(f"Start optimizer step at {rank}")
-        optimizer.step()
-        # print(f"End optimizer at step {rank}")
+    # print(f"Start optimizer step at {rank}")
+    optimizer.step()
+    # print(f"End optimizer at step {rank}")
 
 
 def init_process(rank, size, fn, backend="gloo"):  # TODO NCCL
@@ -142,11 +156,11 @@ def init_process(rank, size, fn, backend="gloo"):  # TODO NCCL
     for i in range(size - 1):
         add_process_group(i, i + 1)
 
-    fn()
+    fn(rank, size)
 
 
 if __name__ == "__main__":
-    size = len(COMPONENT_PATHS)
+    size = 4
     processes = []
     mp.set_start_method("spawn")
     for rank in range(size):
