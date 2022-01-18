@@ -139,28 +139,59 @@ def run(
         if rank == 0:
             label = labels[i].to(DEVICES[rank])
         dist.broadcast(label, src = 0, group=group_0_3)
+        loss = t.Tensor()
 
         if rank == 0:
             x = model(tokens[i].to(DEVICES[rank]))
+            x.requires_grad = True
             dist.broadcast(x, src=0, group=group_0_1)
         if rank == 1:
             x = t.zeros(BATCH_SIZE, 128, 4096).to(DEVICES[rank])
+            x.requires_grad = True
             dist.broadcast(x, src=0, group=group_0_1)
             x = model(x)
             dist.broadcast(x, src=1, group=group_1_2)
         if rank == 2:
             x = t.zeros(BATCH_SIZE, 128, 4096).to(DEVICES[rank])
+            x.requires_grad = True
             dist.broadcast(x, src=1, group=group_1_2)
             x = model(x)
             dist.broadcast(x, src=2, group=group_2_3)
         if rank == 3:
             x = t.zeros(BATCH_SIZE, 128, 4096).to(DEVICES[rank])
+            x.requires_grad = True
             dist.broadcast(x, src=2, group=group_2_3)
             x = model(x)
             loss = t.nn.functional.cross_entropy(x[:,-1,:], label)
-            print(loss.item())
-            # loss.backward()
-            # optimizer.step()
+            print("Loss", loss.item())
+
+        # Do backwards for all processes in correct order
+
+        if rank == 0:
+            sum_grads = t.tensor([0]).to(DEVICES[rank])
+            dist.broadcast(sum_grads, src=1, group=group_0_1)
+            out = (x * sum_grads).sum()
+            out.backward()
+            optimizer.step()
+        if rank == 1:
+            sum_grads = t.tensor([0]).to(DEVICES[rank])
+            dist.broadcast(sum_grads, src=2, group=group_1_2)
+            out = (x * sum_grads).sum()
+            out.backward()
+            sum_grads = t.tensor([sum([p.grad.sum().item() for p in model.parameters()])]).to(DEVICES[rank])
+            dist.broadcast(sum_grads, src=1, group=group_0_1)
+        if rank == 2:
+            
+            x_grads = t.zeros_like(x).to(DEVICES[rank])
+            dist.broadcast(sum_grads, src=3, group=group_2_3)
+            out = (x * x_grads).sum()
+            out.backward()
+            sum_grads = t.tensor([sum([p.grad.sum().item() for p in model.parameters()])]).to(DEVICES[rank])
+            dist.broadcast(sum_grads, src=2, group=group_1_2)
+        if rank == 3:
+            loss.backward()
+            x_grads = x.grad
+            dist.broadcast(x_grads, src=3, group=group_2_3)
         dist.barrier()
 
     dist.barrier()
