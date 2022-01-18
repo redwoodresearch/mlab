@@ -41,7 +41,7 @@ class UniAttention(nn.Module):
 
     def forward(self, x: t.Tensor, pos_embedding):
         batch, seq_len = x.shape[:2]
-        pos_ids = t.arange(input_ids.shape[1]).unsqueeze(0).to(input_ids.device)
+        pos_ids = t.arange(x.shape[1]).unsqueeze(0).to(x.device)
         pos_emb = pos_embedding(pos_ids)
 
         q, k, _ = t.split(self.project_qkv(x + pos_emb), self.hidden_size, dim=-1)
