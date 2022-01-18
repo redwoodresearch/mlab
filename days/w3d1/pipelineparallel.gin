@@ -1,0 +1,8 @@
+pprun.num_batches = 100
+pprun.x_size = (10,)
+pprun.y_size = (10,)
+pprun.minibatch_size = 12
+
+start_pipeline_cluster.model_paths=[".pipe_par_test_model_0", ".pipe_par_test_model_1"]
+start_pipeline_cluster.model_in_shapes=[(10,),(30,)]
+
