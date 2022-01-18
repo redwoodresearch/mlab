@@ -80,7 +80,7 @@ class MiniGPT(nn.Module):
     def forward(self, input_ids):
         emb = self.token_embedding(input_ids)
         for block in self.blocks:
-            emb = block(emb, self.pos_embedding)
+            emb = emb + block(emb, self.pos_embedding)
         return t.einsum('bnl, vl -> bnv', emb, self.token_embedding.weight)
     
         
