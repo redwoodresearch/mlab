@@ -202,7 +202,7 @@ def run(
 
             optimizer.step()
 
-            if i % 1e2 == 1e2 - 1:
+            if i % 300 == 299:
                 t.save(model, f"pipedream_model_r{rank}_e{e}_b{i}.pt")
 
     print(rank, "done training")
