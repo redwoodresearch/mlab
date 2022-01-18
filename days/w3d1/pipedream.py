@@ -40,6 +40,7 @@ def start_comet(hyperparams):
         api_key="oGcm04SiEeJM89dRyU0vcOFzd",
         project_name="mlab_pipedream",
         workspace="luuf",
+        auto_output_logging=False,
     )
     experiment.log_parameters(hyperparams)
 
@@ -156,57 +157,53 @@ def run(
             dist.broadcast(labels, src=0)
 
             intermediates = []
-            outs = []
 
             # Forward
-            for j in range(num_microbatches):
+            for j in range(num_microbatches+1):
                 # Run batch through first stage and broadcast result to second stage
-                if rank == ZERO:
-                    intermediate = model(batch[j*ub_size:(j+1)*ub_size])
-                else:
-                    intermediate = t.zeros(microbatch_shape, device=DEVICE, requires_grad=True)
-                    
-                dist.broadcast(intermediate, src=0)
-                intermediates.append(intermediate)
+                if j < num_microbatches:
+                    if rank == ZERO:
+                        intermediate = model(batch[j*ub_size:(j+1)*ub_size])
+                    else:
+                        intermediate = t.zeros(microbatch_shape, device=DEVICE, requires_grad=True)
+                        
+                    dist.broadcast(intermediate, src=0)
+                    intermediates.append(intermediate)
 
-                if rank != ZERO:
-                    out = model(intermediate)
-                    outs.append(out)
+                if j != 0:
+                    # Run through second stage and compute loss
+                    if rank != ZERO:
+                        out = model(intermediates[j-1])
 
-            # Backward
-            for j in range(num_microbatches):
-                # Run through second stage and compute loss
-                if rank != ZERO:
-                    # loss = t.sqrt(t.sum((out - labels)**2))
-                    loss = loss_fn(input=outs[j][:,-1], target=labels[j*ub_size:(j+1)*ub_size]) # QUESTION: when to call forward?
-                    outs[j] = None
-                    if i % 4 == 0:
-                        print(f"batch {i} loss {loss}")
-                    loss.backward()
+                        # loss = t.sqrt(t.sum((out - labels)**2))
+                        loss = loss_fn(input=out[:,-1], target=labels[(j-1)*ub_size:j*ub_size])
+                        del out
+                        if i % 4 == 0:
+                            print(f"batch {i} loss {loss}")
+                        loss.backward()
 
-                    intermediate_grad = intermediates[j].grad
-                    intermediates[j] = None
-                else:
-                    intermediate_grad = t.zeros_like(intermediates[j])
+                        intermediate_grad = intermediates[j-1].grad
+                        intermediates[j-1] = None
+                    else:
+                        intermediate_grad = t.zeros_like(intermediates[j-1])
 
-                # Broadcast grads to first stage and finish backward pass
-                dist.broadcast(intermediate_grad, src=1)
+                    # Broadcast grads to first stage and finish backward pass
+                    dist.broadcast(intermediate_grad, src=1)
 
-                if rank == ZERO:
-                    intermediates[j].backward(gradient = intermediate_grad)
-                    intermediates[j] = None
-                    #print(f"zero received grad updates {intermediate_grad}")
+                    if rank == ZERO:
+                        intermediates[j-1].backward(gradient = intermediate_grad)
+                        intermediates[j-1] = None
+                        #print(f"zero received grad updates {intermediate_grad}")
 
-                del intermediate_grad
+                    del intermediate_grad
 
             # Free stored stuff
-            del outs
             del intermediates
 
             optimizer.step()
 
             if i % 1e2 == 1e2 - 1:
-                t.save(model, f"model_r{rank}_e{e}_b{i}.pt")
+                t.save(model, f"pipedream_model_r{rank}_e{e}_b{i}.pt")
 
     print(rank, "done training")
     dist.barrier()
@@ -228,7 +225,7 @@ def init_process(
     dist.init_process_group(backend, rank=rank, world_size=size)
     print("inited process group", rank)
 
-    run(rank, size, model_prefix='stage_', batch_size=16, num_microbatches=4, lr=3e-5)
+    run(rank, size, model_prefix='stage_', batch_size=16, num_microbatches=4, lr=3e-6)
 
 
 @gin.configurable
