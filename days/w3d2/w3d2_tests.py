@@ -76,6 +76,7 @@ class MiniGPT(nn.Module):
         max_position_embeddings=512,
     ):
         super().__init__()
+        self.vocab_size = vocab_size
         self.token_embedding = nn.Embedding(vocab_size, hidden_size)
         self.pos_embedding = nn.Embedding(max_position_embeddings, hidden_size)
         self.blocks = nn.Sequential(
@@ -88,6 +89,10 @@ class MiniGPT(nn.Module):
         for block in self.blocks:
             emb = emb + block(emb, self.pos_embedding)
         return t.einsum("bnl, vl -> bnv", emb, self.token_embedding.weight)
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 
 def test_text_to_attentions(their_text_to_attentions):
