@@ -60,17 +60,6 @@ class PixelByteToFloat(nn.Module):
         return inp.to(torch.float) / 255.0
 
 
-class DuelingHead(nn.Module):
-    def __init__(self, input_hidden_size, action_size, dueling_hidden_size):
-        super().__init__()
-
-        self._advantage_side = nn.Sequential(
-            nn.Linear(input_hidden_size, dueling_hidden_size), nn.ReLU(),
-            nn.Linear(dueling_hidden_size, action_size))
-        self._value_side = nn.Sequential(
-            nn.Linear(input_hidden_size, dueling_hidden_size), nn.ReLU(),
-            nn.Linear(dueling_hidden_size, 1))
-
     def forward(self, x):
         adv_v = self._advantage_side(x)
         adv_v = adv_v - adv_v.mean()
