@@ -1,0 +1,5 @@
+DistributedDataLoader.mini_batch_size = 8
+DistributedDataLoader.data_fn = "days.w2d5.dataparallel.load_data"
+
+run.model_init_fn_name = "days.w2d5.dataparallel.init_model"
+create_processes.local_parallelism = 2
