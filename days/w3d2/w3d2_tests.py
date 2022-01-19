@@ -39,8 +39,8 @@ class UniAttention(nn.Module):
         self.hidden_size = hidden_size
         self.head_size = hidden_size // num_heads
         self.n_heads = num_heads
-
-    def forward(self, x: t.Tensor, pos_embedding):
+        
+    def value_headwise(self, x, pos_embedding):
         batch, seq_len = x.shape[:2]
         pos_ids = t.arange(x.shape[1]).unsqueeze(0).to(x.device)
         pos_emb = pos_embedding(pos_ids)
@@ -62,6 +62,19 @@ class UniAttention(nn.Module):
         self._attn_scores = attn_scores.detach()[0]
         probs = attn_scores.softmax(dim=-1)
         combined_v = t.einsum('bhqk, bhkl -> bhql', probs, v)
+        # combined_v: batch num_heads seq_len head_size
+        return combined_v
+        
+        
+    def forward_headwise(self, x, pos_embedding):
+        combined_v = self.value_headwise(x, pos_embedding)       
+        output_weight_matrix = self.project_output.weight
+        output_weight_matrix = einops.rearrange(output_weight_matrix, "embed (heads headsize) -> heads embed headsize", heads=self.n_heads)
+        out = t.einsum("hel,bhql->bhqe", output_weight_matrix, combined_v)
+        return out
+
+    def forward(self, x: t.Tensor, pos_embedding):
+        combined_v = self.value_headwise(x, pos_embedding)
         combined_v = einops.rearrange(combined_v, 'b h q l -> b q (h l)')
         out = self.project_output(combined_v)
         return out
