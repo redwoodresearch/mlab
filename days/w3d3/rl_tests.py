@@ -1,4 +1,6 @@
-import dqn_solution as sol
+
+
+#import solution.dqn_minimal as sol
 import torch
 import torch.nn as nn
 
@@ -14,21 +16,38 @@ def allclose(my_out, their_out, name, tol=1e-5):
         tpeek(f"{name} MATCH!!!!!!!!\n", my_out)
 
 
-def test_q_net(model):
+def test_q_net(model_class):
+    in_size = torch.randint(100, (1,))
+    hidden_size = torch.randint(100, (1,))
+    out_size = torch.randint(100, (1,))
     torch.manual_seed(1011)
-    in_size = torch.randint(100, 1)
-    hidden_size = torch.randint(100, 1)
-    out_size = torch.randint(100, 1)
-    input = torch.rand((16, in_size))
-    my_out = nn.Sequantial(
+    target_model = nn.Sequential(
         nn.Linear(in_size, hidden_size),
         nn.ReLU(),
         nn.Linear(hidden_size, hidden_size),
         nn.ReLU(),
         nn.Linear(hidden_size, out_size),
-    )(input).detach()
+    )
+    torch.manual_seed(1011)
+    model = model_class(in_size, hidden_size, out_size)
+    input = torch.rand((16, in_size))
+    my_out = target_model(input).detach()
     their_out = model(input).detach()
     allclose(my_out, their_out, "test_q_net")
+
+class q_mlp(nn.Module):
+    def __init__(self, in_size, hidden_size, out_size):
+        super().__init__()
+        self.model = nn.Sequential(
+                nn.Linear(in_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, out_size),
+            )
+    
+    def forward(self, input):
+        return self.model(input)
 
 
 def force_batched(x):
@@ -47,5 +66,9 @@ def calc_loss(net, gamma, obs, act, reward, obs_next, done):
         is_non_done = torch.logical_not(force_batched(done)) # (b,)
         target = reward + is_non_done * gamma * torch.max(net(obs_next), dim=-1)
     return (target - pred) ** 2
+
+if __name__ == "__main__":
+    test_q_net(q_mlp)
+    
 
 
