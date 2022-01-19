@@ -106,6 +106,11 @@ class DuelingHead(nn.Module):
 
         return adv_v + value_v
 
+@gin.configurable
+def mlp_model(obs_size, action_size, hidden_size):
+    return nn.Sequential(CastToFloat(), nn.Linear(obs_size, hidden_size),
+                         nn.ReLU(), nn.Linear(hidden_size, hidden_size),
+                         nn.ReLU(), dqn_head(hidden_size, action_size))
 
 @gin.configurable
 def dqn_head(hidden_size, action_size, use_dueling, dueling_hidden_size=256):
@@ -131,11 +136,7 @@ class CastToFloat(nn.Module):
         return x.to(torch.float)
 
 
-@gin.configurable
-def mlp_model(obs_size, action_size, hidden_size):
-    return nn.Sequential(CastToFloat(), nn.Linear(obs_size, hidden_size),
-                         nn.ReLU(), nn.Linear(hidden_size, hidden_size),
-                         nn.ReLU(), dqn_head(hidden_size, action_size))
+
 
 
 def get_linear_fn(start: float, end: float, end_fraction: float):

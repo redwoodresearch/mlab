@@ -1,11 +1,9 @@
 setup.py
 days/atari_wrappers.py
 days/bert.py
-days/dataparallel.py
 days/dqn_solution.py
 days/gc_resnet.py
 days/gpt2.py
-days/gradient_compression.py
 days/hpsearch.py
 days/modules.py
 days/old_resnet.py
@@ -14,6 +12,7 @@ days/pp_nominibatch.py
 days/rrjobs.py
 days/simple_policy_gradient.py
 days/torch_intro.py
+days/utils.py
 ml_bootcamp.egg-info/PKG-INFO
 ml_bootcamp.egg-info/SOURCES.txt
 ml_bootcamp.egg-info/dependency_links.txt
