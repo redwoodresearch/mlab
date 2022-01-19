@@ -1,0 +1,20 @@
+pprun.num_batches = 100
+pprun.y_size = ()
+pprun.minibatch_size = 12
+pprun.use_cpu = False
+pprun.dataset_fn_name = "days.pipelineparallel.make_dataset_imdb"
+pprun.use_autocast = True
+pprun.pipe_width = 4
+# pprun.autocast_type = "float16"
+start_pipeline_cluster.model_paths = [
+    "gpt-j-6b_part0",
+    "gpt-j-6b_part1",
+    "gpt-j-6b_part2",
+    "gpt-j-6b_part3",
+]
+start_pipeline_cluster.model_in_shapes = [
+    (128,),
+    (128, 4096),
+    (128, 4096),
+    (128, 4096),
+]

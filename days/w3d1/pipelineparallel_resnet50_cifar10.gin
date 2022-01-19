@@ -1,0 +1,8 @@
+pprun.num_batches = 100
+pprun.x_size = (3,64,64)
+pprun.y_size = ()
+pprun.minibatch_size = 12
+
+start_pipeline_cluster.model_paths=[".resnet50_part0",".resnet50_part1"]
+start_pipeline_cluster.model_in_shapes=[(3,64,64),(512, 8,8)]
+
