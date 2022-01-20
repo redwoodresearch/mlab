@@ -4,6 +4,7 @@ build/
 crash-*
 **/__pycache__/
 mlab.egg-info/
+ml_bootcamp.egg-info/
 scratch/
 .ipynb_checkpoints/
 image*
