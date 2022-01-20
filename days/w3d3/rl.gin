@@ -1,0 +1,18 @@
+
+train.n_steps = 100000
+train.train_freq = 16
+train.batch_size = 128
+train.maxlen = 10000
+train.eval_freq = 1000
+train.optimizer = @Adam
+train.epsilon_start = 0.5
+train.epsilon_end = 0.05
+
+Adam.lr = 1e-3
+
+evaluate.record = True
+
+make_choice.device = "cpu"
+
+gradient_step.device = "cpu"
+gradient_step.gamma = 0.98
