@@ -128,7 +128,8 @@ def reinforcement_learn():
     action = 1
     for episode_batch in range(10):
         actions, values, (next_imgs, next_rewards) = model(obses)
-        act_sample = t.distributions.Categorical(logits=actions).sample(1)
+        print(actions.shape)
+        act_sample = t.distributions.Categorical(logits=actions).sample()
         print("act shape", act_sample.shape)
         outies = [envs[i].step(act_sample[i]) for i in range(env_batch_size)]
         obses = [outie[0] for outie in outies]
