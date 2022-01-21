@@ -1,0 +1,4 @@
+batch_size = 64
+train.temp = 0.6
+gen_len = 32
+train.lr = 3e-5
