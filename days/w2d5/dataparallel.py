@@ -16,7 +16,7 @@ from einops import *
 import json
 from tqdm import tqdm
 
-DEVICE = "cpu"
+DEVICE = "cuda"
 DEVICES = [0, 1, 2]
 MAX_LEN = 1024
 
@@ -68,7 +68,7 @@ class DistributedDataLoader:
         size,
         data_size=(1024,),
         data_fn="days.w2d5.dataparallel.load_data",
-        mini_batch_size=1,
+        mini_batch_size=4,
         random_seed=0,
     ):
         self.rank = rank
@@ -107,6 +107,7 @@ class DistributedDataLoader:
                     mini_batches, src=0
                 )  # all processes must do this, else all wait forever
                 my_batch = mini_batches[self.rank]
+                #print("my batch ", my_batch.shape)
                 yield my_batch
         else:
             for _ in range(self.len):
@@ -119,6 +120,7 @@ class DistributedDataLoader:
                 )
                 dist.broadcast(mini_batches, src=0)
                 my_batch = mini_batches[self.rank]
+                #print("my batch2 ", my_batch.shape)
                 yield my_batch
 
 
@@ -161,7 +163,7 @@ def run(
     model_init_fn_name="days.w2d5.dataparallel.init_model",
     sharded_optimizer=False,
 ):
-    print("i'm rank", rank)
+    print("i'm rank", rank, " sharded is ", sharded_optimizer)
     # device = "cuda:" + str(rank)
     model = import_object_from_qualified_name(model_init_fn_name)()
     model.train()
@@ -184,26 +186,34 @@ def run(
     # else, listen for a minibatch from rank 1
     dataloader = DistributedDataLoader(rank=rank, size=size)
     dist.barrier()
-    pbar = tqdm(enumerate(dataloader))
-    for batch_num, batch in pbar:
+    #print("thru the barrier, i'm rank", rank, " sharded is ", sharded_optimizer)
+    pbar = tqdm(dataloader)
+    for batch in pbar:
+        #print("ere ", rank)
+        #print("batch1 ", batch)
         out = model(batch.to(DEVICE)).logits
+        #print("fore ", rank)
         loss = t.nn.CrossEntropyLoss()(
-            rearrange(out[:-1], "a b c -> (a b) c"),
-            rearrange(batch[1:], "a b -> (a b)"),
+            rearrange(out[:, :-1], "a b c -> (a b) c"),
+            rearrange(batch[:, 1:], "a b -> (a b)"),
         )
+        #print("out; ", out[:-1], "batch ", batch[1:])
         loss.backward()
+        #print("here ", rank)
         if sharded_optimizer:
             add_grad(param_buckets, rank)
         else:
             alladd_grad(model)
+        #print("there", rank)
         optimizer.step()
         optimizer.zero_grad()
+        #print("everywhere", rank)
         if sharded_optimizer:
             broadcast_updated_params(param_buckets, rank)
         # print(rank, "loss", loss.cpu().detach().numpy())
-        print(rank, batch_num)
-        pbar.set_description(f"loss {loss.cpu().item()}")
-    print(rank, "done training")
+        #print(rank, batch_num)
+        pbar.set_description(f"loss {loss}")
+    #print(rank, "done training")
     dist.barrier()
 
     if rank == 0:
@@ -229,7 +239,7 @@ def init_process(
 @gin.configurable
 def create_processes(
     local_parallelism=2,
-    device="cpu",
+    device="cuda",
 ):
     # raise AssertionError(":)")
     processes = []

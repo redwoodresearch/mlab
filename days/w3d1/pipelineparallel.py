@@ -26,7 +26,7 @@ TAGS = {
 class HFBlockSequence(nn.Module):
     def __init__(self, *layers):
         super().__init__()
-        self.layers = nn.ModuleList(layers)  # treat like a list
+        self.layers = nn.ModuleList(layers)  # ModuleList
 
     def forward(self, x):
         for layer in self.layers:
@@ -284,7 +284,7 @@ def init_process(rank, size, run, *args, **kwargs):
 @gin.configurable
 def start_pipeline_cluster(
     model_paths: List[str], model_in_shapes: List[tuple]
-):  # does gin add the arguments here? crazy
+):  
     processes = []
     mp.set_start_method("spawn")
     pipe_stages = len(model_paths)
