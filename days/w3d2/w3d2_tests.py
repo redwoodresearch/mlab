@@ -97,6 +97,9 @@ class MiniGPT(nn.Module):
             emb = emb + block(emb, self.pos_embedding)
         return t.einsum('bnl, vl -> bnv', emb, self.token_embedding.weight)
 
+    def unembed(self, emb: t.Tensor) -> t.Tensor:
+        return t.einsum('...l, vl -> ...v', emb, self.token_embedding.weight)
+
     def layer0_embedding_contributions(self, input_ids):
         emb = [self.token_embedding(input_ids)]
 
@@ -130,6 +133,11 @@ class MiniGPT(nn.Module):
                 Wo = self.weight_matrix('o', 1, j)
                 emb[i][j+1] = t.einsum('bqh, lh -> bql', combined_V, Wo)
         return emb
+
+    def all_logit_contributions(self, input_ids: t.Tensor) -> t.Tensor:
+        l1_ec = self.layer1_embedding_contributions(input_ids)
+        l1_ec_tensor = t.stack([t.stack(row, dim=0) for row in l1_ec], dim=0)
+        return self.unembed(l1_ec_tensor)
 
     def weight_matrix(self, qkvo: str, layer: int, head: int):
         return self.blocks[layer].weight_matrix(qkvo, head)
