@@ -26,28 +26,48 @@ class GPT2TPConfig:
         self.part_hidden_size = self.hidden_size // self.tp_size
 
 
+def on_backward_allreduce(x, dist_group):
+    def my_hook(grad):
+        print("hooked grad shape", grad.shape)
+        grad = grad.clone()
+        dist.all_reduce(grad, group=dist_group)
+        return grad
+
+    x.register_backward_hook(my_hook)
+    return x
+
+
 class GPT2AttentionTP(nn.Module):
     def __init__(self, config: GPT2TPConfig):
         super().__init__()
         self.config = config
         self.num_heads = config.n_heads // config.tp_size
-        self.qkv_projection = nn.Linear(config.hidden_size, 3 * config.hidden_size // config.tp_size)
+        self.qkv_projection = nn.Linear(
+            config.hidden_size, 3 * config.hidden_size // config.tp_size
+        )
         self.dropout = nn.Dropout(config.dropout)
-        self.o_projection = nn.Linear(config.hidden_size // config.tp_size, config.hidden_size)
+        self.o_projection = nn.Linear(
+            config.hidden_size // config.tp_size, config.hidden_size
+        )
 
         self.register_buffer(
             "mask",
-            t.triu(t.ones((config.max_positions, config.max_positions), dtype=t.bool)).unsqueeze(0).unsqueeze(0),
+            t.triu(t.ones((config.max_positions, config.max_positions), dtype=t.bool))
+            .unsqueeze(0)
+            .unsqueeze(0),
         )
         self.register_buffer("masked_bias", t.tensor(-1e4))
 
     def forward(self, x):
+        on_backward_allreduce(x, self.config.tp_dist_group)
         b_len, s_len, _ = x.shape
         qkv = t.split(self.qkv_projection(x), 3, dim=-1)
         qkv = [rearrange(a, "b s (h c) -> b h s c", h=self.num_heads) for a in qkv]
         q, k, v = qkv
         attention_pattern = t.einsum("bhfc,bhtc->bhft", k, q)
-        attention_pattern = t.where(self.mask[:, :, :s_len, :s_len], attention_pattern, self.masked_bias)
+        attention_pattern = t.where(
+            self.mask[:, :, :s_len, :s_len], attention_pattern, self.masked_bias
+        )
         attention_pattern = t.softmax(attention_pattern, dim=-2)
         attention_pattern = self.dropout(attention_pattern)
         values = t.einsum("bhft,bhfc->bhtc", attention_pattern, v)
@@ -66,6 +86,7 @@ class GPT2MLPTP(nn.Module):
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
+        on_backward_allreduce(x, self.config.tp_dist_group)
         intermediate = F.gelu(self.dropout(self.linear1(x)))
         x = self.linear2(intermediate)
         dist.all_reduce(x, group=self.config.tp_dist_group)
@@ -92,7 +113,9 @@ class GPT2StackTP(nn.Module):
     def __init__(self, config: GPT2TPConfig):
         super().__init__()
         self.config = config
-        self.stack = nn.Sequential(*[GPT2LayerTP(config) for _ in range(config.num_layers)])
+        self.stack = nn.Sequential(
+            *[GPT2LayerTP(config) for _ in range(config.num_layers)]
+        )
 
     def forward(self, x):
         return self.stack(x)
