@@ -1,14 +1,11 @@
 setup.py
 days/atari_wrappers.py
 days/bert.py
-days/dqn_solution.py
 days/gc_resnet.py
 days/gpt2.py
 days/hpsearch.py
 days/modules.py
 days/old_resnet.py
-days/pipelineparallel.py
-days/pp_nominibatch.py
 days/rrjobs.py
 days/simple_policy_gradient.py
 days/torch_intro.py
