@@ -1,0 +1,19 @@
+train_dqn.experiment_name = "acrobot"
+train_dqn.env_id = "Acrobot-v1"
+train_dqn.gamma = 0.99
+train_dqn.steps = 100000
+train_dqn.start_eps = 1.0
+train_dqn.end_eps = 0.1
+train_dqn.exploration_frac = 0.1
+train_dqn.lr = 1e-4
+train_dqn.train_freq = 4
+train_dqn.batch_size = 128
+train_dqn.buffer_size = 10000
+train_dqn.eval_freq = 10000
+train_dqn.eval_count = 3
+train_dqn.use_double_dqn = False
+train_dqn.multi_step_n = 1
+
+dqn_head.use_dueling = False
+
+mlp_model.hidden_size = 64
