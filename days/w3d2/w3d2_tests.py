@@ -66,6 +66,7 @@ class UniAttention(nn.Module):
         self._attn_scores = attn_scores.detach()[0]
         probs = attn_scores.softmax(dim=-1)
         combined_v = t.einsum('bhqk, bhkl -> bhql', probs, v)
+        # b = batch_size, h = num heads, q = sequence length, l = head size
         combined_v = einops.rearrange(combined_v, 'b h q l -> b q (h l)')
         self._combined_v = combined_v
         out = self.project_output(combined_v)
