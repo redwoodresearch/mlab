@@ -10,7 +10,7 @@ from torchtyping import TensorType
 import transformers
 from typing import Optional
 
-from _gpt_sol import _UnidirectionalAttention, _GPT2Block, _GPT2
+from days.w2d3._gpt_sol import _UnidirectionalAttention, _GPT2Block, _GPT2
 
 
 def _check_equal(tensor1, tensor2):
