@@ -22,7 +22,7 @@ class HookHandler:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.reset()
-        print("All hooks removed!")
+        # print("All hooks removed!")
 
     def add_hook(
         self,

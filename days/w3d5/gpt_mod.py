@@ -139,6 +139,7 @@ if __name__ == "__main__":
 class GPT2Output:
     logits: TensorType["batch_size", "vocab_size"]
     final_encoding: TensorType["batch_size", "hidden_size"]
+    all_logits: TensorType["batch_size", "seq_length", "vocab_size"]
 
 
 class GPT2(nn.Module):
@@ -214,7 +215,7 @@ class GPT2(nn.Module):
         self._enc = enc
         enc = self.ln(enc)
         logits = torch.einsum("bnl, vl -> bnv", enc, self.token_embedding.weight)
-        return GPT2Output(logits=logits[:, -1, :], final_encoding=enc[:, -1, :])
+        return GPT2Output(logits=logits[:, -1, :], final_encoding=enc[:, -1, :], all_logits=logits)
 
     def next_token(self, input_ids, temperature, freq_penalty=2.0):
         logits = self(input_ids.unsqueeze(0)).logits[0]
