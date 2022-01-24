@@ -1,3 +1,4 @@
+from re import X
 import torch as t
 from days.w3d5 import gpt_mod
 from days.w3d5.hook_handler import HookHandler
@@ -39,10 +40,14 @@ def get_gpt2_contribs(
         head_embeddings = head_embeddings.squeeze(0)  # eliminate batch dim
         res_embedding = res_embedding.squeeze(0)
 
+    # we subtract off the mean of each term going through layer norm
+    # this is because layer norm subtracts off the mean of the vector
+    # and thus we don't care about the relative magnitudes of the terms
     res_embedding -= res_embedding.mean(dim=-1, keepdim=True)
     head_embeddings -= head_embeddings.mean(dim=-1, keepdim=True)
 
     sum_of_embeddings = head_embeddings.sum(dim=(0, 1)) + res_embedding
+
     l_norms = t.sqrt(
         t.var(
             sum_of_embeddings,
@@ -57,15 +62,17 @@ def get_gpt2_contribs(
     ln_weight = gpt2.ln.weight
     unembed_matrix = gpt2.token_embedding.weight
 
+    def embed_to_contribs(x):
+        # layer norm calculations, ignoring bias (which is a separate term)
+        # we've also already subtracted off the means
+        ln_out = ln_weight * (x / l_norms)
+        return t.einsum("ve, ...e -> ...v", unembed_matrix, ln_out)
+
     ln_bias_contrib = unembed_matrix @ ln_bias
-    res_contrib = t.einsum(
-        "ve, ...e -> ...v", unembed_matrix, (ln_weight * (res_embedding / l_norms))
-    )
-    head_contribs = t.einsum(
-        "ve, ...e -> ...v", unembed_matrix, (ln_weight * (head_embeddings / l_norms))
-    )
+    res_contrib = embed_to_contribs(res_embedding)
+    head_contribs = embed_to_contribs(head_embeddings)
 
     summed_logits = ln_bias_contrib + res_contrib + head_contribs.sum(dim=(0, 1))
     assert t.allclose(summed_logits, gpt_out.all_logits)
 
-    return res_contrib, head_contribs, ln_bias_contrib, summed_logits
+    return res_contrib, head_contribs, ln_bias_contrib, summed_logits, gpt_out.all_logits
