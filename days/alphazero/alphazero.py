@@ -6,6 +6,8 @@ import functools
 import copy
 from einops import rearrange, repeat
 
+from tqdm import tqdm
+
 
 def init_env(size=3):
     return {
@@ -37,7 +39,8 @@ def print_env(env):
 
 
 def get_winner(env):
-    thing = 1
+    # return None, 0,1
+    return None
 
 
 def step_env(env, action, player):
@@ -50,7 +53,11 @@ def step_env(env, action, player):
         raise AssertionError("inavlid action", action, env)
     env = copy.deepcopy(env)
     env["board"][i][j] = player + 1  # this is tictactoe specific
-    return env, get_winner(env)
+    winner = get_winner(env)
+    # if won, reset env
+    if winner is not None:
+        env = init_env()
+    return env, winner
 
 
 # prob interface: env->Tensor[action_size]
@@ -131,10 +138,32 @@ def actsample_alphazero(model):
     return fun
 
 
-def mcts_beam_search_game(
-    beam_width=32,
+def mcts_beam_search_game(beam_width=32, target_finished_runs=10):
+    finished_runs = []
+    beam_states = [{"actions": [], "score": 0, "env": init_env()}]
+    while len(finished_runs) < target_finished_runs:
+        thing += 1
+
+
+def train_alphazero(
+    board_size, n_steps, playouts_per_step, train_batch_size, inference_batch_size
 ):
-    rollouts = [{"actions": [], "score": 0, "env": init_env()}]
+    env = init_env()
+    model = AlphaZeroModel(
+        board_size=board_size,
+        input_channels=env["input_size"],
+        input_scalars=env["input_scalars"],
+        output_channels=env["action_size"],
+    )
+    optimizer = t.optim.Adam(model.parameters(), lr=1e-4)
+    pbar = tqdm(range(n_steps))
+    for step in pbar:
+        envs = [
+            [{"actions": [], "score": 0, "env": init_env()}]
+            for _ in range(inference_batch_size)
+        ]
+        loss_p = loss.detach().cpu().item()
+        pbar.set_description(f"Loss: {loss_p}")
 
 
 if __name__ == "__main__":
