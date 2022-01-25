@@ -4,5 +4,6 @@
   "remote.SSH.defaultExtensions": [
     "ms-python.python",
     "ms-toolsai.jupyter"
-  ]
+  ],
+  "python.pythonPath": "/home/ubuntu/miniconda3/envs/tony-research/bin/python"
 }

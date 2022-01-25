@@ -1,0 +1,32 @@
+jupyterlab
+torchtyping
+einops
+numpy
+transformers
+sentencepiece
+unidecode
+jupyter_kernel_gateway
+ipykernel
+gin-config
+web-pdb
+pytest
+matplotlib
+plotly
+sklearn
+black
+comet_ml
+mediapy
+numpy-stl
+traitlets==5.1.1
+
+# Torch
+--find-links https://download.pytorch.org/whl/cu111/torch_stable.html
+torch==1.10.1+cu111
+torchvision==0.11.2+cu111
+torchaudio==0.10.1+cu111
+
+# Tony specific stuff
+pandas
+isort
+jupyterlab_code_formatter
+ipywidgets
