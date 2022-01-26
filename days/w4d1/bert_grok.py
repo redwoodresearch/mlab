@@ -6,10 +6,10 @@ Adapted from days/w2d1/w2d2.ipynb on the branch lukas-tony.
 from collections import OrderedDict
 from typing import Callable, Dict, Optional, Tuple, Union
 
+import einops
 import torch as t
 import torch.nn.functional as F
 from days.w2d1 import bert_tests
-from einops import rearrange, reduce, repeat
 from torch import einsum, nn
 from torchtyping import TensorType as T
 from torchtyping import patch_typeguard
@@ -26,10 +26,10 @@ def raw_attention_pattern(
     project_key: Callable[[T["_":..., "hidden"]], T["_":..., "qk"]],
 ) -> T["batch", "num_heads", "key":"seq_len", "query":"seq_len"]:
 
-    queries = rearrange(
+    queries = einops.rearrange(
         project_query(token_activations), "b s (head d) -> b head s d", head=num_heads
     )
-    keys = rearrange(
+    keys = einops.rearrange(
         project_key(token_activations), "b s (head d) -> b head s d", head=num_heads
     )
 
@@ -41,24 +41,21 @@ if __name__ == "__main__":
     bert_tests.test_attention_pattern_fn(raw_attention_pattern)
 
 
-@typechecked
 def bert_attention(
-    token_activations: T["batch", "seq_len", "d_in"],
+    token_activations,  #: Tensor[batch_size, seq_length, hidden_size (768)],
     num_heads: int,
-    attention_pattern: T["batch", "num_heads", "key":"seq_len", "query":"seq_len"],
-    project_value: Callable[[T["_":..., "hidden"]], T["_":..., "d_v"]],
-    project_output: Callable[[T["_":..., "d_v"]], T["_":..., "d_out"]],
-) -> T["batch", "seq_len", "d_out"]:
-
-    attention_prob = t.softmax(attention_pattern, dim=-2)  # dim: b head s s
-    values = rearrange(
-        project_value(token_activations), "b s (head d) -> b head s d", head=num_heads
+    attention_pattern,  #: Tensor[batch_size,num_heads, seq_length, seq_length],
+    project_value,  #: function( (Tensor[..., 768]) -> Tensor[..., 768] ),
+    project_output,  #: function( (Tensor[..., 768]) -> Tensor[..., 768] )
+):  # -> Tensor[batch_size, seq_length, hidden_size]
+    softmaxed_attention = attention_pattern.softmax(dim=-2)
+    V = project_value(token_activations)
+    V = einops.rearrange(
+        V, "b seqlen (headnum headsize) -> b headnum seqlen headsize", headnum=num_heads
     )
-
-    output_by_head = einsum("bhis, bhid -> bhsd", attention_prob, values)
-    concatenated = rearrange(output_by_head, "b h s d -> b s (h d)")
-
-    return project_output(concatenated)
+    combined_values = einsum("bhkl, bhkq -> bhql", V, softmaxed_attention)
+    out = project_output(einops.rearrange(combined_values, "b h q l -> b q (h l)"))
+    return out
 
 
 if __name__ == "__main__":
@@ -166,6 +163,15 @@ class LayerNorm(nn.Module):
         self.bias = t.nn.Parameter(t.zeros((normalized_dim,)))
         self.eps = eps
 
+    # Working code
+    # This version removes "grokking"
+    # def forward(self, input: t.Tensor):
+    #     m = t.mean(input, dim=-1, keepdim=True)
+    #     v = t.var(input, dim=-1, keepdim=True, unbiased=False)
+    #     input = (input - m) / t.sqrt(v + self.eps)
+    #     return input * self.weight + self.bias
+
+    # Broken code
     def forward(self, input: t.Tensor):
         m = t.mean(input, dim=-1, keepdim=True).detach()
         v = t.var(input, dim=-1, keepdim=True, unbiased=False).detach()
@@ -177,18 +183,23 @@ if __name__ == "__main__":
     bert_tests.test_layer_norm(LayerNorm)
 
 
+# Something is probably wrong here?
 class BertBlock(nn.Module):
     def __init__(
-        self, hidden_size: int, intermediate_size: int, num_heads: int, dropout: float
+        self,
+        hidden_size: int,
+        intermediate_size: int,
+        num_heads: int,
+        dropout: float,
     ):
         super().__init__()
 
         self.mha = MultiHeadedSelfAttention(
             num_heads=num_heads, hidden_size=hidden_size
         )
-        self.ln1 = LayerNorm(normalized_dim=hidden_size)
+        self.ln1 = LayerNorm(normalized_dim=hidden_size) #!!!!!!!!!!!!!!
         self.bmlp = BertMLP(input_size=hidden_size, intermediate_size=intermediate_size)
-        self.ln2 = LayerNorm(normalized_dim=hidden_size)
+        self.ln2 = LayerNorm(normalized_dim=hidden_size) #!!!!!!!!!!!!!!
 
         self.dropout = nn.Dropout(dropout)
 
