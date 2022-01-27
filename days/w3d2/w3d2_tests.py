@@ -214,7 +214,12 @@ def test_layer0_embedding_contributions(f):
 def test_layer1_embedding_contributions(f):
     model = MiniGPT()
     input_ids = t.randint(0, 50000, (1, 10))
-    _check_equal(model.layer1_embedding_contributions(input_ids), f(model, input_ids))
+    expected = model.layer1_embedding_contributions(input_ids)
+    print(f"{expected[1][1]=}")
+    actual = f(model, input_ids)
+    print(f"{actual[1][1]=}")
+    print(f"{actual[1][1] - expected[1][1]=}")
+    _check_equal(expected, actual)
     
     
 ###########################################################################    
