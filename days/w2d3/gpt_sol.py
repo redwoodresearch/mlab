@@ -150,7 +150,7 @@ class GPT2(nn.Module):
         return torch.distributions.categorical.Categorical(logits=logits).sample()
 
     def generate(self, text, max_length=30, temperature=1.0, freq_penalty=2.0):
-        self.empty_cache()
+        self.clear_cache()
         input_ids = self.tokenizer(text).input_ids
         generated = []
         for i in range(max_length):
