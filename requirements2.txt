@@ -121,7 +121,7 @@ torchvision==0.11.2
 tornado @ file:///home/conda/feedstock_root/build_artifacts/tornado_1610094708661/work
 tqdm @ file:///tmp/build/80754af9/tqdm_1625563689033/work
 traitlets @ file:///home/conda/feedstock_root/build_artifacts/traitlets_1635260543454/work
-transformers==4.15.0
+transformers==5.10.1
 typeguard==2.13.3
 typing-extensions==4.0.1
 Unidecode==1.3.2
