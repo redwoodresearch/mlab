@@ -1,4 +1,4 @@
-anyio==3.5.0
+anyio==4.14.2
 argon2-cffi==21.3.0
 argon2-cffi-bindings==21.2.0
 attrs @ file:///home/conda/feedstock_root/build_artifacts/attrs_1640799537051/work
