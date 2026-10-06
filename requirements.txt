@@ -1,4 +1,4 @@
-jupyterlab==3.2.5
+jupyterlab==4.5.11
 torch
 torchtyping
 einops
